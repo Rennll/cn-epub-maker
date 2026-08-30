@@ -11,7 +11,7 @@ def test_normalize_removes_only_leading_ideographic_spaces():
 
 def test_utf8_bom_is_detected(tmp_path: Path):
     path = tmp_path / "book.txt"
-    path.write_bytes(b"\xef\xbb\xbf\xe7\xac\ac1\xe7\xab\xa0\n\xe6\xad\xa3\xe6\x96x96\x87")
+    path.write_bytes("\ufeff第1章\n正文".encode("utf-8"))
     assert detect_encoding(path) == "utf-8-sig"
     lines, encoding = read_lines(path)
     assert encoding == "utf-8-sig"
