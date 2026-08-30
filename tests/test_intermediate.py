@@ -26,7 +26,7 @@ def test_intermediate_is_per_chapter_and_preserves_order(tmp_path: Path):
     assert metadata["volumes"][0]["number"] == "7"
     assert metadata["volumes"][0]["chapters"] == [26, 27]
 
-    first = json.loads((root / "chapters/000026.json").read_text(encoding="utf-8"))
+    first = json.loads((root / "chapters/000001.json").read_text(encoding="utf-8"))
     assert first["number"] == "26"
     assert first["paragraphs"] == [{"text": "正文 < & >"}]
-    assert (root / "chapters/000027.json").is_file()
+    assert (root / "chapters/000002.json").is_file()
