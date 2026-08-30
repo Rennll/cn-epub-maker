@@ -25,7 +25,7 @@ def _markdown(book: Book) -> str:
     lines: list[str] = []
     if book.volumes:
         for volume in book.volumes:
-            lines.extend([f"# {volume.label} {volume.title}".rstrip(), ""])
+            lines.extend([f"## {volume.label} {volume.title}".rstrip(), ""])
             for chapter in volume.chapters:
                 lines.extend(_chapter_markdown(chapter))
     for chapter in book.chapters:
@@ -52,7 +52,7 @@ def render(book: Book, output: str | Path) -> Path:
 
         cmd = [
             "pandoc", str(md), "-o", str(output),
-            "--toc", "--toc-depth=1", "--split-level=1",
+            "--toc", "--toc-depth=2", "--split-level=1",
             "--css", str(css),
             "--metadata", f"title={book.title}",
             "--metadata", f"author={book.author}",
