@@ -72,3 +72,8 @@ def test_render_requires_pandoc(tmp_path: Path):
         assert "第二卷" in nav_text
         assert "第1章" in nav_text
         assert "第26章" in nav_text
+
+        content_files = [n for n in names if n.endswith(".xhtml") and "nav" not in n]
+        assert len(content_files) >= 2
+        content_text = "\n".join(zf.read(n).decode("utf-8") for n in content_files)
+        assert "a < b &amp; c &gt; d" in content_text
