@@ -1,6 +1,8 @@
+import re
 import shutil
 import zipfile
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import pytest
 
@@ -58,3 +60,12 @@ def test_render_requires_pandoc(tmp_path: Path):
         assert len(content_files) >= 2
         content_text = "\n".join(zf.read(n).decode("utf-8") for n in content_files)
         assert "a &lt; b &amp; c &gt; d" in content_text
+
+        opf_name = next(n for n in names if n.endswith(".opf"))
+        opf_root = ET.fromstring(zf.read(opf_name))
+        ns = {"opf": "http://www.idpf.org/2007/opf"}
+        manifest = {item.attrib["id"]: item for item in opf_root.findall("opf:manifest/opf:item", ns)}
+        spine_ids = [itemref.attrib["idref"] for itemref in opf_root.findall("opf:spine/opf:itemref", ns)]
+        spine_hrefs = {manifest[item_id].attrib["href"] for item_id in spine_ids}
+        assert len(spine_hrefs) == 2
+        assert all(not re.search(r"volume|第一卷|第二卷", href, re.I) for href in spine_hrefs)
