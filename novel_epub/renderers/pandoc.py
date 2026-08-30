@@ -82,13 +82,9 @@ def _pandoc_chapter(chapter: Chapter, destination: Path) -> None:
 
 
 def _iter_chapters(book: Book):
-    if book.volumes:
-        for volume in book.volumes:
-            for chapter in volume.chapters:
-                yield volume, chapter
-    else:
-        for chapter in book.chapters:
-            yield None, chapter
+    yield from ((None, chapter) for chapter in book.chapters)
+    for volume in book.volumes:
+        yield from ((volume, chapter) for chapter in volume.chapters)
 
 
 def _chapter_entries(book: Book):
