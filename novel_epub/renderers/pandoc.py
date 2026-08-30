@@ -27,8 +27,12 @@ def _escape_markdown(text: str) -> str:
     return "\n".join(_MARKDOWN_CHARS.sub(r"\\\1", line) for line in text.split("\n"))
 
 
+def _chapter_heading(chapter: Chapter, level: int = 1) -> str:
+    return f"{'#' * level} {chapter.label} {chapter.title}".rstrip()
+
+
 def _chapter_markdown(chapter: Chapter) -> str:
-    lines = [f"# {chapter.label} {chapter.title}".rstrip(), ""]
+    lines = [_chapter_heading(chapter), ""]
     for paragraph in chapter.paragraphs:
         lines.extend([_escape_markdown(paragraph.text), ""])
     return "\n".join(lines).rstrip() + "\n"
@@ -41,11 +45,13 @@ def _markdown(book: Book) -> str:
         for volume in book.volumes:
             lines.extend([f"# {volume.label} {volume.title}".rstrip(), ""])
             for chapter in volume.chapters:
-                lines.extend(_chapter_markdown(chapter).rstrip().splitlines())
-                lines.append("")
+                lines.extend([_chapter_heading(chapter, 2), ""])
+                for paragraph in chapter.paragraphs:
+                    lines.extend([_escape_markdown(paragraph.text), ""])
     for chapter in book.chapters:
-        lines.extend(_chapter_markdown(chapter).rstrip().splitlines())
-        lines.append("")
+        lines.extend([_chapter_heading(chapter), ""])
+        for paragraph in chapter.paragraphs:
+            lines.extend([_escape_markdown(paragraph.text), ""])
     return "\n".join(lines).rstrip() + "\n"
 
 
