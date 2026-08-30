@@ -55,6 +55,12 @@ def _markdown(book: Book) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _validate_chapters(book: Book) -> None:
+    sequences = [chapter.sequence for _volume, chapter in _iter_chapters(book)]
+    if len(sequences) != len(set(sequences)):
+        raise ValueError("duplicate chapter sequence")
+
+
 def _pandoc_chapter(chapter: Chapter, destination: Path) -> None:
     """Convert exactly one chapter to XHTML through Pandoc."""
     source = destination.with_suffix(".md")
@@ -179,6 +185,7 @@ def _write_epub(book: Book, output: Path, chapter_files: list[tuple[Chapter, Pat
 
 def render(book: Book, output: str | Path) -> Path:
     """Render chapters independently with Pandoc, then assemble a native EPUB."""
+    _validate_chapters(book)
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix="novel-epub-") as tmp:
