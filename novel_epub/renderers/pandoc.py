@@ -21,8 +21,6 @@ h1, h2 { text-align: center; }
 def _markdown(book: Book) -> str:
     lines: list[str] = []
     for volume in book.volumes:
-        # Volume is a navigation grouping. Pandoc heading hierarchy is used
-        # here; chapter headings are the split level/content documents.
         lines.append(f"# {volume.label} {volume.title}".rstrip())
         lines.append("")
         for chapter in volume.chapters:
@@ -35,6 +33,8 @@ def _markdown(book: Book) -> str:
 def _chapter_markdown(chapter) -> list[str]:
     lines = [f"## {chapter.label} {chapter.title}".rstrip(), ""]
     for paragraph in chapter.paragraphs:
+        # Pandoc owns HTML escaping; raw novel text is never interpolated into
+        # HTML. Preserve paragraph text verbatim in the Markdown source.
         lines.extend([paragraph.text, ""])
     return lines
 
