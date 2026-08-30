@@ -67,12 +67,24 @@ def test_render_requires_pandoc(tmp_path: Path):
 
         opf_dir = Path(opf_name).parent.as_posix()
         print("EPUB diagnostic content documents:")
+        chapter_details = {}
         for href in sorted(chapter_hrefs):
             zip_path = unquote(f"{opf_dir}/{href}" if opf_dir != "." else href)
             text = zf.read(zip_path).decode("utf-8")
             title = re.search(r"<title>(.*?)</title>", text, re.S)
             heading = re.search(r"<h[1-6][^>]*>(.*?)</h[1-6]>", text, re.S)
+            chapter_details[href] = heading.group(1) if heading else ""
             print(f"  {zip_path}: title={title.group(1) if title else '<none>'!r}, heading={heading.group(1) if heading else '<none>'!r}")
+
         print("EPUB diagnostic nav entries:")
         print(nav_text)
         assert len(chapter_hrefs) == 3
+
+        title_pages = [href for href, heading in chapter_details.items() if heading == "測試書"]
+        real_chapters = [href for href, heading in chapter_details.items() if heading in {
+            "第1章 黄山真君和九洲一号群",
+            "第26章 我那与众不同的炼丹炉",
+        }]
+        assert len(title_pages) == 1
+        assert len(real_chapters) == 2
+        assert title_pages[0] not in real_chapters
