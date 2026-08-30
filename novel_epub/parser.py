@@ -8,6 +8,7 @@ from .normalize import normalize_line
 
 DEFAULT_VOLUME_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s卷部冊]+)\s*(?P<unit>[卷部冊]))[\s　]*(?P<title>.*?)\s*$"
 DEFAULT_CHAPTER_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s章集篇回]+)\s*(?P<unit>[章集篇回]))[\s　]*(?P<title>.*?)\s*$"
+DEFAULT_EXTRA_PATTERN = r"^\s*(?P<label>番外(?:篇)?)\s*[\s　]*(?P<title>.*?)\s*$"
 
 
 @dataclass
@@ -24,17 +25,13 @@ class ParseResult:
 
 
 def parse_lines(
-    lines: list[str],
-    *,
-    title: str,
-    author: str,
-    language: str = "zh-CN",
-    cover: str | None = None,
-    volume_pattern: str = DEFAULT_VOLUME_PATTERN,
+    lines: list[str], *, title: str, author: str, language: str = "zh-CN",
+    cover: str | None = None, volume_pattern: str = DEFAULT_VOLUME_PATTERN,
     chapter_pattern: str = DEFAULT_CHAPTER_PATTERN,
 ) -> ParseResult:
     volume_re = re.compile(volume_pattern)
     chapter_re = re.compile(chapter_pattern)
+    extra_re = re.compile(DEFAULT_EXTRA_PATTERN)
     book = Book(title=title, author=author, language=language, cover=cover)
     warnings: list[WarningItem] = []
     current_volume: Volume | None = None
@@ -51,13 +48,14 @@ def parse_lines(
             current_chapter.paragraphs.append(Paragraph(text="\n".join(paragraph_lines)))
         paragraph_lines.clear()
 
-    def add_chapter(cm, line_no: int):
+    def add_chapter(cm, line_no: int, fallback_number: str | None = None):
         nonlocal chapter_sequence, current_chapter
         flush_paragraph()
         chapter_sequence += 1
-        number = cm.groupdict().get("number") or ""
-        label = cm.groupdict().get("label") or cm.group(0).strip()
-        chapter_title = (cm.groupdict().get("title") or "").strip()
+        groups = cm.groupdict()
+        number = groups.get("number") or fallback_number or ""
+        label = groups.get("label") or cm.group(0).strip()
+        chapter_title = (groups.get("title") or "").strip()
         if not chapter_title:
             warnings.append(WarningItem("empty_chapter", line_no, f"empty chapter: {label}"))
         if number in seen_numbers and number:
@@ -97,13 +95,19 @@ def parse_lines(
         if cm:
             add_chapter(cm, line_no)
             continue
+        em = extra_re.match(stripped)
+        if em:
+            add_chapter(em, line_no, fallback_number="番外")
+            continue
 
         if current_chapter is None:
             preamble_nonempty.append(line_no)
             continue
 
-        # Preserve text. Only formatting indentation was normalized.
+        # Only formatting indentation is normalized. Text itself is preserved.
         paragraph_lines.append(line)
+        if stripped.startswith("第") and re.search(r"[章集篇回]", stripped):
+            warnings.append(WarningItem("suspicious_chapter_heading", line_no, f"possible chapter heading not matched: {stripped[:80]}"))
 
     flush_paragraph()
     if preamble_nonempty:
