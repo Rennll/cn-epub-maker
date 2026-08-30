@@ -12,17 +12,17 @@ def write_intermediate(book: Book, directory: str | Path) -> Path:
     chapters_dir.mkdir(parents=True, exist_ok=True)
 
     chapter_entries: list[dict] = []
+    chapter_files: dict[int, str] = {}
     for index, chapter in enumerate(book.iter_chapters(), start=1):
         filename = f"{index:06d}.json"
-        chapter_entries.append(
-            {
-                "sequence": chapter.sequence,
-                "number": chapter.number,
-                "label": chapter.label,
-                "title": chapter.title,
-                "file": f"chapters/{filename}",
-            }
-        )
+        chapter_files[id(chapter)] = filename
+        chapter_entries.append({
+            "sequence": chapter.sequence,
+            "number": chapter.number,
+            "label": chapter.label,
+            "title": chapter.title,
+            "file": f"chapters/{filename}",
+        })
         _write_json(chapters_dir / filename, {
             "sequence": chapter.sequence,
             "number": chapter.number,
@@ -42,7 +42,10 @@ def write_intermediate(book: Book, directory: str | Path) -> Path:
                 "number": v.number,
                 "label": v.label,
                 "title": v.title,
-                "chapters": [c.sequence for c in v.chapters],
+                "chapters": [
+                    {"sequence": c.sequence, "file": f"chapters/{chapter_files[id(c)]}"}
+                    for c in v.chapters
+                ],
             }
             for v in book.volumes
         ],
@@ -53,7 +56,4 @@ def write_intermediate(book: Book, directory: str | Path) -> Path:
 
 
 def _write_json(path: Path, value: dict) -> None:
-    path.write_text(
-        json.dumps(value, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
