@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import mimetypes
+import re
 import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -12,6 +13,12 @@ body { font-size: 1em; line-height: 1.8; margin: 1em; text-align: justify; }
 p { text-indent: 2em; margin: 0; padding: 0; }
 h1, h2 { text-align: center; }
 """
+
+_MARKDOWN_CHARS = re.compile(r"([\\`*{}\[\]()#+.!_>|~-])")
+
+
+def _escape_markdown(text: str) -> str:
+    return "\n".join(_MARKDOWN_CHARS.sub(r"\\\1", line) for line in text.split("\n"))
 
 
 def _markdown(book: Book) -> str:
@@ -28,7 +35,7 @@ def _markdown(book: Book) -> str:
 def _chapter_markdown(chapter) -> list[str]:
     lines = [f"## {chapter.label} {chapter.title}".rstrip(), ""]
     for paragraph in chapter.paragraphs:
-        lines.extend([paragraph.text, ""])
+        lines.extend([_escape_markdown(paragraph.text), ""])
     return lines
 
 
