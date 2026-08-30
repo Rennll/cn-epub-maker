@@ -30,8 +30,9 @@ def make_book() -> Book:
 def test_markdown_preserves_volume_and_chapter_hierarchy():
     md = _markdown(make_book())
     assert "# 第一卷 九洲一号群" in md
-    assert "## 第1章 黄山真君和九洲一号群" in md
-    assert "## 第26章 我那与众不同的炼丹炉" in md
+    assert "# 第1章 黄山真君和九洲一号群" in md
+    assert "# 第二卷 武道筑基" in md
+    assert "# 第26章 我那与众不同的炼丹炉" in md
     assert "a < b & c \\> d" in md
 
 
