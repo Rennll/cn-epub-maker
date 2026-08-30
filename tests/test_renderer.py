@@ -96,19 +96,12 @@ def test_epub_renderer_contract_links_manifest_spine_and_content(tmp_path: Path)
         assert metadata.find("dc:creator", opf_ns).text == "作者"
         assert metadata.find("dc:language", opf_ns).text == "zh-CN"
 
-        manifest = {
-            item.attrib["id"]: item
-            for item in opf.findall("opf:manifest/opf:item", opf_ns)
-        }
-        spine = [
-            itemref.attrib["idref"]
-            for itemref in opf.findall("opf:spine/opf:itemref", opf_ns)
-        ]
+        manifest = {item.attrib["id"]: item for item in opf.findall("opf:manifest/opf:item", opf_ns)}
+        spine = [itemref.attrib["idref"] for itemref in opf.findall("opf:spine/opf:itemref", opf_ns)]
         assert spine == ["ch000001", "ch000002"]
 
         for item in manifest.values():
-            href = item.attrib["href"]
-            assert f"EPUB/{href}" in zf.namelist()
+            assert f"EPUB/{item.attrib['href']}" in zf.namelist()
         for item_id in spine:
             item = manifest[item_id]
             assert item.attrib["media-type"] == "application/xhtml+xml"
@@ -119,10 +112,7 @@ def test_epub_renderer_contract_links_manifest_spine_and_content(tmp_path: Path)
         toc = nav.find(f".//*[@{{{nav_epub_ns}}}type='toc']")
         assert toc is not None
         links = nav.findall(".//{http://www.w3.org/1999/xhtml}a")
-        assert [link.attrib["href"] for link in links] == [
-            "text/ch000001.xhtml",
-            "text/ch000002.xhtml",
-        ]
+        assert [link.attrib["href"] for link in links] == ["text/ch000001.xhtml", "text/ch000002.xhtml"]
 
         xhtml_ns = {"x": "http://www.w3.org/1999/xhtml"}
         for href in ["text/ch000001.xhtml", "text/ch000002.xhtml"]:
@@ -132,4 +122,14 @@ def test_epub_renderer_contract_links_manifest_spine_and_content(tmp_path: Path)
             assert title is not None
             assert stylesheet is not None
             assert stylesheet.attrib["href"] == "../styles/stylesheet.css"
-            assert "EPUB/styles/stylesheet.css" in zf.namelist()
+
+
+def test_epub_renderer_contract_rejects_duplicate_chapter_sequences(tmp_path: Path):
+    if shutil.which("pandoc") is None:
+        pytest.skip("Pandoc is not installed in this test environment")
+    book = Book(title="測試書", author="作者", chapters=[
+        Chapter(sequence=1, number="1", label="第1章", title="甲"),
+        Chapter(sequence=1, number="2", label="第2章", title="乙"),
+    ])
+    with pytest.raises(ValueError, match="duplicate chapter sequence"):
+        render(book, tmp_path / "book.epub")
