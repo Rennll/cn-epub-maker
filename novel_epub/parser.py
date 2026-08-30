@@ -23,10 +23,6 @@ class ParseResult:
     warnings: list[WarningItem]
 
 
-def _heading_match(pattern: re.Pattern[str], text: str):
-    return pattern.match(text)
-
-
 def parse_lines(
     lines: list[str],
     *,
@@ -48,13 +44,19 @@ def parse_lines(
     seen_numbers: set[str] = set()
     seen_volume_numbers: set[str] = set()
     preamble_nonempty: list[int] = []
+    paragraph_lines: list[str] = []
+
+    def flush_paragraph() -> None:
+        if current_chapter is not None and paragraph_lines:
+            current_chapter.paragraphs.append(Paragraph(text="\n".join(paragraph_lines)))
+        paragraph_lines.clear()
 
     def add_chapter(cm, line_no: int):
         nonlocal chapter_sequence, current_chapter
+        flush_paragraph()
         chapter_sequence += 1
         number = cm.groupdict().get("number") or ""
         label = cm.groupdict().get("label") or cm.group(0).strip()
-        unit = cm.groupdict().get("unit") or "章"
         chapter_title = (cm.groupdict().get("title") or "").strip()
         if not chapter_title:
             warnings.append(WarningItem("empty_chapter", line_no, f"empty chapter: {label}"))
@@ -62,12 +64,7 @@ def parse_lines(
             warnings.append(WarningItem("duplicate_chapter_number", line_no, f"duplicate chapter number: {number}"))
         if number:
             seen_numbers.add(number)
-        current_chapter = Chapter(
-            sequence=chapter_sequence,
-            number=number,
-            label=label,
-            title=chapter_title,
-        )
+        current_chapter = Chapter(sequence=chapter_sequence, number=number, label=label, title=chapter_title)
         if current_volume is not None:
             current_volume.chapters.append(current_chapter)
         else:
@@ -77,10 +74,12 @@ def parse_lines(
         line = normalize_line(raw).rstrip()
         stripped = line.strip()
         if not stripped:
+            flush_paragraph()
             continue
 
-        vm = _heading_match(volume_re, stripped)
+        vm = volume_re.match(stripped)
         if vm:
+            flush_paragraph()
             volume_sequence += 1
             number = vm.groupdict().get("number") or ""
             label = vm.groupdict().get("label") or vm.group(0).strip()
@@ -89,17 +88,12 @@ def parse_lines(
                 warnings.append(WarningItem("duplicate_volume_number", line_no, f"duplicate volume number: {number}"))
             if number:
                 seen_volume_numbers.add(number)
-            current_volume = Volume(
-                sequence=volume_sequence,
-                number=number,
-                label=label,
-                title=vol_title,
-            )
+            current_volume = Volume(sequence=volume_sequence, number=number, label=label, title=vol_title)
             book.volumes.append(current_volume)
             current_chapter = None
             continue
 
-        cm = _heading_match(chapter_re, stripped)
+        cm = chapter_re.match(stripped)
         if cm:
             add_chapter(cm, line_no)
             continue
@@ -108,21 +102,12 @@ def parse_lines(
             preamble_nonempty.append(line_no)
             continue
 
-        # Preserve all non-empty body lines exactly apart from formatting
-        # indentation removed by normalize_line(). Do not strip punctuation,
-        # convert numerals, or silently discard suspicious content.
-        current_chapter.paragraphs.append(Paragraph(text=line))
+        # Preserve text. Only formatting indentation was normalized.
+        paragraph_lines.append(line)
 
+    flush_paragraph()
     if preamble_nonempty:
-        warnings.append(
-            WarningItem(
-                "text_before_first_chapter",
-                preamble_nonempty[0],
-                f"text found before first chapter ({len(preamble_nonempty)} non-empty lines)",
-            )
-        )
-
+        warnings.append(WarningItem("text_before_first_chapter", preamble_nonempty[0], f"text found before first chapter ({len(preamble_nonempty)} non-empty lines)"))
     if not book.chapter_count:
         warnings.append(WarningItem("no_chapters", 0, "no chapters were detected"))
-
     return ParseResult(book=book, warnings=warnings)
