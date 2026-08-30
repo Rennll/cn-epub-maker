@@ -65,3 +65,71 @@ def test_render_requires_pandoc(tmp_path: Path):
 
         first = zf.read("EPUB/text/ch000001.xhtml").decode("utf-8")
         assert "a &lt; b &amp; c &gt; d" in first
+
+
+def test_epub_renderer_contract_links_manifest_spine_and_content(tmp_path: Path):
+    if shutil.which("pandoc") is None:
+        pytest.skip("Pandoc is not installed in this test environment")
+
+    output = tmp_path / "book.epub"
+    render(make_book(), output)
+
+    with zipfile.ZipFile(output) as zf:
+        infos = zf.infolist()
+        assert infos[0].filename == "mimetype"
+        assert infos[0].compress_type == zipfile.ZIP_STORED
+        assert zf.read("mimetype") == b"application/epub+zip"
+
+        container = ET.fromstring(zf.read("META-INF/container.xml"))
+        rootfile = container.find("{urn:oasis:names:tc:opendocument:xmlns:container}rootfiles/{urn:oasis:names:tc:opendocument:xmlns:container}rootfile")
+        assert rootfile is not None
+        assert rootfile.attrib["full-path"] == "EPUB/content.opf"
+        assert rootfile.attrib["media-type"] == "application/oebps-package+xml"
+
+        opf = ET.fromstring(zf.read("EPUB/content.opf"))
+        opf_ns = {"opf": "http://www.idpf.org/2007/opf", "dc": "http://purl.org/dc/elements/1.1/"}
+        assert opf.attrib["version"] == "3.0"
+        metadata = opf.find("opf:metadata", opf_ns)
+        assert metadata is not None
+        assert metadata.find("dc:title", opf_ns).text == "測試書"
+        assert metadata.find("dc:creator", opf_ns).text == "作者"
+        assert metadata.find("dc:language", opf_ns).text == "zh-CN"
+
+        manifest = {
+            item.attrib["id"]: item
+            for item in opf.findall("opf:manifest/opf:item", opf_ns)
+        }
+        spine = [
+            itemref.attrib["idref"]
+            for itemref in opf.findall("opf:spine/opf:itemref", opf_ns)
+        ]
+        assert spine == ["ch000001", "ch000002"]
+
+        # Every manifest resource must exist in the EPUB, and every spine item
+        # must resolve to an XHTML document.
+        for item in manifest.values():
+            href = item.attrib["href"]
+            assert f"EPUB/{href}" in zf.namelist()
+        for item_id in spine:
+            item = manifest[item_id]
+            assert item.attrib["media-type"] == "application/xhtml+xml"
+            assert item.attrib["href"].startswith("text/")
+
+        nav = ET.fromstring(zf.read("EPUB/nav.xhtml"))
+        nav_ns = {"epub": "http://www.idpf.org/2007/ops"}
+        toc = nav.find(".//epub:toc", nav_ns)
+        assert toc is not None
+        links = nav.findall(".//a")
+        assert [link.attrib["href"] for link in links] == [
+            "text/ch000001.xhtml",
+            "text/ch000002.xhtml",
+        ]
+
+        for href in ["text/ch000001.xhtml", "text/ch000002.xhtml"]:
+            chapter = ET.fromstring(zf.read(f"EPUB/{href}"))
+            title = chapter.find("./head/title")
+            stylesheet = chapter.find("./head/link[@rel='stylesheet']")
+            assert title is not None
+            assert stylesheet is not None
+            assert stylesheet.attrib["href"] == "../styles/stylesheet.css"
+            assert "EPUB/styles/stylesheet.css" in zf.namelist()
