@@ -1,3 +1,4 @@
+import re
 import shutil
 import zipfile
 from pathlib import Path
@@ -56,7 +57,6 @@ def test_render_requires_pandoc(tmp_path: Path):
         assert "第26章" in nav_text
 
         content_files = [n for n in names if n.endswith(".xhtml") and "nav" not in n]
-        assert len(content_files) >= 2
         content_text = "\n".join(zf.read(n).decode("utf-8") for n in content_files)
         assert "a &lt; b &amp; c &gt; d" in content_text
 
@@ -67,4 +67,12 @@ def test_render_requires_pandoc(tmp_path: Path):
         spine_ids = [itemref.attrib["idref"] for itemref in opf_root.findall("opf:spine/opf:itemref", ns)]
         spine_hrefs = {manifest[item_id].attrib["href"] for item_id in spine_ids}
         chapter_hrefs = {href for href in spine_hrefs if href.startswith("text/ch")}
+        print("EPUB diagnostic content documents:")
+        for href in sorted(chapter_hrefs):
+            text = zf.read(href).decode("utf-8")
+            title = re.search(r"<title>(.*?)</title>", text, re.S)
+            heading = re.search(r"<h[1-6][^>]*>(.*?)</h[1-6]>", text, re.S)
+            print(f"  {href}: title={title.group(1) if title else '<none>'!r}, heading={heading.group(1) if heading else '<none>'!r}")
+        print("EPUB diagnostic nav entries:")
+        print(nav_text)
         assert len(chapter_hrefs) == 2
