@@ -8,7 +8,7 @@ from .intermediate import write_intermediate
 from .normalize import read_lines
 from .parser import parse_lines
 from .renderers.pandoc import render
-from .validator import validate_book, validate_epub
+from .validator import run_epubcheck, validate_book, validate_epub
 
 
 def build(args: argparse.Namespace) -> int:
@@ -68,7 +68,16 @@ def validate(args: argparse.Namespace) -> int:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
+
+    epubcheck = run_epubcheck(args.epub)
+    if not epubcheck.ok:
+        for error in epubcheck.errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+
     print(f"OK: {args.epub}")
+    if not epubcheck.available:
+        print("WARNING: EPUBCheck executable not found; external validation skipped.", file=sys.stderr)
     return 0
 
 
