@@ -61,10 +61,10 @@ def _pandoc_chapter(chapter: Chapter, destination: Path) -> None:
     fragment = destination.with_suffix(".html")
     source.write_text(_chapter_markdown(chapter), encoding="utf-8")
     subprocess.run(
-        ["pandoc", str(source), "--to=html5", "--output", str(fragment)],
+        ["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)],
         check=True,
     )
-    body = fragment.read_text(encoding="utf-8")
+    body = fragment.read_text(encoding="utf-8").strip()
     xhtml = (
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<!DOCTYPE html>\n'
@@ -75,16 +75,16 @@ def _pandoc_chapter(chapter: Chapter, destination: Path) -> None:
         '<link rel="stylesheet" type="text/css" href="../styles/stylesheet.css" />\n'
         "</head>\n"
         "<body>\n"
-        f"{body.strip()}\n"
+        f"{body}\n"
         "</body>\n</html>\n"
     )
     destination.write_text(xhtml, encoding="utf-8")
 
 
 def _iter_chapters(book: Book):
-    yield from ((None, chapter) for chapter in book.chapters)
     for volume in book.volumes:
         yield from ((volume, chapter) for chapter in volume.chapters)
+    yield from ((None, chapter) for chapter in book.chapters)
 
 
 def _chapter_entries(book: Book):
