@@ -81,7 +81,8 @@ def test_epub_renderer_contract_links_manifest_spine_and_content(tmp_path: Path)
         assert zf.read("mimetype") == b"application/epub+zip"
 
         container = ET.fromstring(zf.read("META-INF/container.xml"))
-        rootfile = container.find("{urn:oasis:names:tc:opendocument:xmlns:container}rootfiles/{urn:oasis:names:tc:opendocument:xmlns:container}rootfile")
+        container_ns = "urn:oasis:names:tc:opendocument:xmlns:container"
+        rootfile = container.find(f"{{{container_ns}}}rootfiles/{{{container_ns}}}rootfile")
         assert rootfile is not None
         assert rootfile.attrib["full-path"] == "EPUB/content.opf"
         assert rootfile.attrib["media-type"] == "application/oebps-package+xml"
@@ -105,8 +106,6 @@ def test_epub_renderer_contract_links_manifest_spine_and_content(tmp_path: Path)
         ]
         assert spine == ["ch000001", "ch000002"]
 
-        # Every manifest resource must exist in the EPUB, and every spine item
-        # must resolve to an XHTML document.
         for item in manifest.values():
             href = item.attrib["href"]
             assert f"EPUB/{href}" in zf.namelist()
@@ -116,19 +115,20 @@ def test_epub_renderer_contract_links_manifest_spine_and_content(tmp_path: Path)
             assert item.attrib["href"].startswith("text/")
 
         nav = ET.fromstring(zf.read("EPUB/nav.xhtml"))
-        nav_ns = {"epub": "http://www.idpf.org/2007/ops"}
-        toc = nav.find(".//epub:toc", nav_ns)
+        nav_epub_ns = "http://www.idpf.org/2007/ops"
+        toc = nav.find(f".//*[@{{{nav_epub_ns}}}type='toc']")
         assert toc is not None
-        links = nav.findall(".//a")
+        links = nav.findall(".//{http://www.w3.org/1999/xhtml}a")
         assert [link.attrib["href"] for link in links] == [
             "text/ch000001.xhtml",
             "text/ch000002.xhtml",
         ]
 
+        xhtml_ns = {"x": "http://www.w3.org/1999/xhtml"}
         for href in ["text/ch000001.xhtml", "text/ch000002.xhtml"]:
             chapter = ET.fromstring(zf.read(f"EPUB/{href}"))
-            title = chapter.find("./head/title")
-            stylesheet = chapter.find("./head/link[@rel='stylesheet']")
+            title = chapter.find("./x:head/x:title", xhtml_ns)
+            stylesheet = chapter.find("./x:head/x:link[@rel='stylesheet']", xhtml_ns)
             assert title is not None
             assert stylesheet is not None
             assert stylesheet.attrib["href"] == "../styles/stylesheet.css"
