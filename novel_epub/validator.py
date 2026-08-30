@@ -39,8 +39,8 @@ _XHTML_NS = "http://www.w3.org/1999/xhtml"
 _EPUB_NS = "http://www.idpf.org/2007/ops"
 
 
-def _href_to_archive_path(opf_path: str, href: str) -> str:
-    return str((Path(opf_path).parent / href.split("#", 1)[0]).as_posix())
+def _href_to_archive_path(base_path: str, href: str) -> str:
+    return str((Path(base_path).parent / href.split("#", 1)[0]).as_posix())
 
 
 def _validate_epub_structure(zf: ZipFile, errors: list[str]) -> None:
@@ -104,16 +104,19 @@ def _validate_epub_structure(zf: ZipFile, errors: list[str]) -> None:
         except KeyError:
             pass
         else:
-            toc = nav_root.find(f".//{{{_EPUB_NS}}}nav[@epub:type='toc']")
+            toc = None
+            for nav in nav_root.findall(f".//{{{_XHTML_NS}}}nav"):
+                if nav.get(f"{{{_EPUB_NS}}}type") == "toc":
+                    toc = nav
+                    break
             if toc is None:
                 toc = nav_root.find(f".//{{{_XHTML_NS}}}nav")
             if toc is not None:
-                nav_dir = Path(nav_path).parent
                 for anchor in toc.findall(f".//{{{_XHTML_NS}}}a"):
                     href = anchor.get("href", "")
                     if not href or href.startswith("#"):
                         continue
-                    target = str((nav_dir / href.split("#", 1)[0]).as_posix())
+                    target = _href_to_archive_path(nav_path, href)
                     if target not in names:
                         errors.append(f"nav target missing: {target}")
 
