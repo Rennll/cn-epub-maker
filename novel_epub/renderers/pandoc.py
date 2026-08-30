@@ -69,7 +69,8 @@ def _validate_book(book: Book) -> None:
         cover = Path(book.cover)
         if not cover.is_file():
             raise FileNotFoundError(f"cover file not found: {cover}")
-        if mimetypes.guess_type(cover.name)[0] not in {"image/jpeg", "image/png", "image/gif", "image/webp"}:
+        media_type = mimetypes.guess_type(cover.name)[0]
+        if media_type not in {"image/jpeg", "image/png", "image/gif", "image/webp"}:
             raise ValueError(f"unsupported cover media type: {cover.name}")
 
 
@@ -99,10 +100,6 @@ def _pandoc_chapter(chapter: Chapter, destination: Path, language: str) -> None:
         "</body>\n</html>\n"
     )
     destination.write_text(xhtml, encoding="utf-8")
-
-
-def _chapter_entries(book: Book):
-    yield from _iter_chapters(book)
 
 
 def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
@@ -138,7 +135,7 @@ def _content_opf(book: Book, chapter_paths: dict[int, str], identifier: str, cov
         '<item id="css" href="styles/stylesheet.css" media-type="text/css" />',
     ]
     spine: list[str] = []
-    for index, (_volume, chapter) in enumerate(_chapter_entries(book), start=1):
+    for index, (_volume, chapter) in enumerate(_iter_chapters(book), start=1):
         item_id = f"ch{index:06d}"
         href = chapter_paths[chapter.sequence]
         manifest.append(f'<item id="{item_id}" href="{href}" media-type="application/xhtml+xml" />')
@@ -166,10 +163,7 @@ def _content_opf(book: Book, chapter_paths: dict[int, str], identifier: str, cov
 
 def _write_epub(book: Book, output: Path, chapter_files: list[tuple[Chapter, Path]]) -> None:
     identifier = str(uuid.uuid4())
-    chapter_paths = {
-        chapter.sequence: f"text/ch{index:06d}.xhtml"
-        for index, (chapter, _source) in enumerate(chapter_files, start=1)
-    }
+    chapter_paths = {chapter.sequence: f"text/ch{index:06d}.xhtml" for index, (chapter, _source) in enumerate(chapter_files, start=1)}
     cover_name = Path(book.cover).name if book.cover else None
     container = '''<?xml version="1.0" encoding="UTF-8"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
