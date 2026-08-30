@@ -1,5 +1,5 @@
 from pathlib import Path
-from zipfile import ZIP_DEFLATED, ZipFile
+from zipfile import ZipFile
 
 from novel_epub.validator import validate_epub
 
@@ -20,6 +20,11 @@ CONTAINER = '''<?xml version="1.0" encoding="UTF-8"?>
   <rootfiles><rootfile full-path="EPUB/content.opf" media-type="application/oebps-package+xml" /></rootfiles>
 </container>
 '''
+
+
+NAV = '''<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+  <body><nav epub:type="toc"><a href="text/ch000001.xhtml">Chapter</a></nav></body>
+</html>'''
 
 
 def _opf(manifest: str, spine: str, metadata: str = "<dc:title>Book</dc:title>") -> str:
@@ -47,9 +52,9 @@ def test_valid_epub_structure_passes(tmp_path: Path):
         container=CONTAINER,
         opf=opf,
         files={
-            "EPUB/nav.xhtml": "<html><body><nav epub:type=\"toc\"><a href=\"text/ch000001.xhtml\">Chapter</a></nav></body></html>",
+            "EPUB/nav.xhtml": NAV,
             "EPUB/styles/stylesheet.css": "body {}",
-            "EPUB/text/ch000001.xhtml": "<html><body><h1>Chapter</h1></body></html>",
+            "EPUB/text/ch000001.xhtml": "<html xmlns=\"http://www.w3.org/1999/xhtml\"><body><h1>Chapter</h1></body></html>",
         },
     )
     assert validate_epub(path) == []
@@ -65,7 +70,7 @@ def test_missing_opf_target_is_reported(tmp_path: Path):
         tmp_path,
         container=CONTAINER,
         opf=opf,
-        files={"EPUB/nav.xhtml": "<html><body><nav></nav></body></html>"},
+        files={"EPUB/nav.xhtml": NAV},
     )
     errors = validate_epub(path)
     assert any("manifest target missing" in error for error in errors)
@@ -80,13 +85,16 @@ def test_spine_reference_must_exist_in_manifest(tmp_path: Path):
         tmp_path,
         container=CONTAINER,
         opf=opf,
-        files={"EPUB/nav.xhtml": "<html><body><nav></nav></body></html>"},
+        files={"EPUB/nav.xhtml": NAV},
     )
     errors = validate_epub(path)
     assert any("spine idref missing from manifest" in error for error in errors)
 
 
 def test_nav_target_must_exist(tmp_path: Path):
+    nav = '''<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+  <body><nav epub:type="toc"><a href="text/missing.xhtml">Missing</a></nav></body>
+</html>'''
     opf = _opf(
         '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav" />',
         "",
@@ -95,9 +103,7 @@ def test_nav_target_must_exist(tmp_path: Path):
         tmp_path,
         container=CONTAINER,
         opf=opf,
-        files={
-            "EPUB/nav.xhtml": "<html><body><nav epub:type=\"toc\"><a href=\"text/missing.xhtml\">Missing</a></nav></body></html>"
-        },
+        files={"EPUB/nav.xhtml": nav},
     )
     errors = validate_epub(path)
     assert any("nav target missing" in error for error in errors)
