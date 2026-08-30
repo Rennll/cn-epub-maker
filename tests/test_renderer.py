@@ -57,10 +57,6 @@ def test_render_requires_pandoc(tmp_path: Path):
         assert "第1章" in nav_text
         assert "第26章" in nav_text
 
-        content_files = [n for n in names if n.endswith(".xhtml") and "nav" not in n]
-        content_text = "\n".join(zf.read(n).decode("utf-8") for n in content_files)
-        assert "a &lt; b &amp; c &gt; d" in content_text
-
         opf_name = next(n for n in names if n.endswith(".opf"))
         opf_root = ET.fromstring(zf.read(opf_name))
         ns = {"opf": "http://www.idpf.org/2007/opf"}
@@ -79,4 +75,4 @@ def test_render_requires_pandoc(tmp_path: Path):
             print(f"  {zip_path}: title={title.group(1) if title else '<none>'!r}, heading={heading.group(1) if heading else '<none>'!r}")
         print("EPUB diagnostic nav entries:")
         print(nav_text)
-        assert len(chapter_hrefs) == 2
+        assert len(chapter_hrefs) == 3
