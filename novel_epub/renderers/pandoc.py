@@ -57,6 +57,7 @@ def render(book: Book, output: str | Path) -> Path:
             "--metadata", f"title={book.title}",
             "--metadata", f"author={book.author}",
             "--metadata", f"lang={book.language}",
+            "--metadata", "epub-title-page=false",
         ]
         if book.cover:
             cover = Path(book.cover)
