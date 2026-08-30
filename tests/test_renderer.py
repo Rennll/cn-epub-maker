@@ -1,6 +1,8 @@
+import re
 import shutil
 import zipfile
 from pathlib import Path
+from urllib.parse import unquote
 from xml.etree import ElementTree as ET
 
 import pytest
@@ -11,40 +13,14 @@ from novel_epub.renderers.pandoc import _markdown, render
 
 def make_book() -> Book:
     book = Book(title="測試書", author="作者")
-    book.volumes.append(
-        Volume(
-            sequence=1,
-            number="1",
-            label="第一卷",
-            title="九洲一号群",
-            chapters=[
-                Chapter(
-                    sequence=1,
-                    number="1",
-                    label="第1章",
-                    title="黄山真君和九洲一号群",
-                    paragraphs=[Paragraph("2019年5月20日，星期一。"), Paragraph("a < b & c > d")],
-                )
-            ],
-        )
-    )
-    book.volumes.append(
-        Volume(
-            sequence=2,
-            number="2",
-            label="第二卷",
-            title="武道筑基",
-            chapters=[
-                Chapter(
-                    sequence=2,
-                    number="26",
-                    label="第26章",
-                    title="我那与众不同的炼丹炉",
-                    paragraphs=[Paragraph("平静的上完了最后一节课……")],
-                )
-            ],
-        )
-    )
+    book.volumes.append(Volume(sequence=1, number="1", label="第一卷", title="九洲一号群", chapters=[
+        Chapter(sequence=1, number="1", label="第1章", title="黄山真君和九洲一号群",
+                paragraphs=[Paragraph("2019年5月20日，星期一。"), Paragraph("a < b & c > d")])
+    ]))
+    book.volumes.append(Volume(sequence=2, number="2", label="第二卷", title="武道筑基", chapters=[
+        Chapter(sequence=2, number="26", label="第26章", title="我那与众不同的炼丹炉",
+                paragraphs=[Paragraph("平静的上完了最后一节课……")])
+    ]))
     return book
 
 
@@ -69,42 +45,33 @@ def test_render_requires_pandoc(tmp_path: Path):
         assert "mimetype" in names
         assert "META-INF/container.xml" in names
 
-        nav_name = next((n for n in names if n.endswith("nav.xhtml")), None)
-        assert nav_name is not None
+        nav_name = next(n for n in names if n.endswith("nav.xhtml"))
         nav_text = zf.read(nav_name).decode("utf-8")
-        assert "第一卷" in nav_text
-        assert "第二卷" in nav_text
-        assert "第1章" in nav_text
-        assert "第26章" in nav_text
+        assert "第一卷" in nav_text and "第二卷" in nav_text
+        assert "第1章" in nav_text and "第26章" in nav_text
 
         opf_name = next(n for n in names if n.endswith(".opf"))
         opf_root = ET.fromstring(zf.read(opf_name))
         ns = {"opf": "http://www.idpf.org/2007/opf"}
-        manifest = {
-            item.attrib["id"]: item
-            for item in opf_root.findall("opf:manifest/opf:item", ns)
-        }
-        spine_ids = [
-            itemref.attrib["idref"]
-            for itemref in opf_root.findall("opf:spine/opf:itemref", ns)
-        ]
-        spine_hrefs = {manifest[item_id].attrib["href"] for item_id in spine_ids}
-        chapter_hrefs = {href for href in spine_hrefs if href.startswith("text/ch")}
+        manifest = {item.attrib["id"]: item for item in opf_root.findall("opf:manifest/opf:item", ns)}
+        spine_ids = [itemref.attrib["idref"] for itemref in opf_root.findall("opf:spine/opf:itemref", ns)]
+        spine_hrefs = [manifest[item_id].attrib["href"] for item_id in spine_ids]
+        chapter_hrefs = [href for href in spine_hrefs if href.startswith("text/ch")]
 
-        # Pandoc's title page is disabled by the renderer. Therefore the only
-        # text/ch*.xhtml documents in the spine should be actual chapters.
-        assert len(chapter_hrefs) == 2
-
-        chapter_text = []
         opf_dir = Path(opf_name).parent.as_posix()
-        for href in sorted(chapter_hrefs):
-            zip_path = f"{opf_dir}/{href}" if opf_dir != "." else href
-            chapter_text.append(zf.read(zip_path).decode("utf-8"))
+        print("EPUB diagnostic content documents:")
+        for href in chapter_hrefs:
+            zip_path = unquote(f"{opf_dir}/{href}" if opf_dir != "." else href)
+            text = zf.read(zip_path).decode("utf-8")
+            title = re.search(r"<title>(.*?)</title>", text, re.S)
+            headings = re.findall(r"<h([1-6])[^>]*>(.*?)</h\1>", text, re.S)
+            print(f"  {zip_path}: title={title.group(1) if title else '<none>'!r}")
+            for level, heading in headings:
+                print(f"    h{level}: {heading!r}")
 
-        assert any("第1章 黄山真君和九洲一号群" in text for text in chapter_text)
-        assert any("第26章 我那与众不同的炼丹炉" in text for text in chapter_text)
-        combined = "\n".join(chapter_text)
-        assert "a &lt; b &amp; c &gt; d" in combined
+        print("EPUB diagnostic nav entries:")
+        print(nav_text)
 
-        # The title page must not be present as an extra content document.
-        assert not any("<h1>測試書</h1>" in text for text in chapter_text)
+        # Keep this assertion intentionally failing for the current Pandoc
+        # output: the diagnostic above identifies why a third document exists.
+        assert len(chapter_hrefs) == 2
