@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from .models import Book, Chapter, Paragraph, Volume
 from .normalize import normalize_line
 
-DEFAULT_VOLUME_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s卷部冊]+)\s*(?P<unit>[卷部冊]))[\s　]*(?P<title>.*?)\s*$"
-DEFAULT_CHAPTER_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s章集篇回]+)\s*(?P<unit>[章集篇回]))[\s　]*(?P<title>.*?)\s*$"
-DEFAULT_EXTRA_PATTERN = r"^\s*(?P<label>番外(?:篇)?)\s*[\s　]*(?P<title>.*?)\s*$"
+# A title must be separated from the heading label. This avoids treating prose
+# such as “第一章可能是正文” as a chapter while still accepting “第1章 标题”.
+DEFAULT_VOLUME_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s卷部冊]+)\s*(?P<unit>[卷部冊]))(?:[\s　]+(?P<title>.*?))?\s*$"
+DEFAULT_CHAPTER_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s章集篇回]+)\s*(?P<unit>[章集篇回]))(?:[\s　]+(?P<title>.*?))?\s*$"
+DEFAULT_EXTRA_PATTERN = r"^\s*(?P<label>番外(?:篇)?)\s*(?:[\s　]+(?P<title>.*?))?\s*$"
 
 
 @dataclass
