@@ -44,34 +44,23 @@ def test_render_requires_pandoc(tmp_path: Path):
         names = set(zf.namelist())
         assert "mimetype" in names
         assert "META-INF/container.xml" in names
+        assert "EPUB/content.opf" in names
+        assert "EPUB/nav.xhtml" in names
+        assert "EPUB/text/ch000001.xhtml" in names
+        assert "EPUB/text/ch000002.xhtml" in names
 
-        nav_name = next(n for n in names if n.endswith("nav.xhtml"))
-        nav_text = zf.read(nav_name).decode("utf-8")
-        assert "第一卷" in nav_text and "第二卷" in nav_text
-        assert "第1章" in nav_text and "第26章" in nav_text
+        nav_text = zf.read("EPUB/nav.xhtml").decode("utf-8")
+        assert "第一卷 九洲一号群" in nav_text
+        assert "第二卷 武道筑基" in nav_text
+        assert "第1章 黄山真君和九洲一号群" in nav_text
+        assert "第26章 我那与众不同的炼丹炉" in nav_text
 
-        opf_name = next(n for n in names if n.endswith(".opf"))
-        opf_root = ET.fromstring(zf.read(opf_name))
+        opf_root = ET.fromstring(zf.read("EPUB/content.opf"))
         ns = {"opf": "http://www.idpf.org/2007/opf"}
         manifest = {item.attrib["id"]: item for item in opf_root.findall("opf:manifest/opf:item", ns)}
         spine_ids = [itemref.attrib["idref"] for itemref in opf_root.findall("opf:spine/opf:itemref", ns)]
         spine_hrefs = [manifest[item_id].attrib["href"] for item_id in spine_ids]
-        chapter_hrefs = [href for href in spine_hrefs if href.startswith("text/ch")]
+        assert spine_hrefs == ["text/ch000001.xhtml", "text/ch000002.xhtml"]
 
-        opf_dir = Path(opf_name).parent.as_posix()
-        print("EPUB diagnostic content documents:")
-        for href in chapter_hrefs:
-            zip_path = unquote(f"{opf_dir}/{href}" if opf_dir != "." else href)
-            text = zf.read(zip_path).decode("utf-8")
-            title = re.search(r"<title>(.*?)</title>", text, re.S)
-            headings = re.findall(r"<h([1-6])[^>]*>(.*?)</h\1>", text, re.S)
-            print(f"  {zip_path}: title={title.group(1) if title else '<none>'!r}")
-            for level, heading in headings:
-                print(f"    h{level}: {heading!r}")
-
-        print("EPUB diagnostic nav entries:")
-        print(nav_text)
-
-        # Pandoc must create one content document per chapter. A volume is a
-        # navigation parent, not an EPUB content document of its own.
-        assert len(chapter_hrefs) == 2
+        first = zf.read("EPUB/text/ch000001.xhtml").decode("utf-8")
+        assert "a &lt; b &amp; c &gt; d" in first
