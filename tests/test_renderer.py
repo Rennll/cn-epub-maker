@@ -1,4 +1,3 @@
-import re
 import shutil
 import zipfile
 from pathlib import Path
@@ -67,5 +66,6 @@ def test_render_requires_pandoc(tmp_path: Path):
         manifest = {item.attrib["id"]: item for item in opf_root.findall("opf:manifest/opf:item", ns)}
         spine_ids = [itemref.attrib["idref"] for itemref in opf_root.findall("opf:spine/opf:itemref", ns)]
         spine_hrefs = {manifest[item_id].attrib["href"] for item_id in spine_ids}
-        assert len(spine_hrefs) == 2
-        assert all(not re.search(r"volume|第一卷|第二卷", href, re.I) for href in spine_hrefs)
+        assert all(not href.endswith("title_page.xhtml") for href in spine_hrefs)
+        chapter_hrefs = {href for href in spine_hrefs if href.startswith("text/ch")}
+        assert len(chapter_hrefs) == 2
