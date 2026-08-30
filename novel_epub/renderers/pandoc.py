@@ -56,7 +56,7 @@ def _markdown(book: Book) -> str:
 
 
 def _pandoc_chapter(chapter: Chapter, destination: Path) -> None:
-    """Convert exactly one chapter to an HTML fragment through Pandoc."""
+    """Convert exactly one chapter to XHTML through Pandoc."""
     source = destination.with_suffix(".md")
     fragment = destination.with_suffix(".html")
     source.write_text(_chapter_markdown(chapter), encoding="utf-8")
