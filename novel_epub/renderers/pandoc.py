@@ -25,8 +25,14 @@ def _markdown(book: Book) -> str:
     lines: list[str] = []
     if book.volumes:
         for volume in book.volumes:
-            lines.extend([f"## {volume.label} {volume.title}".rstrip(), ""])
+            # Pandoc's split level is 1, so level-2 volume headings remain in
+            # the same XHTML as the following chapter while still contributing
+            # a nested entry to the EPUB navigation.
             for chapter in volume.chapters:
+                if not lines:
+                    lines.extend([f"## {volume.label} {volume.title}".rstrip(), ""])
+                elif lines[-1] != f"## {volume.label} {volume.title}".rstrip():
+                    lines.extend([f"## {volume.label} {volume.title}".rstrip(), ""])
                 lines.extend(_chapter_markdown(chapter))
     for chapter in book.chapters:
         lines.extend(_chapter_markdown(chapter))
