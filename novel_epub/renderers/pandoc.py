@@ -25,9 +25,11 @@ def _markdown(book: Book) -> str:
     lines: list[str] = []
     if book.volumes:
         for volume in book.volumes:
-            # Volume is represented at the same heading level as a chapter in
-            # the Pandoc input. This makes each volume/chapter pair a single
-            # split unit; navigation is repaired after Pandoc generates EPUB.
+            # Keep Volume as an h1 navigation parent. Chapters are h2 so the
+            # generated TOC has Volume -> Chapter hierarchy. With split-level
+            # 1, Pandoc creates one document per volume; this is not yet the
+            # final chapter-per-document representation, so render() splits
+            # and rewrites these documents below.
             lines.extend([f"# {volume.label} {volume.title}".rstrip(), ""])
             for chapter in volume.chapters:
                 lines.extend([f"## {chapter.label} {chapter.title}".rstrip(), ""])
