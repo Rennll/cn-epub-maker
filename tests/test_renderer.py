@@ -2,7 +2,6 @@ import re
 import shutil
 import zipfile
 from pathlib import Path
-from urllib.parse import unquote
 from xml.etree import ElementTree as ET
 
 import pytest
@@ -46,6 +45,7 @@ def test_render_requires_pandoc(tmp_path: Path):
         assert "META-INF/container.xml" in names
         assert "EPUB/content.opf" in names
         assert "EPUB/nav.xhtml" in names
+        assert "EPUB/styles/stylesheet.css" in names
         assert "EPUB/text/ch000001.xhtml" in names
         assert "EPUB/text/ch000002.xhtml" in names
 
@@ -54,6 +54,7 @@ def test_render_requires_pandoc(tmp_path: Path):
         assert "第二卷 武道筑基" in nav_text
         assert "第1章 黄山真君和九洲一号群" in nav_text
         assert "第26章 我那与众不同的炼丹炉" in nav_text
+        assert nav_text.index("第一卷") < nav_text.index("第1章") < nav_text.index("第二卷") < nav_text.index("第26章")
 
         opf_root = ET.fromstring(zf.read("EPUB/content.opf"))
         ns = {"opf": "http://www.idpf.org/2007/opf"}
