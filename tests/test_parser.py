@@ -51,3 +51,18 @@ def test_preamble_is_warning_not_deleted():
     ], title="书", author="作者")
     assert result.book.chapter_count == 1
     assert any(w.kind == "text_before_first_chapter" for w in result.warnings)
+
+
+def test_extra_chapter_is_kept():
+    result = parse_lines([
+        "第1章 A",
+        "正文",
+        "番外 初见",
+        "番外正文",
+    ], title="书", author="作者")
+    chapters = list(result.book.iter_chapters())
+    assert len(chapters) == 2
+    assert chapters[1].number == "番外"
+    assert chapters[1].label == "番外"
+    assert chapters[1].title == "初见"
+    assert chapters[1].paragraphs[0].text == "番外正文"
