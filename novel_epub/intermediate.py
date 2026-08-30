@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .models import Book, Chapter
+from .models import Book
 
 
 def write_intermediate(book: Book, directory: str | Path) -> Path:
@@ -12,8 +12,8 @@ def write_intermediate(book: Book, directory: str | Path) -> Path:
     chapters_dir.mkdir(parents=True, exist_ok=True)
 
     chapter_entries: list[dict] = []
-    for chapter in book.iter_chapters():
-        filename = f"{chapter.sequence:06d}.json"
+    for index, chapter in enumerate(book.iter_chapters(), start=1):
+        filename = f"{index:06d}.json"
         chapter_entries.append(
             {
                 "sequence": chapter.sequence,
