@@ -2,6 +2,7 @@ import re
 import shutil
 import zipfile
 from pathlib import Path
+from urllib.parse import unquote
 from xml.etree import ElementTree as ET
 
 import pytest
@@ -67,12 +68,15 @@ def test_render_requires_pandoc(tmp_path: Path):
         spine_ids = [itemref.attrib["idref"] for itemref in opf_root.findall("opf:spine/opf:itemref", ns)]
         spine_hrefs = {manifest[item_id].attrib["href"] for item_id in spine_ids}
         chapter_hrefs = {href for href in spine_hrefs if href.startswith("text/ch")}
+
+        opf_dir = Path(opf_name).parent.as_posix()
         print("EPUB diagnostic content documents:")
         for href in sorted(chapter_hrefs):
-            text = zf.read(href).decode("utf-8")
+            zip_path = unquote(f"{opf_dir}/{href}" if opf_dir != "." else href)
+            text = zf.read(zip_path).decode("utf-8")
             title = re.search(r"<title>(.*?)</title>", text, re.S)
             heading = re.search(r"<h[1-6][^>]*>(.*?)</h[1-6]>", text, re.S)
-            print(f"  {href}: title={title.group(1) if title else '<none>'!r}, heading={heading.group(1) if heading else '<none>'!r}")
+            print(f"  {zip_path}: title={title.group(1) if title else '<none>'!r}, heading={heading.group(1) if heading else '<none>'!r}")
         print("EPUB diagnostic nav entries:")
         print(nav_text)
         assert len(chapter_hrefs) == 2
