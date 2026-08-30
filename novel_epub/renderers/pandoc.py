@@ -23,17 +23,18 @@ def _escape_markdown(text: str) -> str:
 
 def _markdown(book: Book) -> str:
     lines: list[str] = []
-    for volume in book.volumes:
-        lines.extend([f"# {volume.label} {volume.title}".rstrip(), ""])
-        for chapter in volume.chapters:
-            lines.extend(_chapter_markdown(chapter))
+    if book.volumes:
+        for volume in book.volumes:
+            lines.extend([f"# {volume.label} {volume.title}".rstrip(), ""])
+            for chapter in volume.chapters:
+                lines.extend(_chapter_markdown(chapter))
     for chapter in book.chapters:
         lines.extend(_chapter_markdown(chapter))
     return "\n".join(lines).rstrip() + "\n"
 
 
 def _chapter_markdown(chapter) -> list[str]:
-    lines = [f"## {chapter.label} {chapter.title}".rstrip(), ""]
+    lines = [f"# {chapter.label} {chapter.title}".rstrip(), ""]
     for paragraph in chapter.paragraphs:
         lines.extend([_escape_markdown(paragraph.text), ""])
     return lines
@@ -51,7 +52,7 @@ def render(book: Book, output: str | Path) -> Path:
 
         cmd = [
             "pandoc", str(md), "-o", str(output),
-            "--toc", "--toc-depth=2", "--split-level=2",
+            "--toc", "--toc-depth=1", "--split-level=1",
             "--css", str(css),
             "--metadata", f"title={book.title}",
             "--metadata", f"author={book.author}",
