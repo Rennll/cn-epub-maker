@@ -55,13 +55,25 @@ def _markdown(book: Book) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _validate_chapters(book: Book) -> None:
+def _iter_chapters(book: Book):
+    for volume in book.volumes:
+        yield from ((volume, chapter) for chapter in volume.chapters)
+    yield from ((None, chapter) for chapter in book.chapters)
+
+
+def _validate_book(book: Book) -> None:
     sequences = [chapter.sequence for _volume, chapter in _iter_chapters(book)]
     if len(sequences) != len(set(sequences)):
         raise ValueError("duplicate chapter sequence")
+    if book.cover:
+        cover = Path(book.cover)
+        if not cover.is_file():
+            raise FileNotFoundError(f"cover file not found: {cover}")
+        if mimetypes.guess_type(cover.name)[0] not in {"image/jpeg", "image/png", "image/gif", "image/webp"}:
+            raise ValueError(f"unsupported cover media type: {cover.name}")
 
 
-def _pandoc_chapter(chapter: Chapter, destination: Path) -> None:
+def _pandoc_chapter(chapter: Chapter, destination: Path, language: str) -> None:
     """Convert exactly one chapter to XHTML through Pandoc."""
     source = destination.with_suffix(".md")
     fragment = destination.with_suffix(".html")
@@ -71,13 +83,15 @@ def _pandoc_chapter(chapter: Chapter, destination: Path) -> None:
         check=True,
     )
     body = fragment.read_text(encoding="utf-8").strip()
+    chapter_title = escape(f"{chapter.label} {chapter.title}".rstrip())
+    language = escape(language)
     xhtml = (
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<!DOCTYPE html>\n'
-        '<html xmlns="http://www.w3.org/1999/xhtml" lang="zh-CN" xml:lang="zh-CN">\n'
+        f'<html xmlns="http://www.w3.org/1999/xhtml" lang="{language}" xml:lang="{language}">\n'
         "<head>\n"
         '<meta charset="utf-8" />\n'
-        f"<title>{escape(chapter.label + ' ' + chapter.title)}</title>\n"
+        f"<title>{chapter_title}</title>\n"
         '<link rel="stylesheet" type="text/css" href="../styles/stylesheet.css" />\n'
         "</head>\n"
         "<body>\n"
@@ -85,12 +99,6 @@ def _pandoc_chapter(chapter: Chapter, destination: Path) -> None:
         "</body>\n</html>\n"
     )
     destination.write_text(xhtml, encoding="utf-8")
-
-
-def _iter_chapters(book: Book):
-    for volume in book.volumes:
-        yield from ((volume, chapter) for chapter in volume.chapters)
-    yield from ((None, chapter) for chapter in book.chapters)
 
 
 def _chapter_entries(book: Book):
@@ -137,7 +145,7 @@ def _content_opf(book: Book, chapter_paths: dict[int, str], identifier: str, cov
         spine.append(f'<itemref idref="{item_id}" />')
     cover_meta = ""
     if cover_name:
-        media_type = mimetypes.guess_type(cover_name)[0] or "image/jpeg"
+        media_type = mimetypes.guess_type(cover_name)[0]
         manifest.append(f'<item id="cover-image" href="images/{escape(Path(cover_name).name)}" media-type="{media_type}" properties="cover-image" />')
         cover_meta = '<meta name="cover" content="cover-image" />'
 
@@ -178,14 +186,12 @@ def _write_epub(book: Book, output: Path, chapter_files: list[tuple[Chapter, Pat
         zf.writestr("EPUB/content.opf", _content_opf(book, chapter_paths, identifier, cover_name))
         if book.cover:
             cover = Path(book.cover)
-            if not cover.is_file():
-                raise FileNotFoundError(f"cover file not found: {cover}")
             zf.write(cover, f"EPUB/images/{cover.name}")
 
 
 def render(book: Book, output: str | Path) -> Path:
     """Render chapters independently with Pandoc, then assemble a native EPUB."""
-    _validate_chapters(book)
+    _validate_book(book)
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix="novel-epub-") as tmp:
@@ -195,7 +201,7 @@ def render(book: Book, output: str | Path) -> Path:
         chapter_files: list[tuple[Chapter, Path]] = []
         for _volume, chapter in _iter_chapters(book):
             destination = chapter_dir / f"ch{chapter.sequence:06d}.xhtml"
-            _pandoc_chapter(chapter, destination)
+            _pandoc_chapter(chapter, destination, book.language)
             chapter_files.append((chapter, destination))
         _write_epub(book, output, chapter_files)
     return output
