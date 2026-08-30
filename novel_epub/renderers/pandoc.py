@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import mimetypes
 import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -7,12 +8,7 @@ from tempfile import TemporaryDirectory
 from ..models import Book
 
 CSS = """@charset "UTF-8";
-body {
-  font-size: 1em;
-  line-height: 1.8;
-  margin: 1em;
-  text-align: justify;
-}
+body { font-size: 1em; line-height: 1.8; margin: 1em; text-align: justify; }
 p { text-indent: 2em; margin: 0; padding: 0; }
 h1, h2 { text-align: center; }
 """
@@ -21,8 +17,7 @@ h1, h2 { text-align: center; }
 def _markdown(book: Book) -> str:
     lines: list[str] = []
     for volume in book.volumes:
-        lines.append(f"# {volume.label} {volume.title}".rstrip())
-        lines.append("")
+        lines.extend([f"# {volume.label} {volume.title}".rstrip(), ""])
         for chapter in volume.chapters:
             lines.extend(_chapter_markdown(chapter))
     for chapter in book.chapters:
@@ -33,8 +28,6 @@ def _markdown(book: Book) -> str:
 def _chapter_markdown(chapter) -> list[str]:
     lines = [f"## {chapter.label} {chapter.title}".rstrip(), ""]
     for paragraph in chapter.paragraphs:
-        # Pandoc owns HTML escaping; raw novel text is never interpolated into
-        # HTML. Preserve paragraph text verbatim in the Markdown source.
         lines.extend([paragraph.text, ""])
     return lines
 
@@ -59,8 +52,12 @@ def render(book: Book, output: str | Path) -> Path:
         ]
         if book.cover:
             cover = Path(book.cover)
-            if cover.is_file():
-                cmd += ["--epub-cover-image", str(cover)]
+            if not cover.is_file():
+                raise FileNotFoundError(f"cover file not found: {cover}")
+            media_type = mimetypes.guess_type(cover.name)[0]
+            if media_type not in {"image/jpeg", "image/png", "image/gif", "image/webp"}:
+                raise ValueError(f"unsupported cover image type: {cover.suffix}")
+            cmd += ["--epub-cover-image", str(cover)]
 
         subprocess.run(cmd, check=True)
     return output
