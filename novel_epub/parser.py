@@ -58,17 +58,15 @@ def parse_lines(
             current_chapter.paragraphs.append(Paragraph(text="\n".join(paragraph_lines)))
         paragraph_lines.clear()
 
-    def add_chapter(cm, line_no: int, *, fallback_number: int | None = None):
+    def add_chapter(cm, line_no: int):
         nonlocal chapter_sequence, current_chapter
         flush_paragraph()
         chapter_sequence += 1
         groups = cm.groupdict()
         raw_number = groups.get("number")
-        number = _parse_number(raw_number) if raw_number else fallback_number
+        number = _parse_number(raw_number) if raw_number else None
         label = groups.get("label") or cm.group(0).strip()
         chapter_title = (groups.get("title") or "").strip()
-        if not chapter_title and fallback_number is None:
-            warnings.append(WarningItem("empty_chapter", line_no, f"empty chapter: {label}"))
         if number is not None and number in seen_numbers:
             warnings.append(WarningItem("duplicate_chapter_number", line_no, f"duplicate chapter number: {number}"))
         if number is not None:
