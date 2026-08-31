@@ -9,38 +9,41 @@ _LARGE_UNITS = {"万": 10_000, "萬": 10_000, "亿": 100_000_000, "億": 100_000
 
 
 def chinese_numeral_to_int(text: str) -> int | None:
-    """Convert a standard Chinese numeral to an integer.
-
-    Returns None when the input contains unsupported or ambiguous forms.
-    Arabic digits are intentionally not handled here.
-    """
+    """Convert a conventional Chinese numeral to an integer."""
     s = text.strip()
     if not s or any(ch not in _DIGITS and ch not in _SMALL_UNITS and ch not in _LARGE_UNITS for ch in s):
-        return None
-    if s.isdigit():
         return None
 
     total = 0
     section = 0
-    number = 0
+    number: int | None = None
+    last_small_unit = 10_000
+
     for ch in s:
         if ch in _DIGITS:
+            if number is not None:
+                return None
             number = _DIGITS[ch]
             continue
+
         if ch in _SMALL_UNITS:
             unit = _SMALL_UNITS[ch]
-            if number == 0:
+            if unit >= last_small_unit:
+                return None
+            if number is None:
                 number = 1
             section += number * unit
-            number = 0
+            number = None
+            last_small_unit = unit
             continue
-        unit = _LARGE_UNITS[ch]
-        section += number
+
+        if number is not None:
+            section += number
+            number = None
         if section == 0:
             return None
-        total += section * unit
+        total += section * _LARGE_UNITS[ch]
         section = 0
-        number = 0
+        last_small_unit = 10_000
 
-    value = total + section + number
-    return value if value >= 0 else None
+    return total + section + (number or 0)
