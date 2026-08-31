@@ -1,5 +1,6 @@
 import re
 import shutil
+import subprocess
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -122,6 +123,31 @@ def test_epub_renderer_contract_links_manifest_spine_and_content(tmp_path: Path)
             assert title is not None
             assert stylesheet is not None
             assert stylesheet.attrib["href"] == "../styles/stylesheet.css"
+
+
+def test_pandoc_stderr_is_captured_as_utf8(tmp_path: Path, monkeypatch):
+    book = Book(title="測試書", author="作者", chapters=[
+        Chapter(sequence=1, number="1", label="第1章", title="特殊字元", paragraphs=[
+            Paragraph("＠#/×仙子\n極度絕望.jpg")
+        ])
+    ])
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        destination = Path(command[-1])
+        destination.write_text("<h1>特殊字元</h1>", encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="警告：Could not convert TeX math ??")
+
+    monkeypatch.setattr("novel_epub.renderers.pandoc.subprocess.run", fake_run)
+    render(book, tmp_path / "book.epub")
+
+    assert len(calls) == 1
+    assert calls[0][1]["stdout"] == subprocess.PIPE
+    assert calls[0][1]["stderr"] == subprocess.PIPE
+    assert calls[0][1]["text"] is True
+    assert calls[0][1]["encoding"] == "utf-8"
+    assert calls[0][1]["errors"] == "replace"
 
 
 def test_epub_renderer_contract_rejects_duplicate_chapter_sequences(tmp_path: Path):
