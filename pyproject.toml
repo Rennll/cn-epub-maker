@@ -12,5 +12,8 @@ dependencies = []
 [project.scripts]
 novel-epub = "novel_epub.cli:main"
 
+[tool.setuptools]
+packages = ["novel_epub"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
