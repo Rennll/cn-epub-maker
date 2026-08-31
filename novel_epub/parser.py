@@ -3,14 +3,13 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from .chinese_numerals import chinese_numeral_to_int
 from .models import Book, Chapter, Paragraph, Volume
 from .normalize import normalize_line
 
-# A title must be separated from the heading label. This avoids treating prose
-# such as “第一章可能是正文” as a chapter while still accepting “第1章 标题”.
 DEFAULT_VOLUME_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s卷部冊]+)\s*(?P<unit>[卷部冊]))(?:[\s　]+(?P<title>.*?))?\s*$"
 DEFAULT_CHAPTER_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s章集篇回]+)\s*(?P<unit>[章集篇回]))(?:[\s　]+(?P<title>.*?))?\s*$"
-DEFAULT_EXTRA_PATTERN = r"^\s*(?P<label>番外(?:篇)?)\s*(?:[\s　]+(?P<title>.*?))?\s*$"
+DEFAULT_EXTRA_PATTERN = r"^\s*(?P<label>番外(?:篇)?(?:\s*[0-9一二三四五六七八九十百千万萬零〇兩两]+)?)\s*(?:[：:]?\s*(?P<title>.*?))?\s*$"
 
 
 @dataclass
@@ -24,6 +23,15 @@ class WarningItem:
 class ParseResult:
     book: Book
     warnings: list[WarningItem]
+
+
+def _parse_number(raw: str) -> int | None:
+    value = raw.strip().replace(" ", "").replace("　", "")
+    if not value:
+        return None
+    if value.isdigit():
+        return int(value)
+    return chinese_numeral_to_int(value)
 
 
 def parse_lines(
@@ -40,7 +48,7 @@ def parse_lines(
     current_chapter: Chapter | None = None
     chapter_sequence = 0
     volume_sequence = 0
-    seen_numbers: set[str] = set()
+    seen_numbers: set[int] = set()
     seen_volume_numbers: set[str] = set()
     preamble_nonempty: list[int] = []
     paragraph_lines: list[str] = []
@@ -50,19 +58,20 @@ def parse_lines(
             current_chapter.paragraphs.append(Paragraph(text="\n".join(paragraph_lines)))
         paragraph_lines.clear()
 
-    def add_chapter(cm, line_no: int, fallback_number: str | None = None):
+    def add_chapter(cm, line_no: int, *, fallback_number: int | None = None):
         nonlocal chapter_sequence, current_chapter
         flush_paragraph()
         chapter_sequence += 1
         groups = cm.groupdict()
-        number = groups.get("number") or fallback_number or ""
+        raw_number = groups.get("number")
+        number = _parse_number(raw_number) if raw_number else fallback_number
         label = groups.get("label") or cm.group(0).strip()
         chapter_title = (groups.get("title") or "").strip()
-        if not chapter_title:
+        if not chapter_title and fallback_number is None:
             warnings.append(WarningItem("empty_chapter", line_no, f"empty chapter: {label}"))
-        if number in seen_numbers and number:
+        if number is not None and number in seen_numbers:
             warnings.append(WarningItem("duplicate_chapter_number", line_no, f"duplicate chapter number: {number}"))
-        if number:
+        if number is not None:
             seen_numbers.add(number)
         current_chapter = Chapter(sequence=chapter_sequence, number=number, label=label, title=chapter_title)
         if current_volume is not None:
@@ -95,18 +104,23 @@ def parse_lines(
 
         cm = chapter_re.match(stripped)
         if cm:
+            raw_number = cm.groupdict().get("number") or ""
+            parsed = _parse_number(raw_number)
+            if parsed is None:
+                warnings.append(WarningItem("unparsed_chapter_number", line_no, f"could not parse chapter number: {raw_number}"))
+                continue
             add_chapter(cm, line_no)
             continue
+
         em = extra_re.match(stripped)
         if em:
-            add_chapter(em, line_no, fallback_number="番外")
+            add_chapter(em, line_no)
             continue
 
         if current_chapter is None:
             preamble_nonempty.append(line_no)
             continue
 
-        # Only formatting indentation is normalized. Text itself is preserved.
         paragraph_lines.append(line)
         if stripped.startswith("第") and re.search(r"[章集篇回]", stripped):
             warnings.append(WarningItem("suspicious_chapter_heading", line_no, f"possible chapter heading not matched: {stripped[:80]}"))
