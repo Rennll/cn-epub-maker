@@ -81,6 +81,11 @@ def _pandoc_chapter(chapter: Chapter, destination: Path, language: str) -> None:
     subprocess.run(
         ["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)],
         check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     body = fragment.read_text(encoding="utf-8").strip()
     chapter_title = escape(f"{chapter.label} {chapter.title}".rstrip())
