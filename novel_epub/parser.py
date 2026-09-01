@@ -83,7 +83,7 @@ def parse_lines(
         if not stripped:
             if current_chapter is not None:
                 flush_paragraph()
-            elif preamble_lines:
+            elif preamble_lines and preamble_lines[-1] != "":
                 preamble_lines.append("")
             continue
 
@@ -136,10 +136,9 @@ def parse_lines(
             warnings.append(WarningItem("suspicious_chapter_heading", line_no, f"possible chapter heading not matched: {stripped[:80]}"))
 
     flush_paragraph()
-    if preamble_lines:
-        while preamble_lines and preamble_lines[-1] == "":
-            preamble_lines.pop()
-        book.preamble = [Paragraph(text=line) for line in preamble_lines if line]
+    while preamble_lines and preamble_lines[-1] == "":
+        preamble_lines.pop()
+    book.preamble = [Paragraph(text=line) for line in preamble_lines if line]
     if not book.chapter_count:
         warnings.append(WarningItem("no_chapters", 0, "no chapters were detected"))
     return ParseResult(book=book, warnings=warnings)
