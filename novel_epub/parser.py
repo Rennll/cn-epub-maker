@@ -9,7 +9,7 @@ from .normalize import normalize_line
 
 DEFAULT_VOLUME_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s卷部冊]+)\s*(?P<unit>[卷部冊]))(?:[\s　]+(?P<title>.*?))?\s*$"
 DEFAULT_CHAPTER_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s章集篇回]+)\s*(?P<unit>[章集篇回]))(?:[\s　]+(?P<title>.*?))?\s*$"
-DEFAULT_EXTRA_PATTERN = r"^\s*(?P<label>番外(?:篇)?(?:\s*[0-9一二三四五六七八九十百千万萬零〇兩两]+)?)\s*(?:[：:]?\s*(?P<title>.*?))?\s*$"
+DEFAULT_EXTRA_PATTERN = r"^\s*(?P<label>番外(?:篇)?(?:\s*[0-9一二三四五六七八九十百千万萬零〇兩两]+))(?:\s*[：:]?\s*(?P<title>.*?))?\s*$"
 
 
 @dataclass
@@ -115,7 +115,16 @@ def parse_lines(
 
         em = extra_re.match(stripped)
         if em:
-            add_chapter(em, line_no)
+            groups = em.groupdict()
+            label = groups.get("label") or em.group(0).strip()
+            chapter_title = (groups.get("title") or "").strip()
+            flush_paragraph()
+            chapter_sequence += 1
+            current_chapter = Chapter(sequence=chapter_sequence, number=None, label=label, title=chapter_title)
+            if current_volume is not None:
+                current_volume.chapters.append(current_chapter)
+            else:
+                book.chapters.append(current_chapter)
             continue
 
         if current_chapter is None:
