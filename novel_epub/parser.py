@@ -50,8 +50,8 @@ def parse_lines(
     volume_sequence = 0
     seen_numbers: set[int] = set()
     seen_volume_numbers: set[str] = set()
-    preamble_nonempty: list[int] = []
     paragraph_lines: list[str] = []
+    preamble_lines: list[str] = []
 
     def flush_paragraph() -> None:
         if current_chapter is not None and paragraph_lines:
@@ -81,7 +81,10 @@ def parse_lines(
         line = normalize_line(raw).rstrip()
         stripped = line.strip()
         if not stripped:
-            flush_paragraph()
+            if current_chapter is not None:
+                flush_paragraph()
+            elif preamble_lines:
+                preamble_lines.append("")
             continue
 
         vm = volume_re.match(stripped)
@@ -116,7 +119,7 @@ def parse_lines(
             continue
 
         if current_chapter is None:
-            preamble_nonempty.append(line_no)
+            preamble_lines.append(stripped)
             continue
 
         paragraph_lines.append(line)
@@ -124,8 +127,10 @@ def parse_lines(
             warnings.append(WarningItem("suspicious_chapter_heading", line_no, f"possible chapter heading not matched: {stripped[:80]}"))
 
     flush_paragraph()
-    if preamble_nonempty:
-        warnings.append(WarningItem("text_before_first_chapter", preamble_nonempty[0], f"text found before first chapter ({len(preamble_nonempty)} non-empty lines)"))
+    if preamble_lines:
+        while preamble_lines and preamble_lines[-1] == "":
+            preamble_lines.pop()
+        book.preamble = [Paragraph(text=line) for line in preamble_lines if line]
     if not book.chapter_count:
         warnings.append(WarningItem("no_chapters", 0, "no chapters were detected"))
     return ParseResult(book=book, warnings=warnings)
