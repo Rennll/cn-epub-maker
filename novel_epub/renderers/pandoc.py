@@ -38,9 +38,18 @@ def _chapter_markdown(chapter: Chapter) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _preamble_markdown(book: Book) -> str:
+    lines: list[str] = []
+    for paragraph in book.preamble:
+        lines.extend([_escape_markdown(paragraph.text), ""])
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def _markdown(book: Book) -> str:
     """Render the model as a debug-friendly whole-book Markdown document."""
     lines: list[str] = []
+    for paragraph in book.preamble:
+        lines.extend([_escape_markdown(paragraph.text), ""])
     if book.volumes:
         for volume in book.volumes:
             lines.extend([f"# {volume.label} {volume.title}".rstrip(), ""])
@@ -106,12 +115,45 @@ def _pandoc_chapter(chapter: Chapter, destination: Path, language: str) -> None:
     destination.write_text(xhtml, encoding="utf-8")
 
 
+def _pandoc_preamble(book: Book, destination: Path) -> None:
+    source = destination.with_suffix(".md")
+    fragment = destination.with_suffix(".html")
+    source.write_text(_preamble_markdown(book), encoding="utf-8")
+    subprocess.run(
+        ["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    body = fragment.read_text(encoding="utf-8").strip()
+    language = escape(book.language)
+    xhtml = (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<!DOCTYPE html>\n'
+        f'<html xmlns="http://www.w3.org/1999/xhtml" lang="{language}" xml:lang="{language}">\n'
+        "<head>\n"
+        '<meta charset="utf-8" />\n'
+        f"<title>{escape(book.title)}</title>\n"
+        '<link rel="stylesheet" type="text/css" href="../styles/stylesheet.css" />\n'
+        "</head>\n"
+        "<body>\n"
+        f"{body}\n"
+        "</body>\n</html>\n"
+    )
+    destination.write_text(xhtml, encoding="utf-8")
+
+
 def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
     def chapter_li(chapter: Chapter) -> str:
         label = escape(f"{chapter.label} {chapter.title}".rstrip())
         return f'<li><a href="{chapter_paths[chapter.sequence]}">{label}</a></li>'
 
     groups: list[str] = []
+    if book.preamble:
+        groups.append('<li><a href="text/preamble.xhtml">前言</a></li>')
     if book.volumes:
         for volume in book.volumes:
             label = escape(f"{volume.label} {volume.title}".rstrip())
@@ -133,12 +175,15 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
 '''
 
 
-def _content_opf(book: Book, chapter_paths: dict[int, str], identifier: str, cover_name: str | None) -> str:
+def _content_opf(book: Book, chapter_paths: dict[int, str], identifier: str, cover_name: str | None, has_preamble: bool = False) -> str:
     manifest = [
         '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav" />',
         '<item id="css" href="styles/stylesheet.css" media-type="text/css" />',
     ]
     spine: list[str] = []
+    if has_preamble:
+        manifest.append('<item id="preamble" href="text/preamble.xhtml" media-type="application/xhtml+xml" />')
+        spine.append('<itemref idref="preamble" />')
     for index, (_volume, chapter) in enumerate(_iter_chapters(book), start=1):
         item_id = f"ch{index:06d}"
         href = chapter_paths[chapter.sequence]
@@ -165,7 +210,7 @@ def _content_opf(book: Book, chapter_paths: dict[int, str], identifier: str, cov
 '''
 
 
-def _write_epub(book: Book, output: Path, chapter_files: list[tuple[Chapter, Path]]) -> None:
+def _write_epub(book: Book, output: Path, chapter_files: list[tuple[Chapter, Path]], preamble_file: Path | None = None) -> None:
     identifier = str(uuid.uuid4())
     chapter_paths = {chapter.sequence: f"text/ch{index:06d}.xhtml" for index, (chapter, _source) in enumerate(chapter_files, start=1)}
     cover_name = Path(book.cover).name if book.cover else None
@@ -176,15 +221,17 @@ def _write_epub(book: Book, output: Path, chapter_files: list[tuple[Chapter, Pat
 '''
     with zipfile.ZipFile(output, "w") as zf:
         zf.writestr("mimetype", "application/epub+zip", compress_type=zipfile.ZIP_STORED)
-        zf.writestr("META-INF/container.xml", container)
-        zf.writestr("EPUB/nav.xhtml", _nav_xhtml(book, chapter_paths))
-        zf.writestr("EPUB/styles/stylesheet.css", CSS)
+        zf.writestr("META-INF/container.xml", container, compress_type=zipfile.ZIP_DEFLATED)
+        zf.writestr("EPUB/nav.xhtml", _nav_xhtml(book, chapter_paths), compress_type=zipfile.ZIP_DEFLATED)
+        zf.writestr("EPUB/styles/stylesheet.css", CSS, compress_type=zipfile.ZIP_DEFLATED)
+        if preamble_file:
+            zf.writestr("EPUB/text/preamble.xhtml", preamble_file.read_bytes(), compress_type=zipfile.ZIP_DEFLATED)
         for chapter, source in chapter_files:
-            zf.writestr(f"EPUB/{chapter_paths[chapter.sequence]}", source.read_bytes())
-        zf.writestr("EPUB/content.opf", _content_opf(book, chapter_paths, identifier, cover_name))
+            zf.writestr(f"EPUB/{chapter_paths[chapter.sequence]}", source.read_bytes(), compress_type=zipfile.ZIP_DEFLATED)
+        zf.writestr("EPUB/content.opf", _content_opf(book, chapter_paths, identifier, cover_name, bool(preamble_file)), compress_type=zipfile.ZIP_DEFLATED)
         if book.cover:
             cover = Path(book.cover)
-            zf.write(cover, f"EPUB/images/{cover.name}")
+            zf.write(cover, f"EPUB/images/{cover.name}", compress_type=zipfile.ZIP_DEFLATED)
 
 
 def render(book: Book, output: str | Path) -> Path:
@@ -201,5 +248,9 @@ def render(book: Book, output: str | Path) -> Path:
             destination = chapter_dir / f"ch{chapter.sequence:06d}.xhtml"
             _pandoc_chapter(chapter, destination, book.language)
             chapter_files.append((chapter, destination))
-        _write_epub(book, output, chapter_files)
+        preamble_file = None
+        if book.preamble:
+            preamble_file = root / "preamble.xhtml"
+            _pandoc_preamble(book, preamble_file)
+        _write_epub(book, output, chapter_files, preamble_file)
     return output
