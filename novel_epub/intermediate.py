@@ -36,11 +36,18 @@ def write_intermediate(book: Book, directory: str | Path) -> Path:
             },
         )
 
+    if book.preamble:
+        _write_json(
+            root / "preamble.json",
+            {"paragraphs": [{"text": p.text} for p in book.preamble]},
+        )
+
     metadata = {
         "title": book.title,
         "author": book.author,
         "language": book.language,
         "cover": book.cover,
+        "preamble": {"file": "preamble.json"} if book.preamble else None,
         "volumes": [
             {
                 "sequence": v.sequence,
