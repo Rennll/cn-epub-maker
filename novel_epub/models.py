@@ -33,6 +33,7 @@ class Book:
     author: str
     language: str = "zh-CN"
     cover: str | None = None
+    preamble: list[Paragraph] = field(default_factory=list)
     volumes: list[Volume] = field(default_factory=list)
     chapters: list[Chapter] = field(default_factory=list)
 
