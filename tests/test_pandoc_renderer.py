@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import zipfile
 
 from novel_epub.models import Book, Chapter, Paragraph
@@ -7,10 +8,11 @@ from novel_epub.renderers import pandoc
 
 
 def test_render_preserves_preamble_and_epub_order(monkeypatch, tmp_path):
-    def fake_pandoc(source, destination):
-        destination.write_text("<p>rendered</p>", encoding="utf-8")
+    def fake_run(args, **kwargs):
+        destination = args[args.index("--output") + 1]
+        pandoc.Path(destination).write_text("<p>rendered</p>", encoding="utf-8")
 
-    monkeypatch.setattr(pandoc, "subprocess", type("Subprocess", (), {"run": staticmethod(lambda args, **kwargs: fake_pandoc(type("Source", (), {"read_text": lambda self, encoding=None: ""})(), Path(args[-1])))})())
+    monkeypatch.setattr(pandoc.subprocess, "run", fake_run)
 
     book = Book(
         title="書",
