@@ -18,23 +18,32 @@ def chinese_numeral_to_int(text: str) -> int | None:
     section = 0
     number: int | None = None
     last_small_unit = 10_000
+    zero_pending = False
 
     for ch in s:
         if ch in _DIGITS:
-            if number is not None:
+            digit = _DIGITS[ch]
+            if digit == 0:
+                if number is None:
+                    zero_pending = True
+                else:
+                    number = 0
+                continue
+            if number is not None and number != 0:
                 return None
-            number = _DIGITS[ch]
+            number = digit
             continue
 
         if ch in _SMALL_UNITS:
             unit = _SMALL_UNITS[ch]
             if unit >= last_small_unit:
                 return None
-            if number is None:
+            if number is None or number == 0:
                 number = 1
             section += number * unit
             number = None
             last_small_unit = unit
+            zero_pending = False
             continue
 
         if number is not None:
@@ -45,5 +54,9 @@ def chinese_numeral_to_int(text: str) -> int | None:
         total += section * _LARGE_UNITS[ch]
         section = 0
         last_small_unit = 10_000
+        zero_pending = False
 
-    return total + section + (number or 0)
+    value = total + section + (number or 0)
+    if zero_pending and value == 0:
+        return 0
+    return value
