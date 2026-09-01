@@ -149,7 +149,7 @@ def test_extra_chapter_inside_volume_preserves_toc_order():
         (2, "番外1"),
         (3, "第101章"),
     ]
-    assert [c.title for c in volume.chapters] == ["A", "初見", "B"]
+    assert [c.title for c in volume.chapters] == ["A", "初见", "B"]
 
 
 def test_text_containing_extra_word_is_not_automatically_a_chapter():
