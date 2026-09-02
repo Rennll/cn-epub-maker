@@ -2,7 +2,7 @@
 
 將中文小說 TXT 轉換成 EPUB 的 Python 工具。
 
-目前 `main` 上的穩定基線是 V1：重點是以保留原文為優先，解析卷／章／段落結構，產生 Intermediate，再透過 Pandoc 建立 EPUB 並進行結構驗證。
+目前 `main` 上的穩定基線是 V1：以保留原文為優先，解析卷／章／段落結構，產生 Intermediate，再透過 Pandoc 建立 EPUB 並進行結構驗證。
 
 V1 不會自動進行簡體轉繁體、垃圾內容清理、全域阿拉伯數字轉換或章節重新編號。這些屬於 V2 的後續設計；V2 目前尚未完整實作。
 
@@ -15,7 +15,7 @@ python3 -m pip install -e .
 pandoc --version
 ```
 
-EPUBCheck 為選用工具。安裝後放在 `PATH` 中即可讓 `validate` 額外執行 EPUB 標準驗證。
+EPUBCheck 為選用工具。安裝後放在 `PATH` 中，即可讓 `validate` 額外執行 EPUB 標準驗證。
 
 ## 快速使用
 
