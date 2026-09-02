@@ -1,158 +1,151 @@
 # cn-epub-maker
 
-將中文小說 TXT 檔轉換為專業的直排（或橫排）EPUB 電子書。
+將中文小說 TXT 轉換成 EPUB 的 Python 工具。
 
-[English](README.en.md)
+目前 `main` 上的穩定基線是 V1：重點是以保留原文為優先，解析卷／章／段落結構，產生 Intermediate，再透過 Pandoc 建立 EPUB 並進行結構驗證。
 
-## 功能特色
+V1 不會自動進行簡體轉繁體、垃圾內容清理、全域阿拉伯數字轉換或章節重新編號。這些屬於 V2 的後續設計；V2 目前尚未完整實作。
 
-- **自動偵測編碼** — 支援 GBK、GB18030、UTF-8、Big5
-- **簡體轉繁體** — 透過 [OpenCC](https://github.com/BYVoid/OpenCC) 自動轉換
-- **直排右翻排版** — 正確的 `writing-mode: vertical-rl` 與 RTL 翻頁方向，如同實體中文書
-- **智慧去除垃圾內容** — 自動清除網站廣告、分隔線、內容簡介等
-- **章節結構解析** — 自動辨識 `第X卷`、`第X章`、`第X回` 等格式
-- **章節重新編號** — 修正來源檔案中的章節編號錯誤與重複
-- **中文排版規範** — `""` → `「」`、`''` → `『』`、阿拉伯數字轉中文數字
-- **封面圖片支援**
-- **高度自訂** — 可自訂卷/章正則表達式、編碼、排版方向
+## 安裝
 
-## 安裝依賴
+需要 Python 3.10 以上，以及可執行的 Pandoc。
 
 ```bash
-# 必要
-brew install pandoc
-
-# 選用（簡轉繁功能需要）
-brew install opencc
+python3 -m pip install -e .
+pandoc --version
 ```
 
-## 使用方式
+EPUBCheck 為選用工具。安裝後放在 `PATH` 中即可讓 `validate` 額外執行 EPUB 標準驗證。
+
+## 快速使用
+
+基本 build：
 
 ```bash
-# 基本用法 — 自動偵測編碼，轉繁體，直排輸出：
-python3 cn_epub_maker.py novel.txt --title "書名" --author "作者"
-
-# 加入封面圖片：
-python3 cn_epub_maker.py novel.txt -t "書名" -a "作者" --cover cover.png
-
-# 指定輸出路徑：
-python3 cn_epub_maker.py novel.txt -t "書名" -a "作者" -o output.epub
-
-# 來源已是繁體中文，跳過轉換：
-python3 cn_epub_maker.py novel.txt -t "書名" -a "作者" --no-convert
-
-# 使用橫排排版：
-python3 cn_epub_maker.py novel.txt -t "書名" -a "作者" --horizontal
-
-# 保留原始章節編號（不重新編號）：
-python3 cn_epub_maker.py novel.txt -t "書名" -a "作者" --no-renumber
-
-# 自訂章節格式（例如古典小說用「第X回」）：
-python3 cn_epub_maker.py novel.txt -t "書名" -a "作者" \
-  --chapter-pattern "^(?P<label>第.+回)[\s　]*(?P<title>.*)"
-
-# 保留阿拉伯數字與原始引號：
-python3 cn_epub_maker.py novel.txt -t "書名" -a "作者" --keep-arabic --keep-quotes
+novel-epub build novel.txt --title "書名" --author "作者"
 ```
 
-## 參數說明
-
-| 參數 | 說明 |
-|------|------|
-| `-t, --title` | 書名（必填） |
-| `-a, --author` | 作者（必填） |
-| `-o, --output` | 輸出 EPUB 路徑 |
-| `--cover` | 封面圖片（PNG/JPG） |
-| `--lang` | 語言標籤（預設：`zh-Hant`） |
-| `--encoding` | 強制指定來源編碼 |
-| `--no-convert` | 跳過簡轉繁 |
-| `--horizontal` | 使用橫排排版 |
-| `--no-renumber` | 保留原始章節編號 |
-| `--keep-arabic` | 保留阿拉伯數字 |
-| `--keep-quotes` | 保留原始引號 |
-| `--volume-pattern` | 自訂卷標題正則表達式 |
-| `--chapter-pattern` | 自訂章標題正則表達式 |
-
-## 運作原理
-
-1. **讀取** TXT 檔案並自動偵測編碼
-2. **轉換** 為繁體中文（透過 OpenCC，可選）
-3. **清除** 垃圾內容（廣告、網址、分隔線）
-4. **解析** 卷/章結構，轉為 Markdown
-5. **重新編號** 章節，修正來源編號錯誤
-6. **轉換** 標點符號與數字為中文格式
-7. **生成** EPUB（透過 pandoc，搭配直排 CSS）
-8. **修補** EPUB spine 的 RTL 翻頁方向
-
-## 直排排版細節
-
-本工具遵循[好讀直式 EPUB 製作規範](https://haodoo.org/?p=16765)：
-
-- 所有頁面（含書名頁、目錄）皆套用 `writing-mode: vertical-rl`
-- OPF spine 設定 `page-progression-direction="rtl"`
-- 使用標準橫式標點（閱讀器會自動旋轉）
-- `text-orientation: mixed` 確保標點正確顯示
-- 宋體 TC 字型優先
-
-## Kindle 注音字型
-
-本專案附帶修改版的**王漢宗中楷體注音**字型（`fonts/HanWangKaiMediumChuIn.ttf`），安裝到 Kindle 後，所有中文字都會自動顯示注音（ㄅㄆㄇㄈ）。
-
-### 字型修改內容
-
-此字型基於原版王漢宗中楷體注音，針對**直排顯示**做了以下優化：
-
-- **標點符號字形替換**：所有標點（`，。！？：；…—、《》〈〉（）「」『』`）替換為宋體繁（Songti TC）的字形，確保直排時位置正確、無多餘注音
-- **直排引號修正**：移除 `﹁﹂﹃﹄`（Unicode Vertical Presentation Forms）的字形映射，搭配 EPUB 內使用直排專用字符，Kindle 會用預設字型顯示引號（方向正確、不帶注音）
-
-### 安裝方式
-
-1. 用 USB 連接 Kindle
-2. 將 `fonts/HanWangKaiMediumChuIn.ttf` 複製到 Kindle 根目錄的 `fonts` 資料夾（沒有就新建）
-3. 開啟任意中文書 → 點 `Aa`（頁面顯示）→ 選擇「HanWangKaiMediumChuIn」字型
-
-### 注意事項
-
-- **破音字**：字型只顯示預設讀音，多音字（如「了」「地」「不」）不一定正確
-- 僅支援 Kindle 實體裝置，不支援 Kindle App
-- 原始字型由王漢宗教授捐贈，自由使用
-
-## ToneOZ 注音字型（破音字支援）
-
-本專案也附帶 **[澳聲通注音楷體](https://github.com/jeffreyxuan/toneoz-font-zhuyin)**（`fonts/ToneOZ-Zhuyin-Kai-Traditional.ttf`），基於思源宋體，採用 SIL Open Font License，無版權爭議。
-
-### 破音字自動選音
-
-搭配 `add_zhuyin_ivs.py` 腳本，可自動為 EPUB 中的破音字加入 IVS（異體字選擇器）標記。ToneOZ 字型會根據標記顯示正確的注音。
+也可以使用 Python module 方式執行：
 
 ```bash
-# 安裝依賴
-pip install pypinyin
-brew install opencc  # 用於簡繁轉換以提高破音字判斷準確度
-
-# 為 EPUB 加入 IVS 標記
-python3 add_zhuyin_ivs.py input.epub -o output_zhuyin.epub
+python3 -m novel_epub.cli build novel.txt --title "書名" --author "作者"
 ```
 
-### 原理
+指定輸出檔案：
 
-1. **pypinyin** 分析上下文，判斷每個破音字的正確讀音（如「銀行」的行 = ㄏㄤˊ）
-2. 先轉簡體再分析，提高詞組匹配準確度
-3. 查詢 `phonic_table_Z.txt` 對照表，找到對應的 IVS 選擇器
-4. 在漢字後插入隱形的 Unicode 標記（如 `U+E01E1`）
-5. ToneOZ 字型看到標記，顯示對應讀音的注音
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --output book.epub
+```
 
-### 字型修改內容
+指定來源編碼：
 
-與王漢宗字型相同的直排優化：
-- 標點符號字形替換為宋體繁，確保直排位置正確
-- 移除 `﹁﹂﹃﹄` 字形映射，搭配直排引號修正
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --encoding gb18030
+```
 
-### 安裝方式
+加入封面：
 
-1. 用 USB 連接 Kindle
-2. 將 `fonts/ToneOZ-Zhuyin-Kai-Traditional.ttf` 複製到 Kindle 的 `fonts` 資料夾
-3. 開書 → `Aa` → 選擇「ToneOZ-Zhuyin-Kai-Traditional」字型
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --cover cover.jpg
+```
+
+如果需要保留 Intermediate：
+
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --keep-intermediate
+```
+
+也可以指定 Intermediate 目錄：
+
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --keep-intermediate \
+  --intermediate book.intermediate
+```
+
+驗證既有 EPUB：
+
+```bash
+novel-epub validate book.epub
+```
+
+## 目前 V1 提供的能力
+
+- 讀取 TXT，支援常見中文編碼並可手動指定編碼。
+- 處理 UTF-8 BOM 與不同 newline 表示。
+- 移除定義中的段首全形空格縮排。
+- 解析 `Book → Volume → Chapter → Paragraph` 結構。
+- 支援阿拉伯數字與定義範圍內的中文章節數字。
+- 保留卷、章、段落與章節原始 label 等結構資訊。
+- 保留第一個章節之前的前言內容。
+- 支援明確格式的番外章節。
+- 對可繼續處理的輸入異常提供 warning，而不是任意猜測。
+- 產生 Intermediate JSON，適合大量章節的作品。
+- 使用 Pandoc 建立 EPUB。
+- 支援書名、作者、語言與封面等基本 metadata。
+- 提供內建 EPUB 結構驗證，並可選擇使用 EPUBCheck。
+
+## V1 的設計原則
+
+V1 將「文字表示」、「文件結構」、「Intermediate」與「EPUB rendering」分開：
+
+```text
+TXT
+ ↓
+Normalize
+ ↓
+Parser
+ ↓
+Intermediate
+ ↓
+Pandoc
+ ↓
+EPUB
+ ↓
+Validation
+```
+
+Parser 以明確 grammar 判斷卷章結構，不進行語意猜測。章節的 `number`、`label`、`sequence` 也刻意分開，因此跳號、重複編號與番外章節不需要被重新編號。
+
+更多 V1 行為與邊界請參閱 `docs/v1-architecture-decisions.md`。
+
+## V1 與 V2
+
+V1 是目前穩定基線。V2 會在 V1 上加入明確隔離的文字 transformation 與 presentation extension，而不是重新建立舊版架構。
+
+目前已確定的 V2 設計包括：
+
+- OpenCC：預設啟用，可停用，並保留 conversion profile 擴充能力。
+- Junk Cleaner：使用者指定規則、`line` / `block` target、`exact` / `contains` / `regex` matcher，並採 remove-only 設計。
+- Quote Conversion：獨立 transformation，要求明確且可重複套用而不產生額外變化。
+- Full Source Mode：停用內容 transformation，但仍執行 Normalize。
+- Transformation metadata：記錄在 Intermediate，不寫入 EPUB metadata。
+- Arabic numeral conversion 與 chapter renumbering：不列入 V2 migration baseline。
+
+V2 的完整設計與 migration decisions 請參閱 `docs/v2-migration-and-design-decisions.md`。
+
+## 文件
+
+`docs/` 主要供 AI 與跨 session 工作使用：
+
+- `docs/README.md` — 文件地圖與資訊分層。
+- `docs/v1-architecture-decisions.md` — V1 canonical architecture / behavior。
+- `docs/v2-migration-and-design-decisions.md` — V2 canonical design / decisions。
+- `docs/next-session-handoff.md` — 當前未完成工作的短期交接狀態。
 
 ## 授權
 
