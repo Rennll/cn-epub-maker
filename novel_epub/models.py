@@ -12,7 +12,7 @@ class Paragraph:
 @dataclass
 class Chapter:
     sequence: int
-    number: str
+    number: int | None
     label: str
     title: str
     paragraphs: list[Paragraph] = field(default_factory=list)
@@ -33,6 +33,7 @@ class Book:
     author: str
     language: str = "zh-CN"
     cover: str | None = None
+    preamble: list[Paragraph] = field(default_factory=list)
     volumes: list[Volume] = field(default_factory=list)
     chapters: list[Chapter] = field(default_factory=list)
 
