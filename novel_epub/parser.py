@@ -51,16 +51,22 @@ def parse_lines(
     seen_numbers: set[int] = set()
     seen_volume_numbers: set[str] = set()
     paragraph_lines: list[str] = []
-    preamble_lines: list[str] = []
+    preamble_paragraph_lines: list[str] = []
 
     def flush_paragraph() -> None:
         if current_chapter is not None and paragraph_lines:
             current_chapter.paragraphs.append(Paragraph(text="\n".join(paragraph_lines)))
         paragraph_lines.clear()
 
+    def flush_preamble_paragraph() -> None:
+        if preamble_paragraph_lines:
+            book.preamble.append(Paragraph(text="\n".join(preamble_paragraph_lines)))
+            preamble_paragraph_lines.clear()
+
     def add_chapter(cm, line_no: int):
         nonlocal chapter_sequence, current_chapter
         flush_paragraph()
+        flush_preamble_paragraph()
         chapter_sequence += 1
         groups = cm.groupdict()
         raw_number = groups.get("number")
@@ -83,13 +89,14 @@ def parse_lines(
         if not stripped:
             if current_chapter is not None:
                 flush_paragraph()
-            elif preamble_lines and preamble_lines[-1] != "":
-                preamble_lines.append("")
+            else:
+                flush_preamble_paragraph()
             continue
 
         vm = volume_re.match(stripped)
         if vm:
             flush_paragraph()
+            flush_preamble_paragraph()
             volume_sequence += 1
             number = vm.groupdict().get("number") or ""
             label = vm.groupdict().get("label") or vm.group(0).strip()
@@ -119,6 +126,7 @@ def parse_lines(
             label = groups.get("label") or em.group(0).strip()
             chapter_title = (groups.get("title") or "").strip()
             flush_paragraph()
+            flush_preamble_paragraph()
             chapter_sequence += 1
             current_chapter = Chapter(sequence=chapter_sequence, number=None, label=label, title=chapter_title)
             if current_volume is not None:
@@ -128,7 +136,7 @@ def parse_lines(
             continue
 
         if current_chapter is None:
-            preamble_lines.append(stripped)
+            preamble_paragraph_lines.append(stripped)
             continue
 
         paragraph_lines.append(line)
@@ -136,9 +144,7 @@ def parse_lines(
             warnings.append(WarningItem("suspicious_chapter_heading", line_no, f"possible chapter heading not matched: {stripped[:80]}"))
 
     flush_paragraph()
-    while preamble_lines and preamble_lines[-1] == "":
-        preamble_lines.pop()
-    book.preamble = [Paragraph(text=line) for line in preamble_lines if line]
+    flush_preamble_paragraph()
     if not book.chapter_count:
         warnings.append(WarningItem("no_chapters", 0, "no chapters were detected"))
     return ParseResult(book=book, warnings=warnings)
