@@ -8,12 +8,48 @@ from .intermediate import write_intermediate
 from .normalize import read_lines
 from .parser import parse_lines
 from .renderers.pandoc import render
+from .transforms import (
+    JunkCleaner,
+    OpenCCTransformer,
+    PunctuationTransformer,
+    TransformAudit,
+    TransformPipeline,
+    TransformationError,
+)
 from .validator import run_epubcheck, validate_book, validate_epub
+
+
+def _run_transformations(lines: list[str], args: argparse.Namespace) -> tuple[list[str], list[TransformAudit]]:
+    if args.full_source:
+        return lines, []
+
+    transformers = [JunkCleaner()]
+    if args.opencc:
+        transformers.append(OpenCCTransformer(profile=args.opencc_profile))
+    if args.punctuation:
+        transformers.append(PunctuationTransformer())
+
+    text, audit = TransformPipeline(transformers).run("\n".join(lines))
+    return text.split("\n"), audit
+
+
+def _print_transform_audit(audit: list[TransformAudit]) -> None:
+    for stage in audit:
+        if stage.name == "opencc":
+            profile = stage.metadata.get("profile", "unknown")
+            print(f"Transformation: OpenCC ({profile})")
+        elif stage.name == "punctuation":
+            print("Transformation: Punctuation")
+        elif stage.name == "junk_cleaner":
+            print("Transformation: Junk Cleaner")
+        for warning in stage.warnings:
+            print(f"WARNING: {stage.name}: {warning}", file=sys.stderr)
 
 
 def build(args: argparse.Namespace) -> int:
     try:
         lines, encoding = read_lines(args.input, args.encoding)
+        lines, audit = _run_transformations(lines, args)
         result = parse_lines(
             lines,
             title=args.title,
@@ -34,6 +70,7 @@ def build(args: argparse.Namespace) -> int:
         print(f"Chapters: {result.book.chapter_count}")
         print(f"Paragraphs: {result.book.paragraph_count}")
         print(f"Warnings: {len(result.warnings)}")
+        _print_transform_audit(audit)
         for warning in result.warnings:
             where = f" at line {warning.line}" if warning.line else ""
             print(f"WARNING: {warning.message}{where}", file=sys.stderr)
@@ -54,6 +91,9 @@ def build(args: argparse.Namespace) -> int:
             return 3
         print(f"EPUB: {output}")
         return 0
+    except TransformationError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     except (OSError, ValueError, UnicodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -95,7 +135,11 @@ def main() -> int:
     build_parser.add_argument("--encoding")
     build_parser.add_argument("--keep-intermediate", action="store_true")
     build_parser.add_argument("--intermediate")
-    build_parser.set_defaults(func=build)
+    build_parser.add_argument("--opencc-profile", default="s2twp", choices=OpenCCTransformer.available_profiles())
+    build_parser.add_argument("--no-opencc", dest="opencc", action="store_false")
+    build_parser.add_argument("--no-punctuation", dest="punctuation", action="store_false")
+    build_parser.add_argument("--full-source", action="store_true")
+    build_parser.set_defaults(func=build, opencc=True, punctuation=True, full_source=False)
 
     validate_parser = sub.add_parser("validate", help="validate an EPUB archive")
     validate_parser.add_argument("epub")
