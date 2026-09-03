@@ -56,16 +56,18 @@ class JunkCleaner:
         for index, rule in enumerate(self.rules, start=1):
             if rule.target not in {"line", "block"} or rule.matcher not in {"exact", "contains", "regex"}:
                 warnings.append(f"rule {index}: invalid target/matcher; rule skipped")
-                per_rule.append({"rule": index, "matched": 0, "removed": 0, "skipped": True})
+                per_rule.append({"rule": index, "matched": 0, "removed": 0})
                 continue
-            try:
-                current, count = self._apply_rule(current, rule)
-            except re.error as exc:
-                warnings.append(f"rule {index} regex {rule.pattern!r}: {exc}; rule skipped")
-                per_rule.append({"rule": index, "matched": 0, "removed": 0, "skipped": True})
-                continue
+            if rule.matcher == "regex":
+                try:
+                    re.compile(rule.pattern)
+                except re.error as exc:
+                    warnings.append(f"rule {index} regex {rule.pattern!r}: {exc}; rule skipped")
+                    per_rule.append({"rule": index, "matched": 0, "removed": 0})
+                    continue
+            current, count = self._apply_rule(current, rule)
             matched += count
-            per_rule.append({"rule": index, "matched": count, "removed": count, "skipped": False})
+            per_rule.append({"rule": index, "matched": count, "removed": count})
         canonical = "\n".join("" if line.strip() == "" else line for line in current.split("\n"))
         return TransformResult(
             text=canonical,
