@@ -4,6 +4,7 @@ from novel_epub.transforms import (
     JunkCleaner,
     JunkRule,
     OpenCCTransformer,
+    PunctuationTransformer,
     TransformPipeline,
     TransformationError,
     TransformResult,
