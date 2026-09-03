@@ -20,7 +20,7 @@ V2 adds isolated extension points around that core. Legacy compatibility is subo
 |---|---|---|
 | OpenCC Simplified → Traditional | Keep | Enabled by default; configurable and extensible by conversion profile |
 | Junk Cleaner | Keep | User-configured, remove-only, explicit target and matcher |
-| Quote Conversion | Keep | Independent transformation with explicit/idempotent behavior |
+| Quote/Punctuation Conversion | Keep | Independent transformation with explicit/idempotent behavior |
 | Arabic numeral conversion | Do not migrate | Avoid changing dates, IDs, URLs, formulas, versions, or other numeric content |
 | Chapter renumbering | Do not migrate | Preserve source numbering and references |
 
@@ -30,19 +30,39 @@ V2 is not intended to become a complete behavioral clone of the legacy implement
 
 ### Transform Pipeline
 
-The default V2 pipeline is:
+The current default V2 pipeline is:
 
-TXT → Normalize → Junk Cleaner → OpenCC → Quote Conversion → Parser → Book → Intermediate → EPUB → Validation
+TXT → Normalize → Junk Cleaner → OpenCC → Punctuation → Parser → Book → Intermediate → EPUB → Validation
+
+Whitespace Cleanup is intentionally reserved as a separate future transformation. Its detailed semantics are not defined yet and should not be folded into Junk Cleaner or silently added to Normalize.
 
 The order is intentional. Content transformations are separate from structural parsing and should not be silently embedded in Parser or Renderer behavior.
 
-### Transform Contract
+### Common Transform Contract
 
-A transformation receives text and produces transformed text plus observable statistics and warnings. Transformations should be independently testable, and zero matches are a normal result rather than a failure.
+Each transformation receives text and, when successful, produces a `TransformResult` conceptually containing:
+
+- `text`: transformed text.
+- `changed`: whether the output text differs from the input.
+- `warnings`: recoverable problems encountered during the transformation.
+- `stats`: optional transformer-specific execution statistics.
+- `metadata`: optional information describing the transformation/configuration used.
+
+`text`, `changed`, and `warnings` are common fields. `stats` is intentionally not a universal schema: each transformer may report only statistics that are meaningful for it. `metadata` describes configuration or transformation identity rather than execution counts.
+
+Zero changes and zero matches are normal successful results and do not produce warnings.
+
+The CLI is responsible for presenting transformation results; transformers should return structured information rather than constructing CLI-specific messages. For example, OpenCC may be displayed simply as `✅ 使用 OpenCC（s2twp）` rather than reporting character-level conversion counts.
+
+Transformers do not directly modify Book, Chapter, Volume, EPUB, or other structural objects, and they do not invoke other transformers. The pipeline owns transformation order.
 
 ### Failure and Auditability
 
-Recoverable problems produce warnings and skip the affected transformation or rule. Unrecoverable problems, or output that can no longer be trusted, produce an error and stop the pipeline. Zero matches are not failures.
+Recoverable problems produce warnings and skip only the affected operation/rule when possible. The pipeline continues. Unrecoverable problems, or output that can no longer be trusted, produce an error and stop the pipeline.
+
+Errors are not represented as successful `TransformResult` values. A transformer reports a structured error to the pipeline; the pipeline stops subsequent processing, and the CLI renders a concise, user-facing message identifying the responsible transformer and actionable cause when available. Detailed traceback information should be reserved for an explicit debug mode rather than normal CLI output.
+
+Configuration errors and runtime/system errors are both fatal when they prevent trustworthy transformation. For example, an invalid OpenCC profile is a configuration error and must stop the pipeline rather than silently falling back.
 
 Transformation metadata belongs in Intermediate rather than EPUB metadata so transformed output remains auditable and reproducible. Transformations should be deterministic and idempotent where practical.
 
@@ -50,7 +70,17 @@ Transformation metadata belongs in Intermediate rather than EPUB metadata so tra
 
 ### OpenCC
 
-OpenCC is retained as a V2 transformation and is enabled by default. It can be disabled, and the design keeps a conversion-profile abstraction for future profiles. It follows the common transformation failure policy.
+OpenCC is retained as a V2 transformation and is enabled by default. The default profile is `s2twp`, matching the legacy implementation. The user may disable OpenCC or select a supported conversion profile.
+
+The transformation applies to the full text after Normalize and Junk Cleaner. OpenCC itself does not perform custom English, URL, email, or prose-context detection; protection/context-sensitive handling belongs to the relevant downstream transformation, such as Punctuation.
+
+The first V2 implementation exposes built-in profile names only. The internal design uses a conversion-profile abstraction/registry so additional built-in profiles can be added later without redesign. Arbitrary external OpenCC configuration files are intentionally out of scope for the first V2 implementation.
+
+An invalid or nonexistent profile is a configuration error: the pipeline stops and the user is told to provide a valid profile. There is no silent fallback. OpenCC initialization/dependency failures are also fatal when the transformation cannot be performed reliably.
+
+Zero changes are normal success. OpenCC does not need character-level conversion statistics; profile identity is sufficient for normal reporting, e.g. `✅ 使用 OpenCC（s2twp）`.
+
+OpenCC should be deterministic and idempotent.
 
 ### Junk Cleaner
 
@@ -59,20 +89,63 @@ Junk Cleaner is a parser-preprocessing transformation. Users explicitly select w
 Its configuration is separate from general book configuration. A rule specifies a target and matcher:
 
 - `line` targets one normalized source line and cannot cross a newline.
-- `block` targets a continuous text block separated by blank lines and cannot cross a blank-line boundary.
+- `block` targets one or more continuous non-blank lines. One or more blank lines form the boundary between blocks.
 - `exact`, `contains`, and `regex` are supported matchers.
 
 A matching rule removes the entire target. `contains` and `regex` do not replace only the matching substring.
 
-Rules execute in user-specified order, with each rule retargeting the result of the previous rule. The cleaner operates before Parser and therefore has no knowledge of chapters, paragraphs, volumes, or EPUB structure. It must not infer structure, cross configured boundaries, or introduce a second normalization layer.
+`exact` means the complete target equals the configured pattern. It does not trim or otherwise normalize the target before comparison.
 
-Each rule reports match/removal counts. Zero matches are normal. Invalid configuration or regex is a warning; the invalid rule is skipped and later rules continue.
+`regex` uses the target determined by `scope`: one line for `line`, or one current block for `block`. Regex matching uses search semantics. No additional regex flags are exposed in the first V2 implementation. An invalid regex is a warning; that rule is skipped and later rules continue. A syntactically valid regex that matches very broadly is still valid user configuration and is not heuristically rejected.
+
+Rules execute in user-specified order, with each rule operating on the result of the previous rule. For each `block` rule, blocks are re-formed from the current text after previous rules have run.
+
+Removing a block removes only the block's non-blank lines. Boundary blank lines are not removed, merged, or newly created by Junk Cleaner. If this leaves consecutive blank lines, that is an expected intermediate result; whitespace cleanup is a separate concern.
+
+The cleaner operates before Parser and therefore has no knowledge of chapters, paragraphs, volumes, or EPUB structure. It must not infer structure, cross configured boundaries, or introduce a second normalization layer.
+
+Each rule reports match/removal counts. Zero matches are normal. Invalid regex/configuration at rule level is a warning when the affected rule can be safely skipped; later rules continue.
 
 Junk Cleaner is remove-only. Arbitrary replacement is intentionally a separate future transformation concern.
 
-### Quote Conversion
+### Punctuation Conversion
 
-Quote Conversion is independent of the other transformations. Defined curly-quote forms are converted to Chinese quotation forms such as `「」` and `『』`; already-correct Chinese quotation marks are preserved. The transform should be explicit and idempotent and runs after Junk Cleaner and OpenCC.
+Punctuation Conversion is an independent transformation that converts applicable Simplified-Chinese-style punctuation to common Taiwan Traditional Chinese full-width punctuation while preserving English content and punctuation outside Chinese context.
+
+Direct quote conversions are:
+
+- `“` → `「`
+- `”` → `」`
+- `‘` → `『`
+- `’` → `』`
+
+In Chinese context, the following conversions apply:
+
+- `,` → `，`
+- `!` → `！`
+- `?` → `？`
+- `:` → `：`
+- `;` → `；`
+- `.` → `。` when it is a Chinese sentence-ending period
+- three or more consecutive ASCII periods → one `……`
+
+Existing `……` remains unchanged. The ellipsis rule is evaluated before the single-period rule.
+
+Parentheses `(` `)`, square brackets `[` `]`, and curly braces `{` `}` remain unchanged. Other ASCII symbols such as `/`, `\\`, `|`, `_`, `=`, `+`, `-`, `*`, `%`, `#`, `@`, `<`, `>`, and `~` are not converted by this transformer in the first V2 implementation.
+
+Chinese-context detection is local rather than based on whether an entire line contains Chinese. Punctuation is considered in Chinese context when the nearest meaningful preceding content is Chinese CJK text; English and numbers do not establish Chinese context. Leading punctuation with no preceding Chinese context is preserved. Whitespace does not itself establish or remove context.
+
+Obvious URLs and email addresses are protected from punctuation conversion. The first implementation does not attempt broad Markdown/HTML/code parsing beyond the explicitly protected URL/email cases.
+
+The transform does not repair quote pairing, collapse repeated `?`/`!`, remove content, normalize whitespace, or guess author intent. For example, `什麼???` becomes `什麼？？？`, not a single `？`.
+
+Punctuation Conversion is idempotent and runs after OpenCC and before Parser.
+
+### Whitespace Cleanup
+
+Whitespace Cleanup is a reserved future transformer. It should own explicit whitespace/blank-line cleanup rather than allowing Junk Cleaner to alter whitespace as a side effect.
+
+Its detailed rules, scope, ordering, and configuration are intentionally not defined in this stage. When designed, it must be evaluated against the existing Normalize contract so responsibilities do not overlap.
 
 ## Modes
 
@@ -88,7 +161,7 @@ Content transformations are disabled, but Normalize still runs. Therefore this m
 
 ### Parser Configuration
 
-Configurable volume/chapter patterns may be retained where they provide useful structural flexibility. Parser configuration remains structural; it must not become a hidden home for OpenCC, junk cleaning, quote conversion, global numeral conversion, or chapter renumbering.
+Configurable volume/chapter patterns may be retained where they provide useful structural flexibility. Parser configuration remains structural; it must not become a hidden home for OpenCC, junk cleaning, punctuation conversion, global numeral conversion, chapter renumbering, or whitespace cleanup.
 
 ### Renderer Profiles
 
@@ -100,19 +173,22 @@ The configuration model is the primary interface for behavior; the CLI is a fron
 
 The exact Intermediate schema should follow the existing contract. Transformation metadata belongs to Intermediate as part of the audit/reproducibility boundary, not as EPUB metadata.
 
+Regex errors should be presented with enough information to identify and repair the rule, including the rule identity, configured pattern, and underlying regex error when available. Future UX may provide regex testing/help, but such assistance is not required for the first implementation.
+
 ## Non-goals
 
-V2 does not include global Arabic numeral conversion, automatic chapter renumbering, heuristic junk detection, arbitrary replacement through Junk Cleaner, or byte-for-byte source preservation. It also does not justify rebuilding the V1 model, Intermediate boundary, or Pandoc-first renderer merely for legacy compatibility. Any future exception requires a concrete use case and an explicit behavioral contract.
+V2 does not include global Arabic numeral conversion, automatic chapter renumbering, heuristic junk detection, arbitrary replacement through Junk Cleaner, broad whitespace cleanup by Junk Cleaner, or byte-for-byte source preservation. It also does not justify rebuilding the V1 model, Intermediate boundary, or Pandoc-first renderer merely for legacy compatibility. Any future exception requires a concrete use case and an explicit behavioral contract.
 
 ## Implementation Order
 
 1. Establish the common transformation boundary, failure policy, and reporting.
 2. Add the OpenCC conversion profile.
 3. Add Junk Cleaner configuration and remove-only semantics.
-4. Add Quote Conversion.
+4. Add Punctuation Conversion.
 5. Add useful structural Parser configuration.
 6. Add renderer profiles.
 7. Stabilize the configuration/library and CLI boundary.
 8. Add Intermediate transformation metadata.
+9. Design and add Whitespace Cleanup as a separate transformation if its concrete requirements justify it.
 
 Each extension should remain isolated, keep the V1 core stable, and receive focused tests before full/integration validation.
