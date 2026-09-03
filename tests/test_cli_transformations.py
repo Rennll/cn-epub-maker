@@ -96,6 +96,7 @@ def test_build_preserves_newlines_and_blank_blocks_for_parser(tmp_path, monkeypa
     def fake_parse_lines(lines, **kwargs):
         from novel_epub.parser import parse_lines
 
+        captured["lines"] = lines
         result = parse_lines(
             lines,
             title=kwargs["title"],
