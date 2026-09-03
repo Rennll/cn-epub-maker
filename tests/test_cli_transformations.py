@@ -114,6 +114,18 @@ def test_build_preserves_newlines_and_blank_blocks_for_parser(tmp_path, monkeypa
     assert captured["paragraphs"] == ["第一行\n第二行", "第三行", "第四行"]
 
 
+def test_build_normalizes_leading_ideographic_spaces_before_parser(tmp_path, monkeypatch):
+    captured = {}
+    _stub_build_dependencies(
+        monkeypatch,
+        captured,
+        source_lines=["　第一行", "　第二行"],
+    )
+
+    assert build(_build_args(tmp_path, full_source=True)) == 0
+    assert captured["lines"] == ["第一行", "第二行"]
+
+
 def test_build_reports_transformation_error_and_returns_one(tmp_path, monkeypatch, capsys):
     _stub_build_dependencies(monkeypatch, {})
 
