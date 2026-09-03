@@ -18,6 +18,17 @@ class TransformResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class TransformAudit:
+    """One successful transformation stage recorded by the pipeline."""
+
+    name: str
+    changed: bool
+    warnings: list[str]
+    stats: dict[str, Any]
+    metadata: dict[str, Any]
+
+
 class Transformer(Protocol):
     name: str
 
@@ -41,22 +52,26 @@ class JunkCleaner:
         current = text
         warnings: list[str] = []
         matched = 0
+        per_rule: list[dict[str, Any]] = []
         for index, rule in enumerate(self.rules, start=1):
             if rule.target not in {"line", "block"} or rule.matcher not in {"exact", "contains", "regex"}:
                 warnings.append(f"rule {index}: invalid target/matcher; rule skipped")
+                per_rule.append({"rule": index, "matched": 0, "removed": 0, "skipped": True})
                 continue
             try:
                 current, count = self._apply_rule(current, rule)
             except re.error as exc:
                 warnings.append(f"rule {index} regex {rule.pattern!r}: {exc}; rule skipped")
+                per_rule.append({"rule": index, "matched": 0, "removed": 0, "skipped": True})
                 continue
             matched += count
+            per_rule.append({"rule": index, "matched": count, "removed": count, "skipped": False})
         canonical = "\n".join("" if line.strip() == "" else line for line in current.split("\n"))
         return TransformResult(
             text=canonical,
             changed=canonical != text,
             warnings=warnings,
-            stats={"matched": matched, "removed": matched, "rules": len(self.rules)},
+            stats={"matched": matched, "removed": matched, "rules": len(self.rules), "per_rule": per_rule},
             metadata={"name": self.name},
         )
 
@@ -104,17 +119,22 @@ class TransformPipeline:
     def __init__(self, transformers: list[Transformer]) -> None:
         self.transformers = transformers
 
-    def run(self, text: str) -> tuple[str, list[dict[str, Any]]]:
+    def run(self, text: str) -> tuple[str, list[TransformAudit]]:
         current = text
-        audit: list[dict[str, Any]] = []
+        audit: list[TransformAudit] = []
         for transformer in self.transformers:
-            result = transformer.transform(current)
-            audit.append({
-                "name": transformer.name,
-                "changed": result.changed,
-                "warnings": result.warnings,
-                "stats": result.stats,
-                "metadata": result.metadata,
-            })
+            try:
+                result = transformer.transform(current)
+            except TransformationError as exc:
+                raise TransformationError(f"{transformer.name}: {exc}") from exc
+            audit.append(
+                TransformAudit(
+                    name=transformer.name,
+                    changed=result.changed,
+                    warnings=list(result.warnings),
+                    stats=dict(result.stats),
+                    metadata=dict(result.metadata),
+                )
+            )
             current = result.text
         return current, audit
