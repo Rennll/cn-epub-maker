@@ -14,7 +14,7 @@ The stable V1 architecture and behavioral contract. Use this when reasoning abou
 
 `v2-migration-and-design-decisions.md`
 
-The current V2 design and migration decisions. V2 is not yet fully implemented, so this document describes the decided target architecture rather than the complete current implementation.
+The current V2 design and migration decisions. The first V2 transformation slice is now implemented and validated end-to-end; the document remains the architectural baseline for the remaining V2 work.
 
 ### Current Session
 
@@ -26,6 +26,6 @@ Temporary continuation state for unfinished work. It should stay short and curre
 
 Use the repository source code and tests as the canonical source for implementation details. Do not duplicate implementation facts in these documents when they can be inspected directly.
 
-Use V1 documentation for completed architecture and behavior, V2 documentation for confirmed future design decisions, and the handoff only for current unfinished work and session-specific context.
+Use V1 documentation for completed architecture and behavior, V2 documentation for confirmed future design decisions and the current V2 implementation boundary, and the handoff only for current unfinished work and session-specific context.
 
 Historical handoff documents are not canonical project documentation. Once their durable knowledge has been incorporated into V1 or V2, their remaining session state can be discarded.
