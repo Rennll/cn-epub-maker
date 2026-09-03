@@ -2,7 +2,7 @@ from argparse import Namespace
 from types import SimpleNamespace
 
 from novel_epub.cli import build, main
-from novel_epub.transforms import TransformationError
+from novel_epub.transforms import TransformAudit, TransformationError
 
 
 def _build_args(tmp_path, **overrides):
@@ -128,7 +128,7 @@ def test_build_reports_transformation_error_and_returns_one(tmp_path, monkeypatc
     assert "ERROR: OpenCC conversion failed" in captured.err
 
 
-def test_full_source_mode_takes_precedence_over_transformation_options(tmp_path, monkeypatch):
+def test_build_full_source_mode_takes_precedence_over_transformation_options(tmp_path, monkeypatch):
     captured = {}
     _stub_build_dependencies(monkeypatch, captured)
 
@@ -150,6 +150,26 @@ def test_full_source_mode_takes_precedence_over_transformation_options(tmp_path,
         == 0
     )
     assert captured["lines"] == ["简体,中文"]
+
+
+def test_build_warning_summary_includes_transformation_warnings(tmp_path, monkeypatch, capsys):
+    captured = {}
+    _stub_build_dependencies(monkeypatch, captured)
+    audit = [
+        TransformAudit(
+            name="junk_cleaner",
+            changed=False,
+            warnings=["rule 1 regex '[': unterminated character set; rule skipped"],
+            stats={},
+            metadata={},
+        )
+    ]
+    monkeypatch.setattr("novel_epub.cli._run_transformations", lambda lines, args: (lines, audit))
+
+    assert build(_build_args(tmp_path)) == 0
+    output = capsys.readouterr()
+    assert "Warnings: 1" in output.out
+    assert "WARNING: junk_cleaner: rule 1 regex '[': unterminated character set; rule skipped" in output.err
 
 
 def test_main_exposes_v2_transformation_options(monkeypatch):
