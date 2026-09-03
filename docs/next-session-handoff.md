@@ -4,59 +4,45 @@
 
 V1 is complete and stable.
 
-The first V2 transformation slice is implemented and has passed focused tests, CLI integration validation, and real TXT → CLI → Pandoc → EPUB black-box validation. V2 as a whole remains incomplete where future features require a separate contract.
+V2 is complete for its defined scope: the transformation pipeline, CLI orchestration, Intermediate transformation metadata, focused/integration tests, and real TXT → CLI → Pandoc → EPUB black-box validation are all in place.
 
-The V2 design decisions are recorded in `docs/v2-migration-and-design-decisions.md`. Source code and tests remain the canonical source for implementation details.
+V2 extends the V1 core rather than replacing it. The completed path is:
 
-## Completed V2 Slice
+Normalize → V2 Transformations → Parser → Intermediate → V1 EPUB Renderer → Validation
 
-The following V2 work is complete:
+The V2 design and migration decisions are recorded in `docs/v2-migration-and-design-decisions.md`. Source code and tests remain the canonical source for implementation details.
 
-1. Common transformation boundary, result/error/audit contract, and pipeline.
-2. Junk Cleaner remove-only semantics, explicit rules, warnings, and statistics.
-3. V2 transformation orchestration while preserving the V1 Parser contract.
-4. OpenCC with the built-in conversion-profile registry and `s2twp` default.
-5. Punctuation Conversion with URL/email protection and idempotent behavior.
-6. CLI integration, transformation reporting, and Full Source Mode.
-7. Transformation audit metadata persisted in Intermediate `book.json`.
-8. Focused tests, CLI/integration tests, and real TXT → EPUB black-box validation.
+## Next Stage: V2.x
 
-The intended V2 content pipeline is:
+The next architectural task is `Intermediate → Book → EPUB` rebuilding.
 
-Normalize → Junk Cleaner → OpenCC → Punctuation → Parser → Intermediate → EPUB → Validation
+This is not a missing V2 implementation step. Treat it as a new V2.x feature/evolution that requires its own explicit contract, data-model decisions, implementation plan, and tests.
 
-The real EPUB path has been validated end-to-end. Final EPUB assertions account for renderer behavior such as HTML whitespace collapsing; such renderer behavior is not treated as a transformation-stage guarantee.
+Before implementation, clarify the responsibilities and boundaries between Intermediate, Book, and EPUB generation. Preserve the completed V1/V2 contracts unless a concrete use case requires an explicit change.
 
 ## Important Context
 
-Treat `docs/v1-architecture-decisions.md` as the V1 contract and `docs/v2-migration-and-design-decisions.md` as the current V2 design baseline. Use source code and tests as the canonical source for implementation details.
+V1 remains the stable structural baseline. V2 adds the completed transformation stage around that baseline.
 
-Junk Cleaner is remove-only and user-configured. Rules execute sequentially in user-specified order. Supported scopes are `line` and `block`; supported matchers are `exact`, `contains`, and `regex`. Invalid regex is a recoverable warning for that rule, so later rules continue. Pure whitespace lines produced/preserved at the Junk Cleaner boundary are canonicalized to `""`; lines containing non-whitespace content are otherwise not whitespace-normalized.
+The V2 content pipeline is:
 
-OpenCC is enabled by default with profile `s2twp`. The first implementation exposes built-in profiles only; invalid profiles and initialization/dependency failures are fatal. OpenCC operates on the full text after Junk Cleaner.
+Normalize → Junk Cleaner → OpenCC → Punctuation → Parser → Intermediate → EPUB → Validation
 
-Punctuation Conversion runs after OpenCC and before Parser. It handles the agreed Taiwan full-width punctuation/context rules, ellipsis conversion, direct quote conversion, and URL/email protection. It must be idempotent and must not perform general whitespace cleanup or content repair.
-
-Full Source Mode disables content transformations but still runs Normalize:
+Full Source Mode remains:
 
 TXT → Normalize → Parser
 
-## Next Steps
+Do not reopen completed V1/V2 behavior merely for V2.x convenience. Renderer behavior such as HTML whitespace collapsing remains a renderer concern rather than a transformation-stage guarantee.
 
-The first V2 transformation slice is complete. Do not reopen the completed V1 architecture or transformation stages unless a concrete regression or new requirement requires it.
+## Do Not Add Without a New Decision
 
-A future Intermediate → Book → EPUB rebuilding capability, if required, is a separate feature and needs its own explicit contract, implementation, and tests. It is not part of the completed transformation slice.
+- Do not treat `Intermediate → Book → EPUB` rebuilding as unfinished V2 work.
+- Do not add a separate Whitespace Cleanup transformer.
+- Do not introduce heuristic junk detection.
+- Do not add arbitrary replacement through Junk Cleaner.
+- Do not add global Arabic numeral conversion or automatic chapter renumbering.
+- Do not broaden Punctuation Conversion into general Markdown/HTML/code parsing without an explicit contract.
+- Do not add arbitrary external OpenCC configuration files without an explicit design decision.
+- Do not weaken or bypass the V1 Parser, Intermediate, or Pandoc-first renderer contracts implicitly.
 
-Regex helper/testing UX remains a future enhancement and is not part of the first implementation.
-
-## Do Not Add
-
-- No separate Whitespace Cleanup transformer.
-- No heuristic junk detection.
-- No arbitrary replacement through Junk Cleaner.
-- No global Arabic numeral conversion.
-- No chapter renumbering.
-- No broad Markdown/HTML/code parsing for Punctuation beyond the explicitly protected URL/email cases.
-- No arbitrary external OpenCC config files in the first implementation.
-
-Keep each extension isolated and preserve the V1 model, Intermediate boundary, parser behavior, and Pandoc-first renderer unless a concrete requirement explicitly changes them.
+The next session should begin with V2.x architecture/design for the rebuilding path, not with another V2 completion pass.
