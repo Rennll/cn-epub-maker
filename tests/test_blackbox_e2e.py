@@ -1,3 +1,4 @@
+import re
 import shutil
 import subprocess
 import sys
@@ -54,6 +55,11 @@ def test_build_real_fixture_produces_transformed_epub(tmp_path: Path):
 
     assert "这是一个测试。" not in content
     assert "這是一個測試。" in content
+
+    dialogue = re.search(r"<p>[^<]*他說[^<]*</p>", content)
+    assert dialogue is not None, repr(content)
+    print(f"DEBUG dialogue XHTML: {dialogue.group(0)!r}")
+
     assert "他說： \"你好，世界！\"" in content
     assert "https://example.com/test?a=1,b=2" in content
     assert "test@example.com" in content
