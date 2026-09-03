@@ -54,7 +54,7 @@ def test_build_real_fixture_produces_transformed_epub(tmp_path: Path):
 
     assert "这是一个测试。" not in content
     assert "這是一個測試。" in content
-    assert "他说： \"你好，世界！\"" in content
+    assert "他說： \"你好，世界！\"" in content
     assert "https://example.com/test?a=1,b=2" in content
     assert "test@example.com" in content
     assert "　這一行前面有全形空白。" not in content
@@ -62,4 +62,4 @@ def test_build_real_fixture_produces_transformed_epub(tmp_path: Path):
     assert "第一章 測試開始" in content
     assert "第二章 測試繼續" in content
     assert "第3章 一張丹方" in content
-    assert "室友知道宋   书航" in content
+    assert "室友知道宋   書航" in content
