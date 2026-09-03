@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from .intermediate import write_intermediate
-from .normalize import read_lines
+from .normalize import normalize_line, read_lines
 from .parser import parse_lines
 from .renderers.pandoc import render
 from .transforms import (
@@ -49,6 +49,7 @@ def _print_transform_audit(audit: list[TransformAudit]) -> None:
 def build(args: argparse.Namespace) -> int:
     try:
         lines, encoding = read_lines(args.input, args.encoding)
+        lines = [normalize_line(line) for line in lines]
         lines, audit = _run_transformations(lines, args)
         result = parse_lines(
             lines,
