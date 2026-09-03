@@ -117,6 +117,44 @@ def _matches(target: str, matcher: str, pattern: str) -> bool:
     return re.search(pattern, target) is not None
 
 
+class OpenCCTransformer:
+    """Convert source text with a registered OpenCC conversion profile."""
+
+    name = "opencc"
+
+    _PROFILES = {
+        "s2twp": "s2twp.json",
+        "s2t": "s2t.json",
+    }
+
+    def __init__(self, profile: str = "s2twp") -> None:
+        self.profile = profile
+
+    @classmethod
+    def available_profiles(cls) -> tuple[str, ...]:
+        return tuple(sorted(cls._PROFILES))
+
+    def transform(self, text: str) -> TransformResult:
+        config = self._PROFILES.get(self.profile)
+        if config is None:
+            raise TransformationError(f"invalid OpenCC profile: {self.profile}")
+
+        try:
+            from opencc import OpenCC
+            converter = OpenCC(config)
+            converted = converter.convert(text)
+        except Exception as exc:
+            raise TransformationError(
+                f"OpenCC conversion failed for profile {self.profile!r}: {exc}"
+            ) from exc
+
+        return TransformResult(
+            text=converted,
+            changed=converted != text,
+            metadata={"profile": self.profile},
+        )
+
+
 class TransformPipeline:
     def __init__(self, transformers: list[Transformer]) -> None:
         self.transformers = transformers
