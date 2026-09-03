@@ -176,7 +176,7 @@ def test_opencc_runtime_init_failure_is_fatal(monkeypatch):
     monkeypatch.setattr("opencc.OpenCC", BrokenOpenCC)
 
     with pytest.raises(TransformationError, match="OpenCC conversion failed for profile 's2twp'"):
-        OpenCCTransformer().transform("简體中文")
+        OpenCCTransformer().transform("简体中文")
 
 
 def test_opencc_runtime_conversion_failure_is_fatal(monkeypatch):
@@ -190,7 +190,7 @@ def test_opencc_runtime_conversion_failure_is_fatal(monkeypatch):
     monkeypatch.setattr("opencc.OpenCC", BrokenOpenCC)
 
     with pytest.raises(TransformationError, match="OpenCC conversion failed for profile 's2twp'"):
-        OpenCCTransformer().transform("簡體中文")
+        OpenCCTransformer().transform("简体中文")
 
 
 def test_pipeline_stops_when_opencc_is_fatal(monkeypatch):
@@ -277,6 +277,18 @@ def test_punctuation_protects_urls_and_email_addresses():
     result = PunctuationTransformer().transform(source)
 
     assert result.text == "中文 https://example.com/a,b?x=1, test@example.com， 中文"
+
+
+def test_punctuation_url_does_not_consume_trailing_chinese_period():
+    result = PunctuationTransformer().transform("https://example.com。中文")
+
+    assert result.text == "https://example.com。中文"
+
+
+def test_punctuation_email_does_not_consume_trailing_chinese_comma():
+    result = PunctuationTransformer().transform("test@example.com，中文")
+
+    assert result.text == "test@example.com，中文"
 
 
 def test_punctuation_does_not_collapse_repeated_question_or_exclamation_marks():
