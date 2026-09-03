@@ -64,8 +64,8 @@ def test_junk_cleaner_reports_per_rule_stats():
     ]).transform("A\nB1\nC")
     assert result.stats["rules"] == 2
     assert result.stats["per_rule"] == [
-        {"rule": 1, "matched": 1, "removed": 1},
-        {"rule": 2, "matched": 1, "removed": 1},
+        {"rule": 1, "matched": 1, "removed": 1, "skipped": False},
+        {"rule": 2, "matched": 1, "removed": 1, "skipped": False},
     ]
 
 
