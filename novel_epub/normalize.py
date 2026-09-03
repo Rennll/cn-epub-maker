@@ -29,7 +29,7 @@ def read_lines(path: str | Path, encoding: str | None = None) -> tuple[list[str]
         raise ValueError(f"cannot decode {path} as {selected}: {exc}") from exc
 
     text = text.replace("\r\n", "\n").replace("\r", "\n")
-    return [normalize_line(line) for line in text.split("\n")], selected
+    return text.split("\n"), selected
 
 
 def normalize_line(line: str) -> str:
