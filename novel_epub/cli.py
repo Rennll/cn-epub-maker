@@ -69,7 +69,8 @@ def build(args: argparse.Namespace) -> int:
         print(f"Volumes: {len(result.book.volumes)}")
         print(f"Chapters: {result.book.chapter_count}")
         print(f"Paragraphs: {result.book.paragraph_count}")
-        print(f"Warnings: {len(result.warnings)}")
+        transformation_warning_count = sum(len(stage.warnings) for stage in audit)
+        print(f"Warnings: {len(result.warnings) + transformation_warning_count}")
         _print_transform_audit(audit)
         for warning in result.warnings:
             where = f" at line {warning.line}" if warning.line else ""
