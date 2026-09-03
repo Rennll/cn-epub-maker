@@ -155,6 +155,93 @@ class OpenCCTransformer:
         )
 
 
+class PunctuationTransformer:
+    """Normalize selected ASCII punctuation in Chinese text."""
+
+    name = "punctuation"
+
+    _DIRECT_MAP = str.maketrans({
+        "“": "「",
+        "”": "」",
+        "‘": "『",
+        "’": "』",
+    })
+    _CONTEXT_MAP = {
+        ",": "，",
+        "!": "！",
+        "?": "？",
+        ":": "：",
+        ";": "；",
+    }
+    _URL_OR_EMAIL = re.compile(
+        r"(?:https?://[^\s，。！？；：、]+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})"
+    )
+
+    @classmethod
+    def _is_chinese(cls, char: str) -> bool:
+        return any(
+            start <= ord(char) <= end
+            for start, end in (
+                (0x3400, 0x4DBF),
+                (0x4E00, 0x9FFF),
+                (0xF900, 0xFAFF),
+            )
+        )
+
+    @classmethod
+    def _is_meaningful(cls, char: str) -> bool:
+        return (char.isascii() and char.isalnum()) or cls._is_chinese(char)
+
+    def transform(self, text: str) -> TransformResult:
+        protected = {
+            match.span(): match.group(0)
+            for match in self._URL_OR_EMAIL.finditer(text)
+        }
+        converted: list[str] = []
+        chinese_context = False
+        i = 0
+
+        while i < len(text):
+            protected_text = next((value for (start, _), value in protected.items() if start == i), None)
+            if protected_text is not None:
+                converted.append(protected_text)
+                i += len(protected_text)
+                continue
+
+            char = text[i]
+            direct = char.translate(self._DIRECT_MAP)
+            if direct != char:
+                converted.append(direct)
+                i += 1
+                continue
+
+            if char == ".":
+                end = i
+                while end < len(text) and text[end] == ".":
+                    end += 1
+                run_length = end - i
+                if chinese_context and run_length >= 3:
+                    converted.append("……")
+                elif chinese_context and run_length == 1:
+                    converted.append("。")
+                else:
+                    converted.append(text[i:end])
+                i = end
+                continue
+
+            if chinese_context and char in self._CONTEXT_MAP:
+                converted.append(self._CONTEXT_MAP[char])
+            else:
+                converted.append(char)
+
+            if self._is_meaningful(char):
+                chinese_context = self._is_chinese(char)
+            i += 1
+
+        result = "".join(converted)
+        return TransformResult(text=result, changed=result != text)
+
+
 class TransformPipeline:
     def __init__(self, transformers: list[Transformer]) -> None:
         self.transformers = transformers

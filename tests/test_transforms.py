@@ -4,6 +4,7 @@ from novel_epub.transforms import (
     JunkCleaner,
     JunkRule,
     OpenCCTransformer,
+    PunctuationTransformer,
     TransformPipeline,
     TransformationError,
     TransformResult,
@@ -206,4 +207,109 @@ def test_pipeline_stops_when_opencc_is_fatal(monkeypatch):
     monkeypatch.setattr("opencc.OpenCC", BrokenOpenCC)
 
     with pytest.raises(TransformationError, match="opencc: OpenCC conversion failed"):
-        TransformPipeline([OpenCCTransformer(), LaterTransformer()]).run("简體中文")
+        TransformPipeline([OpenCCTransformer(), LaterTransformer()]).run("簡體中文")
+
+
+def test_punctuation_converts_direct_quote_pairs():
+    result = PunctuationTransformer().transform('“你好” ‘世界’')
+
+    assert result.text == '「你好」 『世界』'
+    assert result.changed is True
+    assert result.warnings == []
+
+
+def test_punctuation_converts_ascii_punctuation_in_local_chinese_context():
+    result = PunctuationTransformer().transform("你好,世界! 你是誰? 答案:是;好")
+
+    assert result.text == "你好，世界！ 你是誰？ 答案：是；好"
+    assert result.changed is True
+
+
+def test_punctuation_preserves_english_and_non_chinese_context():
+    result = PunctuationTransformer().transform("Hello, world! 123? test: yes; 中文, English, 世界!")
+
+    assert result.text == "Hello, world! 123? test: yes; 中文， English, 世界！"
+
+
+def test_punctuation_whitespace_does_not_remove_chinese_context():
+    result = PunctuationTransformer().transform("中文   , 文字")
+
+    assert result.text == "中文   ， 文字"
+
+
+def test_punctuation_leading_ascii_punctuation_is_preserved():
+    result = PunctuationTransformer().transform(", ! ? : ; .")
+
+    assert result.text == ", ! ? : ; ."
+    assert result.changed is False
+
+
+def test_punctuation_uses_nearest_meaningful_content_for_context():
+    result = PunctuationTransformer().transform("中文, English, 中文, 123, 中文?")
+
+    assert result.text == "中文， English, 中文， 123, 中文？"
+
+
+def test_punctuation_converts_chinese_sentence_period_but_not_numeric_period():
+    result = PunctuationTransformer().transform("中文. 中文 1.2 中文 2.0.")
+
+    assert result.text == "中文。 中文 1.2 中文 2.0."
+
+
+def test_punctuation_ellipsis_is_processed_before_single_period():
+    result = PunctuationTransformer().transform("中文... 中文.... 中文……")
+
+    assert result.text == "中文…… 中文…… 中文……"
+
+
+def test_punctuation_preserves_parentheses_brackets_braces_and_symbols():
+    source = "中文() [] {} / \\ | _ = + - * % # @ < > ~"
+
+    result = PunctuationTransformer().transform(source)
+
+    assert result.text == source
+    assert result.changed is False
+
+
+def test_punctuation_protects_urls_and_email_addresses():
+    source = "中文 https://example.com/a,b?x=1, test@example.com, 中文"
+
+    result = PunctuationTransformer().transform(source)
+
+    assert result.text == "中文 https://example.com/a,b?x=1, test@example.com， 中文"
+
+
+def test_punctuation_url_does_not_consume_trailing_chinese_period():
+    result = PunctuationTransformer().transform("https://example.com。中文")
+
+    assert result.text == "https://example.com。中文"
+
+
+def test_punctuation_email_does_not_consume_trailing_chinese_comma():
+    result = PunctuationTransformer().transform("test@example.com，中文")
+
+    assert result.text == "test@example.com，中文"
+
+
+def test_punctuation_does_not_collapse_repeated_question_or_exclamation_marks():
+    result = PunctuationTransformer().transform("什麼??? 真的!!!")
+
+    assert result.text == "什麼？？？ 真的！！！"
+
+
+def test_punctuation_zero_changes_is_success():
+    source = "繁體中文。 English, 123?"
+
+    result = PunctuationTransformer().transform(source)
+
+    assert result.text == source
+    assert result.changed is False
+    assert result.warnings == []
+
+
+def test_punctuation_is_idempotent():
+    transformer = PunctuationTransformer()
+    once = transformer.transform("中文,世界... ‘你好’!").text
+    twice = transformer.transform(once).text
+
+    assert twice == once
