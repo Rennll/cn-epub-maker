@@ -4,9 +4,14 @@ import json
 from pathlib import Path
 
 from .models import Book
+from .transforms import TransformAudit
 
 
-def write_intermediate(book: Book, directory: str | Path) -> Path:
+def write_intermediate(
+    book: Book,
+    directory: str | Path,
+    transformations: list[TransformAudit] | None = None,
+) -> Path:
     root = Path(directory)
     chapters_dir = root / "chapters"
     chapters_dir.mkdir(parents=True, exist_ok=True)
@@ -48,6 +53,16 @@ def write_intermediate(book: Book, directory: str | Path) -> Path:
         "language": book.language,
         "cover": book.cover,
         "preamble": {"file": "preamble.json"} if book.preamble else None,
+        "transformations": [
+            {
+                "name": stage.name,
+                "changed": stage.changed,
+                "warnings": stage.warnings,
+                "stats": stage.stats,
+                "metadata": stage.metadata,
+            }
+            for stage in (transformations or [])
+        ],
         "volumes": [
             {
                 "sequence": v.sequence,

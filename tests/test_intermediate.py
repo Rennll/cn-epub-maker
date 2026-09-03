@@ -3,6 +3,7 @@ from pathlib import Path
 
 from novel_epub.intermediate import write_intermediate
 from novel_epub.models import Book, Chapter, Paragraph, Volume
+from novel_epub.transforms import TransformAudit
 
 
 def test_intermediate_is_per_chapter_and_preserves_order(tmp_path: Path):
@@ -33,3 +34,52 @@ def test_intermediate_is_per_chapter_and_preserves_order(tmp_path: Path):
     assert first["number"] == "26"
     assert first["paragraphs"] == [{"text": "正文 < & >"}]
     assert (root / "chapters/000002.json").is_file()
+
+
+def test_intermediate_records_transformation_audit(tmp_path: Path):
+    book = Book(title="書", author="作者")
+    audit = [
+        TransformAudit(
+            name="junk_cleaner",
+            changed=True,
+            warnings=["invalid regex skipped"],
+            stats={"rules": 2, "matches": 1},
+            metadata={"rules": ["notice", "ad"]},
+        ),
+        TransformAudit(
+            name="opencc",
+            changed=True,
+            warnings=[],
+            stats={},
+            metadata={"profile": "s2twp"},
+        ),
+    ]
+
+    root = write_intermediate(book, tmp_path / "intermediate", transformations=audit)
+
+    metadata = json.loads((root / "book.json").read_text(encoding="utf-8"))
+    assert metadata["transformations"] == [
+        {
+            "name": "junk_cleaner",
+            "changed": True,
+            "warnings": ["invalid regex skipped"],
+            "stats": {"rules": 2, "matches": 1},
+            "metadata": {"rules": ["notice", "ad"]},
+        },
+        {
+            "name": "opencc",
+            "changed": True,
+            "warnings": [],
+            "stats": {},
+            "metadata": {"profile": "s2twp"},
+        },
+    ]
+
+
+def test_intermediate_records_empty_transformations_for_full_source(tmp_path: Path):
+    book = Book(title="書", author="作者")
+
+    root = write_intermediate(book, tmp_path / "intermediate", transformations=[])
+
+    metadata = json.loads((root / "book.json").read_text(encoding="utf-8"))
+    assert metadata["transformations"] == []

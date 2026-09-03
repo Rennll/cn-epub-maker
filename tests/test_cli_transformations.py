@@ -172,6 +172,30 @@ def test_build_warning_summary_includes_transformation_warnings(tmp_path, monkey
     assert "WARNING: junk_cleaner: rule 1 regex '[': unterminated character set; rule skipped" in output.err
 
 
+def test_build_passes_transformation_audit_to_intermediate(tmp_path, monkeypatch):
+    captured = {}
+    _stub_build_dependencies(monkeypatch, captured)
+    audit = [
+        TransformAudit(
+            name="opencc",
+            changed=True,
+            warnings=[],
+            stats={},
+            metadata={"profile": "s2twp"},
+        )
+    ]
+
+    monkeypatch.setattr("novel_epub.cli._run_transformations", lambda lines, args: (lines, audit))
+
+    def fake_write_intermediate(book, directory, transformations=None):
+        captured["transformations"] = transformations
+
+    monkeypatch.setattr("novel_epub.cli.write_intermediate", fake_write_intermediate)
+
+    assert build(_build_args(tmp_path, keep_intermediate=True)) == 0
+    assert captured["transformations"] == audit
+
+
 def test_main_exposes_v2_transformation_options(monkeypatch):
     captured = {}
 

@@ -78,7 +78,7 @@ def build(args: argparse.Namespace) -> int:
 
         if args.keep_intermediate:
             intermediate = Path(args.intermediate or Path(args.input).with_suffix("").name + ".intermediate")
-            write_intermediate(result.book, intermediate)
+            write_intermediate(result.book, intermediate, transformations=audit)
             print(f"Intermediate: {intermediate}")
 
         output = Path(args.output) if args.output else Path(args.input).with_name(
