@@ -68,4 +68,8 @@ def test_build_real_fixture_produces_transformed_epub(tmp_path: Path):
     assert "第一章 測試開始" in content
     assert "第二章 測試繼續" in content
     assert "第3章 一張丹方" in content
+
+    roommate = re.search(r"<p>[^<]*室友知道宋[^<]*</p>", content)
+    assert roommate is not None, repr(content)
+    print(f"DEBUG roommate XHTML: {roommate.group(0)!r}")
     assert "室友知道宋   書航" in content
