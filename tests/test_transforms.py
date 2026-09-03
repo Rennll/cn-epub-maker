@@ -18,11 +18,11 @@ def test_contains_removes_whole_target_not_substring():
     assert result.stats["removed"] == 1
 
 
-def test_block_exact_uses_continuous_nonblank_lines():
+def test_block_exact_preserves_boundary_blank_lines():
     result = JunkCleaner([JunkRule("block", "exact", "A\nB")]).transform(
         "A\nB\n\nC\nD"
     )
-    assert result.text == "\n\nC\nD"
+    assert result.text == "\nC\nD"
 
 
 def test_invalid_regex_is_warning_and_later_rule_runs():
