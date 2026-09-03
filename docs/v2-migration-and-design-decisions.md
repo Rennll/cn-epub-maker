@@ -34,8 +34,6 @@ The current default V2 pipeline is:
 
 TXT → Normalize → Junk Cleaner → OpenCC → Punctuation → Parser → Book → Intermediate → EPUB → Validation
 
-Whitespace Cleanup is intentionally reserved as a separate future transformation. Its detailed semantics are not defined yet and should not be folded into Junk Cleaner or silently added to Normalize.
-
 The order is intentional. Content transformations are separate from structural parsing and should not be silently embedded in Parser or Renderer behavior.
 
 ### Common Transform Contract
@@ -100,7 +98,9 @@ A matching rule removes the entire target. `contains` and `regex` do not replace
 
 Rules execute in user-specified order, with each rule operating on the result of the previous rule. For each `block` rule, blocks are re-formed from the current text after previous rules have run.
 
-Removing a block removes only the block's non-blank lines. Boundary blank lines are not removed, merged, or newly created by Junk Cleaner. If this leaves consecutive blank lines, that is an expected intermediate result; whitespace cleanup is a separate concern.
+Removing a block removes only the block's non-blank lines. Boundary blank lines are not removed, merged, or newly created by Junk Cleaner.
+
+As an output canonicalization rule, any line that contains only whitespace characters is represented as an empty line (`""`) after Junk Cleaner processing. This includes spaces, tabs, and full-width whitespace. Lines containing any non-whitespace content are otherwise unchanged; Junk Cleaner does not trim trailing whitespace, normalize indentation, or perform general whitespace cleanup. This canonicalization does not collapse multiple blank lines, which remain the Parser's responsibility for paragraph boundaries.
 
 The cleaner operates before Parser and therefore has no knowledge of chapters, paragraphs, volumes, or EPUB structure. It must not infer structure, cross configured boundaries, or introduce a second normalization layer.
 
@@ -141,12 +141,6 @@ The transform does not repair quote pairing, collapse repeated `?`/`!`, remove c
 
 Punctuation Conversion is idempotent and runs after OpenCC and before Parser.
 
-### Whitespace Cleanup
-
-Whitespace Cleanup is a reserved future transformer. It should own explicit whitespace/blank-line cleanup rather than allowing Junk Cleaner to alter whitespace as a side effect.
-
-Its detailed rules, scope, ordering, and configuration are intentionally not defined in this stage. When designed, it must be evaluated against the existing Normalize contract so responsibilities do not overlap.
-
 ## Modes
 
 ### Full Source Mode
@@ -182,13 +176,16 @@ V2 does not include global Arabic numeral conversion, automatic chapter renumber
 ## Implementation Order
 
 1. Establish the common transformation boundary, failure policy, and reporting.
-2. Add the OpenCC conversion profile.
-3. Add Junk Cleaner configuration and remove-only semantics.
-4. Add Punctuation Conversion.
-5. Add useful structural Parser configuration.
-6. Add renderer profiles.
-7. Stabilize the configuration/library and CLI boundary.
-8. Add Intermediate transformation metadata.
-9. Design and add Whitespace Cleanup as a separate transformation if its concrete requirements justify it.
+2. Add the Junk Cleaner configuration and remove-only semantics, including pure-whitespace-line canonicalization.
+3. Add the transformation pipeline/orchestration while keeping V1 structural parsing unchanged.
+4. Add the OpenCC conversion profile.
+5. Add Punctuation Conversion.
+6. Integrate the V2 configuration and pipeline into the CLI.
+7. Add Intermediate transformation metadata.
+8. Add focused tests for each extension and full/integration regression validation.
+
+Regex helper/testing UX remains a future enhancement and is not part of the first implementation.
+
+Whitespace Cleanup is not planned as a separate V2 transformer because the existing Parser already treats any number of consecutive blank/whitespace-only lines as paragraph boundaries without creating empty paragraphs. A separate cleanup stage would add responsibility and processing without changing the resulting parsed structure.
 
 Each extension should remain isolated, keep the V1 core stable, and receive focused tests before full/integration validation.
