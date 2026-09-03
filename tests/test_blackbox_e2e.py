@@ -60,7 +60,7 @@ def test_build_real_fixture_produces_transformed_epub(tmp_path: Path):
     assert dialogue is not None, repr(content)
     print(f"DEBUG dialogue XHTML: {dialogue.group(0)!r}")
 
-    assert "他說： \"你好，世界！\"" in content
+    assert "他說： “你好，世界！”" in content
     assert "https://example.com/test?a=1,b=2" in content
     assert "test@example.com" in content
     assert "　這一行前面有全形空白。" not in content
