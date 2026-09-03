@@ -2,9 +2,9 @@
 
 ## Status
 
-V2 is proposed design and implementation is incomplete. The decisions in this document are the current architectural baseline, not a claim that every item is already implemented.
+V2 is the completed transformation and integration stage built on top of V1. The decisions in this document define the V2 architectural baseline and its completed scope.
 
-V2 extends completed V1. It should not replace the V1 model, Intermediate boundary, parser contract, or Pandoc-first renderer merely to reproduce legacy behavior.
+V2 extends completed V1. It does not replace the V1 model, Intermediate boundary, parser contract, or Pandoc-first renderer merely to reproduce legacy behavior.
 
 ## Relationship to V1
 
@@ -12,7 +12,7 @@ V1 remains the stable core:
 
 Normalize → Parser → Intermediate → Pandoc EPUB → Validation
 
-V2 adds isolated extension points around that core. Legacy compatibility is subordinate to predictable behavior, explicit configuration, and preservation of the V1 architecture.
+V2 adds isolated transformation and orchestration capabilities around that core. Legacy compatibility is subordinate to predictable behavior, explicit configuration, and preservation of the V1 architecture.
 
 ## Migration Decisions
 
@@ -30,9 +30,9 @@ V2 is not intended to become a complete behavioral clone of the legacy implement
 
 ### Transform Pipeline
 
-The current default V2 pipeline is:
+The V2 content pipeline is:
 
-TXT → Normalize → Junk Cleaner → OpenCC → Punctuation → Parser → Book → Intermediate → EPUB → Validation
+TXT → Normalize → Junk Cleaner → OpenCC → Punctuation → Parser → Intermediate → EPUB → Validation
 
 The order is intentional. Content transformations are separate from structural parsing and should not be silently embedded in Parser or Renderer behavior.
 
@@ -72,7 +72,7 @@ OpenCC is retained as a V2 transformation and is enabled by default. The default
 
 The transformation applies to the full text after Normalize and Junk Cleaner. OpenCC itself does not perform custom English, URL, email, or prose-context detection; protection/context-sensitive handling belongs to the relevant downstream transformation, such as Punctuation.
 
-The first V2 implementation exposes built-in profile names only. The internal design uses a conversion-profile abstraction/registry so additional built-in profiles can be added later without redesign. Arbitrary external OpenCC configuration files are intentionally out of scope for the first V2 implementation.
+The first V2 implementation exposes built-in profile names only. The internal design uses a conversion-profile abstraction/registry so additional built-in profiles can be added later without redesign. Arbitrary external OpenCC configuration files are intentionally out of scope for V2.
 
 An invalid or nonexistent profile is a configuration error: the pipeline stops and the user is told to provide a valid profile. There is no silent fallback. OpenCC initialization/dependency failures are also fatal when the transformation cannot be performed reliably.
 
@@ -94,7 +94,7 @@ A matching rule removes the entire target. `contains` and `regex` do not replace
 
 `exact` means the complete target equals the configured pattern. It does not trim or otherwise normalize the target before comparison.
 
-`regex` uses the target determined by `scope`: one line for `line`, or one current block for `block`. Regex matching uses search semantics. No additional regex flags are exposed in the first V2 implementation. An invalid regex is a warning; that rule is skipped and later rules continue. A syntactically valid regex that matches very broadly is still valid user configuration and is not heuristically rejected.
+`regex` uses the target determined by `scope`: one line for `line`, or one current block for `block`. Regex matching uses search semantics. No additional regex flags are exposed in the V2 implementation. An invalid regex is a warning; that rule is skipped and later rules continue. A syntactically valid regex that matches very broadly is still valid user configuration and is not heuristically rejected.
 
 Rules execute in user-specified order, with each rule operating on the result of the previous rule. For each `block` rule, blocks are re-formed from the current text after previous rules have run.
 
@@ -131,11 +131,11 @@ In Chinese context, the following conversions apply:
 
 Existing `……` remains unchanged. The ellipsis rule is evaluated before the single-period rule.
 
-Parentheses `(` `)`, square brackets `[` `]`, and curly braces `{` `}` remain unchanged. Other ASCII symbols such as `/`, `\\`, `|`, `_`, `=`, `+`, `-`, `*`, `%`, `#`, `@`, `<`, `>`, and `~` are not converted by this transformer in the first V2 implementation.
+Parentheses `(` `)`, square brackets `[` `]`, and curly braces `{` `}` remain unchanged. Other ASCII symbols such as `/`, `\\`, `|`, `_`, `=`, `+`, `-`, `*`, `%`, `#`, `@`, `<`, `>`, and `~` are not converted by this transformer in the V2 implementation.
 
 Chinese-context detection is local rather than based on whether an entire line contains Chinese. Punctuation is considered in Chinese context when the nearest meaningful preceding content is Chinese CJK text; English and numbers do not establish Chinese context. Leading punctuation with no preceding Chinese context is preserved. Whitespace does not itself establish or remove context.
 
-Obvious URLs and email addresses are protected from punctuation conversion. The first implementation does not attempt broad Markdown/HTML/code parsing beyond the explicitly protected URL/email cases.
+Obvious URLs and email addresses are protected from punctuation conversion. The V2 implementation does not attempt broad Markdown/HTML/code parsing beyond the explicitly protected URL/email cases.
 
 The transform does not repair quote pairing, collapse repeated `?`/`!`, remove content, normalize whitespace, or guess author intent. For example, `什麼???` becomes `什麼？？？`, not a single `？`.
 
@@ -167,25 +167,26 @@ The configuration model is the primary interface for behavior; the CLI is a fron
 
 The exact Intermediate schema should follow the existing contract. Transformation metadata belongs to Intermediate as part of the audit/reproducibility boundary, not as EPUB metadata.
 
-Regex errors should be presented with enough information to identify and repair the rule, including the rule identity, configured pattern, and underlying regex error when available. Future UX may provide regex testing/help, but such assistance is not required for the first implementation.
+Regex errors should be presented with enough information to identify and repair the rule, including the rule identity, configured pattern, and underlying regex error when available. Future UX may provide regex testing/help, but such assistance is not required for the completed V2 scope.
 
 ## Non-goals
 
 V2 does not include global Arabic numeral conversion, automatic chapter renumbering, heuristic junk detection, arbitrary replacement through Junk Cleaner, broad whitespace cleanup by Junk Cleaner, or byte-for-byte source preservation. It also does not justify rebuilding the V1 model, Intermediate boundary, or Pandoc-first renderer merely for legacy compatibility. Any future exception requires a concrete use case and an explicit behavioral contract.
 
-## Implementation Order
+## Implementation Status
 
-1. Establish the common transformation boundary, failure policy, and reporting.
-2. Add the Junk Cleaner configuration and remove-only semantics, including pure-whitespace-line canonicalization.
-3. Add the transformation pipeline/orchestration while keeping V1 structural parsing unchanged.
-4. Add the OpenCC conversion profile.
-5. Add Punctuation Conversion.
-6. Integrate the V2 configuration and pipeline into the CLI.
-7. Add Intermediate transformation metadata.
-8. Add focused tests for each extension and full/integration regression validation.
+The V2 implementation is complete for the scope defined above. The completed work includes the common transformation contract and pipeline, Junk Cleaner, OpenCC, Punctuation Conversion, CLI orchestration, transformation audit metadata at the Intermediate boundary, focused and integration tests, and real TXT → CLI → Pandoc → EPUB black-box validation.
 
-Regex helper/testing UX remains a future enhancement and is not part of the first implementation.
+The completed V2 path preserves the V1 structural core:
 
-Whitespace Cleanup is not planned as a separate V2 transformer because the existing Parser already treats any number of consecutive blank/whitespace-only lines as paragraph boundaries without creating empty paragraphs. A separate cleanup stage would add responsibility and processing without changing the resulting parsed structure.
+Normalize → V2 Transformations → Parser → Intermediate → V1 EPUB Renderer → Validation
 
-Each extension should remain isolated, keep the V1 core stable, and receive focused tests before full/integration validation.
+## Future Evolution: V2.x
+
+`Intermediate → Book → EPUB` rebuilding is not a missing V2 implementation step. It is a separate V2.x feature/architectural evolution and requires its own explicit data-model contract, implementation, and tests.
+
+Other future capabilities may also be considered under V2.x when they extend or revise the completed V2 architecture without changing the V1/V2 contracts implicitly.
+
+## Design Principles
+
+Each extension should remain isolated, keep the V1 core stable, and receive focused tests before integration validation. Changes to completed V1/V2 contracts require a concrete use case and an explicit behavioral decision rather than being inferred from implementation convenience.

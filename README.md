@@ -1,37 +1,52 @@
 # cn-epub-maker
 
-將中文小說 TXT 轉換成 EPUB 的 Python 工具。
+將中文小說 TXT 轉換成 EPUB 的 Python 工具。適合希望把整理過的中文小說文字轉成可閱讀 EPUB 的使用者，也提供 Intermediate JSON 供後續處理與除錯。
 
-目前 `main` 上的穩定基線是 V1：以保留原文為優先，解析卷／章／段落結構，產生 Intermediate，再透過 Pandoc 建立 EPUB 並進行結構驗證。
-
-V1 不會自動進行簡體轉繁體、垃圾內容清理、全域阿拉伯數字轉換或章節重新編號。這些屬於 V2 的後續設計；V2 目前尚未完整實作。
+目前 V1 與 V2 已完成。V1 提供穩定的 TXT 解析、Intermediate、Pandoc EPUB 產生與驗證；V2 在 V1 之上加入 Normalize、Junk Cleaner、OpenCC、Punctuation Conversion，以及 CLI 與 Intermediate audit metadata 整合。下一階段的 `Intermediate → Book → EPUB` rebuilding 屬於 V2.x，不是目前 V2 的未完成部分。
 
 ## 安裝
 
-需要 Python 3.10 以上，以及可執行的 Pandoc。
+需要：
+
+- Python 3.10 以上
+- Pandoc，且 `pandoc` 必須能在 `PATH` 中執行
+- EPUBCheck 為選用工具；若安裝並放在 `PATH` 中，`validate` 會額外執行 EPUB 標準驗證
+
+建議在虛擬環境中安裝：
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 python3 -m pip install -e .
+```
+
+確認 Pandoc：
+
+```bash
 pandoc --version
 ```
 
-EPUBCheck 為選用工具。安裝後放在 `PATH` 中，即可讓 `validate` 額外執行 EPUB 標準驗證。
+確認 CLI：
 
-## 快速使用
+```bash
+novel-epub --help
+```
 
-基本 build：
+如果不使用安裝後的 `novel-epub` 指令，也可以使用 Python module 方式：
+
+```bash
+python3 -m novel_epub.cli --help
+```
+
+## 基本使用
+
+最基本的 build 需要輸入 TXT、書名與作者：
 
 ```bash
 novel-epub build novel.txt --title "書名" --author "作者"
 ```
 
-也可以使用 Python module 方式執行：
-
-```bash
-python3 -m novel_epub.cli build novel.txt --title "書名" --author "作者"
-```
-
-指定輸出檔案：
+預設輸出檔名為 `<書名>_<作者>.epub`。如果需要指定輸出位置：
 
 ```bash
 novel-epub build novel.txt \
@@ -40,7 +55,18 @@ novel-epub build novel.txt \
   --output book.epub
 ```
 
-指定來源編碼：
+也可以使用 module 方式執行相同命令：
+
+```bash
+python3 -m novel_epub.cli build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --output book.epub
+```
+
+## 來源編碼
+
+程式會自動嘗試常見中文編碼。若知道來源編碼，建議直接指定：
 
 ```bash
 novel-epub build novel.txt \
@@ -48,6 +74,78 @@ novel-epub build novel.txt \
   --author "作者" \
   --encoding gb18030
 ```
+
+目前可指定的常見選項包括 `utf-8-sig`、`utf-8`、`gb18030`、`gbk`、`big5`。Normalize 會處理 UTF-8 BOM 與不同 newline 表示。
+
+## V2 文字處理
+
+一般 build 預設會依序執行：
+
+```text
+Normalize
+  ↓
+Junk Cleaner
+  ↓
+OpenCC
+  ↓
+Punctuation Conversion
+  ↓
+Parser
+  ↓
+Intermediate
+  ↓
+EPUB
+  ↓
+Validation
+```
+
+OpenCC 預設啟用，預設 profile 為 `s2twp`：
+
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --opencc-profile s2twp
+```
+
+目前也提供 `s2t` profile。可以用 `--no-opencc` 停用 OpenCC：
+
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --no-opencc
+```
+
+Punctuation Conversion 預設啟用，可以用 `--no-punctuation` 停用：
+
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --no-punctuation
+```
+
+Junk Cleaner 是 V2 pipeline 的固定階段，目前使用內建預設規則；它採 remove-only 設計，不會把它當成任意文字取代工具。
+
+## Full Source Mode
+
+如果希望停用內容 transformation，可以使用：
+
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --full-source
+```
+
+此模式仍會執行 Normalize，因此不是 byte-for-byte 的原始檔複製。其處理路徑是：
+
+```text
+TXT → Normalize → Parser → Intermediate → EPUB
+```
+
+## 封面與語言
 
 加入封面：
 
@@ -58,7 +156,20 @@ novel-epub build novel.txt \
   --cover cover.jpg
 ```
 
-如果需要保留 Intermediate：
+指定語言：
+
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --lang zh-TW
+```
+
+預設語言為 `zh-CN`。
+
+## Intermediate
+
+如果需要保留 Intermediate JSON：
 
 ```bash
 novel-epub build novel.txt \
@@ -67,7 +178,7 @@ novel-epub build novel.txt \
   --keep-intermediate
 ```
 
-也可以指定 Intermediate 目錄：
+預設會在目前目錄建立 `<輸入檔名>.intermediate`。也可以指定目錄或路徑：
 
 ```bash
 novel-epub build novel.txt \
@@ -77,75 +188,69 @@ novel-epub build novel.txt \
   --intermediate book.intermediate
 ```
 
-驗證既有 EPUB：
+Intermediate 中會包含 transformation audit metadata，方便確認這次 build 使用了哪些 transformation 及其結果。
+
+## 驗證 EPUB
+
+`build` 完成後會執行內建 EPUB 結構驗證。也可以單獨驗證既有 EPUB：
 
 ```bash
 novel-epub validate book.epub
 ```
 
-## 目前 V1 提供的能力
+若系統中存在 EPUBCheck，`validate` 也會執行外部標準驗證；沒有安裝 EPUBCheck 時，內建驗證仍可使用，但會提示外部驗證被略過。
 
-- 讀取 TXT，支援常見中文編碼並可手動指定編碼。
-- 處理 UTF-8 BOM 與不同 newline 表示。
-- 移除定義中的段首全形空格縮排。
-- 解析 `Book → Volume → Chapter → Paragraph` 結構。
-- 支援阿拉伯數字與定義範圍內的中文章節數字。
-- 保留卷、章、段落與章節原始 label 等結構資訊。
-- 保留第一個章節之前的前言內容。
-- 支援明確格式的番外章節。
-- 對可繼續處理的輸入異常提供 warning，而不是任意猜測。
-- 產生 Intermediate JSON，適合大量章節的作品。
-- 使用 Pandoc 建立 EPUB。
-- 支援書名、作者、語言與封面等基本 metadata。
-- 提供內建 EPUB 結構驗證，並可選擇使用 EPUBCheck。
+## 常見問題
 
-## V1 的設計原則
+### 找不到 Pandoc
 
-V1 將「文字表示」、「文件結構」、「Intermediate」與「EPUB rendering」分開：
+如果出現找不到 `pandoc` 的錯誤，請先確認：
 
-```text
-TXT
- ↓
-Normalize
- ↓
-Parser
- ↓
-Intermediate
- ↓
-Pandoc
- ↓
-EPUB
- ↓
-Validation
+```bash
+pandoc --version
 ```
 
-Parser 以明確 grammar 判斷卷章結構，不進行語意猜測。章節的 `number`、`label`、`sequence` 也刻意分開，因此跳號、重複編號與番外章節不需要被重新編號。
+如果指令不存在，請先安裝 Pandoc，並確認它位於 `PATH`。
 
-更多 V1 行為與邊界請參閱 `docs/v1-architecture-decisions.md`。
+### 中文顯示錯誤
 
-## V1 與 V2
+如果 TXT 是 Big5、GBK 或 GB18030 等編碼，請明確指定來源編碼，例如：
 
-V1 是目前穩定基線。V2 會在 V1 上加入明確隔離的文字 transformation 與 presentation extension，而不是重新建立舊版架構。
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --encoding big5
+```
 
-目前已確定的 V2 設計包括：
+### 不想轉換簡體中文
 
-- OpenCC：預設啟用，可停用，並保留 conversion profile 擴充能力。
-- Junk Cleaner：使用者指定規則、`line` / `block` target、`exact` / `contains` / `regex` matcher，並採 remove-only 設計。
-- Quote Conversion：獨立 transformation，要求明確且可重複套用而不產生額外變化。
-- Full Source Mode：停用內容 transformation，但仍執行 Normalize。
-- Transformation metadata：記錄在 Intermediate，不寫入 EPUB metadata。
-- Arabic numeral conversion 與 chapter renumbering：不列入 V2 migration baseline。
+使用 `--no-opencc`。如果同時希望保留原始文字的內容 transformation 行為，也可以直接使用 `--full-source`；Full Source Mode 會停用 OpenCC、Punctuation Conversion 與其他內容 transformation，但仍執行 Normalize。
 
-V2 的完整設計與 migration decisions 請參閱 `docs/v2-migration-and-design-decisions.md`。
+### 不想轉換標點
+
+使用 `--no-punctuation`。這不會停用 OpenCC。
+
+## V1、V2 與 V2.x
+
+V1 是穩定核心，負責：
+
+```text
+TXT → Normalize → Parser → Intermediate → Pandoc → EPUB → Validation
+```
+
+V2 是已完成的 transformation 與 integration 階段，建立在 V1 核心之上，而不是取代 V1。其主要新增能力包括 OpenCC、Junk Cleaner、Punctuation Conversion、Full Source Mode，以及 transformation audit metadata。
+
+V2.x 將用於後續架構演進，例如 `Intermediate → Book → EPUB` rebuilding。這屬於新的功能與 contract，不應視為目前 V2 的缺漏。
 
 ## 文件
 
-`docs/` 主要供 AI 與跨 session 工作使用：
+`docs/` 主要保存專案架構、設計決策與跨 session 的工作交接資訊：
 
 - `docs/README.md` — 文件地圖與資訊分層。
 - `docs/v1-architecture-decisions.md` — V1 canonical architecture / behavior。
-- `docs/v2-migration-and-design-decisions.md` — V2 canonical design / decisions。
-- `docs/next-session-handoff.md` — 當前未完成工作的短期交接狀態。
+- `docs/v2-migration-and-design-decisions.md` — V2 canonical architecture / decisions。
+- `docs/next-session-handoff.md` — 下一個未完成工作的短期交接狀態。
 
 ## 授權
 

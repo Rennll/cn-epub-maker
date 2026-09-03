@@ -4,53 +4,45 @@
 
 V1 is complete and stable.
 
-V2 design decisions are recorded in `docs/v2-migration-and-design-decisions.md`, but V2 implementation is incomplete.
+V2 is complete for its defined scope: the transformation pipeline, CLI orchestration, Intermediate transformation metadata, focused/integration tests, and real TXT → CLI → Pandoc → EPUB black-box validation are all in place.
 
-The V2 design is now implementation-ready for the first transformation slice. Whitespace Cleanup was explicitly removed from the plan after verifying that the existing Parser already treats whitespace-only and consecutive blank lines as paragraph boundaries without creating empty paragraphs.
+V2 extends the V1 core rather than replacing it. The completed path is:
 
-## Current Task
+Normalize → V2 Transformations → Parser → Intermediate → V1 EPUB Renderer → Validation
 
-Continue V2 implementation. Do not reopen the completed V1 architecture unless a concrete regression or new requirement requires it.
+The V2 design and migration decisions are recorded in `docs/v2-migration-and-design-decisions.md`. Source code and tests remain the canonical source for implementation details.
+
+## Next Stage: V2.x
+
+The next architectural task is `Intermediate → Book → EPUB` rebuilding.
+
+This is not a missing V2 implementation step. Treat it as a new V2.x feature/evolution that requires its own explicit contract, data-model decisions, implementation plan, and tests.
+
+Before implementation, clarify the responsibilities and boundaries between Intermediate, Book, and EPUB generation. Preserve the completed V1/V2 contracts unless a concrete use case requires an explicit change.
 
 ## Important Context
 
-Treat `docs/v1-architecture-decisions.md` as the V1 contract and `docs/v2-migration-and-design-decisions.md` as the current V2 design baseline. Use source code and tests as the canonical source for implementation details.
+V1 remains the stable structural baseline. V2 adds the completed transformation stage around that baseline.
 
-The intended V2 content pipeline is:
+The V2 content pipeline is:
 
 Normalize → Junk Cleaner → OpenCC → Punctuation → Parser → Intermediate → EPUB → Validation
 
-Junk Cleaner is remove-only and user-configured. Rules execute sequentially in user-specified order. Supported scopes are `line` and `block`; supported matchers are `exact`, `contains`, and `regex`. Invalid regex is a recoverable warning for that rule, so later rules continue. Pure whitespace lines produced/preserved at the Junk Cleaner boundary are canonicalized to `""`; lines containing non-whitespace content are otherwise not whitespace-normalized.
-
-OpenCC is enabled by default with profile `s2twp`. The first implementation exposes built-in profiles only; invalid profiles and initialization/dependency failures are fatal. OpenCC operates on the full text after Junk Cleaner.
-
-Punctuation Conversion runs after OpenCC and before Parser. It handles the agreed Taiwan full-width punctuation/context rules, ellipsis conversion, direct quote conversion, and URL/email protection. It must be idempotent and must not perform general whitespace cleanup or content repair.
-
-Full Source Mode disables content transformations but still runs Normalize:
+Full Source Mode remains:
 
 TXT → Normalize → Parser
 
-Regex helper/testing UX is a future enhancement and is not part of the first implementation.
+Do not reopen completed V1/V2 behavior merely for V2.x convenience. Renderer behavior such as HTML whitespace collapsing remains a renderer concern rather than a transformation-stage guarantee.
 
-## Next Steps
+## Do Not Add Without a New Decision
 
-1. Establish the common transformation boundary/result/error contract and reporting model.
-2. Implement Junk Cleaner configuration and remove-only semantics, including pure-whitespace-line canonicalization.
-3. Implement transformation pipeline/orchestration without changing the existing V1 Parser contract.
-4. Add OpenCC and its built-in conversion-profile registry.
-5. Add Punctuation Conversion.
-6. Integrate the V2 configuration and transformation pipeline into the CLI.
-7. Add transformation metadata at the Intermediate boundary.
-8. Add focused tests for each extension, then run full regression/integration validation.
+- Do not treat `Intermediate → Book → EPUB` rebuilding as unfinished V2 work.
+- Do not add a separate Whitespace Cleanup transformer.
+- Do not introduce heuristic junk detection.
+- Do not add arbitrary replacement through Junk Cleaner.
+- Do not add global Arabic numeral conversion or automatic chapter renumbering.
+- Do not broaden Punctuation Conversion into general Markdown/HTML/code parsing without an explicit contract.
+- Do not add arbitrary external OpenCC configuration files without an explicit design decision.
+- Do not weaken or bypass the V1 Parser, Intermediate, or Pandoc-first renderer contracts implicitly.
 
-## Do Not Add
-
-- No separate Whitespace Cleanup transformer. The current Parser already handles multiple consecutive blank lines and whitespace-only lines as paragraph boundaries.
-- No heuristic junk detection.
-- No arbitrary replacement through Junk Cleaner.
-- No global Arabic numeral conversion.
-- No chapter renumbering.
-- No broad Markdown/HTML/code parsing for Punctuation beyond the explicitly protected URL/email cases.
-- No arbitrary external OpenCC config files in the first implementation.
-
-Keep each extension isolated and preserve the V1 model, Intermediate boundary, parser behavior, and Pandoc-first renderer unless a concrete requirement explicitly changes them.
+The next session should begin with V2.x architecture/design for the rebuilding path, not with another V2 completion pass.
