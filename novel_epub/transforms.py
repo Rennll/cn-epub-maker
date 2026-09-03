@@ -41,7 +41,6 @@ class JunkCleaner:
         current = text
         warnings: list[str] = []
         matched = 0
-        removed = 0
         for index, rule in enumerate(self.rules, start=1):
             if rule.target not in {"line", "block"} or rule.matcher not in {"exact", "contains", "regex"}:
                 warnings.append(f"rule {index}: invalid target/matcher; rule skipped")
@@ -52,13 +51,12 @@ class JunkCleaner:
                 warnings.append(f"rule {index} regex {rule.pattern!r}: {exc}; rule skipped")
                 continue
             matched += count
-            removed += count
         canonical = "\n".join("" if line.strip() == "" else line for line in current.split("\n"))
         return TransformResult(
             text=canonical,
             changed=canonical != text,
             warnings=warnings,
-            stats={"matched": matched, "removed": removed, "rules": len(self.rules)},
+            stats={"matched": matched, "removed": matched, "rules": len(self.rules)},
             metadata={"name": self.name},
         )
 
@@ -75,16 +73,23 @@ class JunkCleaner:
                     out.append(line)
             return "\n".join(out), count
 
-        blocks = _split_blocks(lines)
-        out_blocks: list[list[str]] = []
+        out: list[str] = []
         count = 0
-        for block in blocks:
-            target = "\n".join(block)
-            if _matches(target, rule.matcher, rule.pattern):
+        i = 0
+        while i < len(lines):
+            if lines[i].strip() == "":
+                out.append(lines[i])
+                i += 1
+                continue
+            start = i
+            while i < len(lines) and lines[i].strip() != "":
+                i += 1
+            block = lines[start:i]
+            if _matches("\n".join(block), rule.matcher, rule.pattern):
                 count += 1
             else:
-                out_blocks.append(block)
-        return "\n\n".join("\n".join(block) for block in out_blocks), count
+                out.extend(block)
+        return "\n".join(out), count
 
 
 def _matches(target: str, matcher: str, pattern: str) -> bool:
@@ -93,21 +98,6 @@ def _matches(target: str, matcher: str, pattern: str) -> bool:
     if matcher == "contains":
         return pattern in target
     return re.search(pattern, target) is not None
-
-
-def _split_blocks(lines: list[str]) -> list[list[str]]:
-    blocks: list[list[str]] = []
-    current: list[str] = []
-    for line in lines:
-        if line.strip() == "":
-            if current:
-                blocks.append(current)
-                current = []
-        else:
-            current.append(line)
-    if current:
-        blocks.append(current)
-    return blocks
 
 
 class TransformPipeline:
@@ -126,8 +116,5 @@ class TransformPipeline:
                 "stats": result.stats,
                 "metadata": result.metadata,
             })
-            if result.warnings:
-                # Warnings are recoverable by contract; the affected operation already skipped itself.
-                pass
             current = result.text
         return current, audit
