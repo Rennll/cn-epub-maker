@@ -208,6 +208,88 @@ def test_build_passes_transformation_audit_to_intermediate(tmp_path, monkeypatch
     assert captured["transformations"] == audit
 
 
+def test_build_runs_transformation_stages_in_documented_order(tmp_path, monkeypatch):
+    captured = {}
+    _stub_build_dependencies(monkeypatch, captured, source_lines=["input"])
+    calls = []
+
+    class FakeTransformer:
+        def __init__(self, name):
+            self.name = name
+
+        def transform(self, text):
+            calls.append((self.name, text))
+            return SimpleNamespace(
+                text=f"{text}|{self.name}",
+                changed=True,
+                warnings=[],
+                stats={},
+                metadata={},
+            )
+
+    monkeypatch.setattr("novel_epub.cli.JunkCleaner", lambda: FakeTransformer("junk_cleaner"))
+    monkeypatch.setattr(
+        "novel_epub.cli.OpenCCTransformer",
+        lambda profile: FakeTransformer("opencc"),
+    )
+    monkeypatch.setattr("novel_epub.cli.PunctuationTransformer", lambda: FakeTransformer("punctuation"))
+
+    assert build(_build_args(tmp_path)) == 0
+    assert calls == [
+        ("junk_cleaner", "input"),
+        ("opencc", "input|junk_cleaner"),
+        ("punctuation", "input|junk_cleaner|opencc"),
+    ]
+    assert captured["lines"] == ["input|junk_cleaner|opencc|punctuation"]
+
+
+def test_build_writes_transformation_audit_to_intermediate_json(tmp_path, monkeypatch):
+    from novel_epub.intermediate import write_intermediate
+    import json
+
+    monkeypatch.setattr("novel_epub.cli.render", lambda book, output: None)
+    monkeypatch.setattr("novel_epub.cli.validate_epub", lambda output: [])
+    monkeypatch.setattr("novel_epub.cli._run_transformations", lambda lines, args: (
+        lines,
+        [
+            TransformAudit(
+                name="opencc",
+                changed=True,
+                warnings=["test warning"],
+                stats={"matched": 2},
+                metadata={"profile": "s2twp"},
+            )
+        ],
+    ))
+    monkeypatch.setattr("novel_epub.cli.read_lines", lambda path, encoding: (["簡體中文"], "utf-8"))
+
+    def fake_input_parser(lines, **kwargs):
+        from novel_epub.models import Book
+
+        return SimpleNamespace(book=Book(title=kwargs["title"], author=kwargs["author"]), warnings=[])
+
+    monkeypatch.setattr("novel_epub.cli.parse_lines", fake_input_parser)
+    monkeypatch.setattr(
+        "novel_epub.cli.validate_book",
+        lambda book, warnings: SimpleNamespace(errors=[]),
+    )
+
+    intermediate = tmp_path / "book.intermediate"
+    args = _build_args(tmp_path, keep_intermediate=True, intermediate=str(intermediate))
+    assert build(args) == 0
+
+    metadata = json.loads((intermediate / "book.json").read_text(encoding="utf-8"))
+    assert metadata["transformations"] == [
+        {
+            "name": "opencc",
+            "changed": True,
+            "warnings": ["test warning"],
+            "stats": {"matched": 2},
+            "metadata": {"profile": "s2twp"},
+        }
+    ]
+
+
 def test_main_exposes_v2_transformation_options(monkeypatch):
     captured = {}
 
