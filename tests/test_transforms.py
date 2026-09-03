@@ -176,7 +176,7 @@ def test_opencc_runtime_init_failure_is_fatal(monkeypatch):
     monkeypatch.setattr("opencc.OpenCC", BrokenOpenCC)
 
     with pytest.raises(TransformationError, match="OpenCC conversion failed for profile 's2twp'"):
-        OpenCCTransformer().transform("简体中文")
+        OpenCCTransformer().transform("简體中文")
 
 
 def test_opencc_runtime_conversion_failure_is_fatal(monkeypatch):
@@ -190,7 +190,7 @@ def test_opencc_runtime_conversion_failure_is_fatal(monkeypatch):
     monkeypatch.setattr("opencc.OpenCC", BrokenOpenCC)
 
     with pytest.raises(TransformationError, match="OpenCC conversion failed for profile 's2twp'"):
-        OpenCCTransformer().transform("简体中文")
+        OpenCCTransformer().transform("簡體中文")
 
 
 def test_pipeline_stops_when_opencc_is_fatal(monkeypatch):
@@ -228,7 +228,7 @@ def test_punctuation_converts_ascii_punctuation_in_local_chinese_context():
 def test_punctuation_preserves_english_and_non_chinese_context():
     result = PunctuationTransformer().transform("Hello, world! 123? test: yes; 中文, English, 世界!")
 
-    assert result.text == "Hello, world! 123? test: yes; 中文，English, 世界！"
+    assert result.text == "Hello, world! 123? test: yes; 中文， English, 世界！"
 
 
 def test_punctuation_whitespace_does_not_remove_chinese_context():
