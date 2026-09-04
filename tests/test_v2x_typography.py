@@ -42,6 +42,106 @@ def test_parser_maps_blank_runs_to_following_paragraph():
     ]
 
 
+@pytest.mark.parametrize(
+    ("blank_lines", "expected"),
+    [
+        (0, ParagraphBoundary.NORMAL),
+        (1, ParagraphBoundary.NORMAL),
+        (2, ParagraphBoundary.EXPANDED),
+        (3, ParagraphBoundary.SCENE_BREAK),
+        (5, ParagraphBoundary.SCENE_BREAK),
+    ],
+)
+def test_parser_maps_blank_run_cardinality_to_following_paragraph(blank_lines, expected):
+    result = parse_lines(
+        ["第1章 開始", "前一段", *([""] * blank_lines), "後一段"],
+        title="書",
+        author="作者",
+    )
+    paragraphs = result.book.chapters[0].paragraphs
+    assert [p.boundary for p in paragraphs] == [ParagraphBoundary.NORMAL, expected]
+
+
+def test_parser_does_not_apply_chapter_start_blank_run_to_previous_paragraph():
+    result = parse_lines(
+        ["第1章 一", "正文", "", "", "第2章 二", "正文"],
+        title="書",
+        author="作者",
+    )
+    chapters = result.book.chapters
+    assert chapters[0].paragraphs[0].boundary is ParagraphBoundary.NORMAL
+    assert chapters[1].paragraphs[0].boundary is ParagraphBoundary.NORMAL
+
+
+def test_parser_does_not_apply_chapter_end_blank_run_without_following_paragraph():
+    result = parse_lines(
+        ["第1章 一", "正文", "", "", ""],
+        title="書",
+        author="作者",
+    )
+    paragraphs = result.book.chapters[0].paragraphs
+    assert len(paragraphs) == 1
+    assert paragraphs[0].boundary is ParagraphBoundary.NORMAL
+
+
+def test_parser_does_not_cross_volume_boundary_with_pending_blank_run():
+    result = parse_lines(
+        ["第1卷 上", "第1章 一", "正文", "", "", "第2卷 下", "第2章 二", "正文"],
+        title="書",
+        author="作者",
+    )
+    first_volume = result.book.volumes[0]
+    second_volume = result.book.volumes[1]
+    assert first_volume.chapters[0].paragraphs[0].boundary is ParagraphBoundary.NORMAL
+    assert second_volume.chapters[0].paragraphs[0].boundary is ParagraphBoundary.NORMAL
+
+
+def test_parser_does_not_cross_preamble_to_first_chapter_boundary():
+    result = parse_lines(
+        ["簡介", "", "", "第1章 開始", "正文"],
+        title="書",
+        author="作者",
+    )
+    assert len(result.book.preamble) == 1
+    assert result.book.preamble[0].boundary is ParagraphBoundary.NORMAL
+    assert result.book.chapters[0].paragraphs[0].boundary is ParagraphBoundary.NORMAL
+
+
+def test_parser_drops_multiple_blank_runs_before_chapter_heading():
+    result = parse_lines(
+        ["第1章 一", "正文", "", "", "", "第2章 二", "正文", "", "", "", "第3章 三", "正文"],
+        title="書",
+        author="作者",
+    )
+    chapters = result.book.chapters
+    assert [chapter.paragraphs[0].boundary for chapter in chapters] == [
+        ParagraphBoundary.NORMAL,
+        ParagraphBoundary.NORMAL,
+        ParagraphBoundary.NORMAL,
+    ]
+
+
+def test_parser_preserves_hard_line_break_and_applies_following_paragraph_boundary():
+    result = parse_lines(
+        [
+            "第1章 開始",
+            "第一行",
+            "第二行",
+            "",
+            "",
+            "下一段",
+        ],
+        title="書",
+        author="作者",
+    )
+    paragraphs = result.book.chapters[0].paragraphs
+    assert len(paragraphs) == 2
+    assert paragraphs[0].text == "第一行\n第二行"
+    assert paragraphs[0].boundary is ParagraphBoundary.NORMAL
+    assert paragraphs[1].text == "下一段"
+    assert paragraphs[1].boundary is ParagraphBoundary.EXPANDED
+
+
 def test_parser_preserves_hard_line_break_inside_one_paragraph():
     result = parse_lines(
         ["第1章 開始", "第一行", "第二行", "", "下一段"],
@@ -52,17 +152,6 @@ def test_parser_preserves_hard_line_break_inside_one_paragraph():
     assert len(paragraphs) == 2
     assert paragraphs[0].text == "第一行\n第二行"
     assert paragraphs[0].boundary is ParagraphBoundary.NORMAL
-
-
-def test_boundary_semantics_reset_at_chapter_boundary():
-    result = parse_lines(
-        ["第1章 一", "正文", "", "", "第2章 二", "正文"],
-        title="書",
-        author="作者",
-    )
-    chapters = result.book.chapters
-    assert chapters[0].paragraphs[0].boundary is ParagraphBoundary.NORMAL
-    assert chapters[1].paragraphs[0].boundary is ParagraphBoundary.NORMAL
 
 
 def test_preamble_uses_boundary_semantics_within_its_region():
