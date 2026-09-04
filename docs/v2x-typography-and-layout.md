@@ -6,7 +6,7 @@ V2.1 Typography / Layout is the first V2.x architecture-evolution milestone. Its
 
 This document records the V2.1 design baseline for typography and layout. Real-device presentation tuning and cross-reader validation are follow-up work, not prerequisites for the semantic implementation to be considered complete.
 
-The core V1/V2 domain model, parser model, Intermediate representation, and Pandoc-first rendering architecture remain unchanged except for the small semantic extension described here.
+The overall system architecture is described in `architecture-overview.md`. V2.1 makes only the semantic extension described here to the existing structural and rendering boundaries.
 
 Typography and layout numeric values are candidate values for initial implementation and testing. They are not architectural contracts and may be adjusted after real-device testing.
 
@@ -23,30 +23,6 @@ The goals are:
 - provide predictable EPUB pagination intent;
 - keep presentation decisions separate from parsing and text transformation;
 - preserve existing Intermediate artifacts and backward compatibility.
-
-The processing architecture remains:
-
-```text
-TXT
- ↓
-Normalize
- ↓
-Junk Cleaner
- ↓
-OpenCC
- ↓
-Punctuation
- ↓
-Parser
- ↓
-Intermediate
- ↓
-Renderer
- ↓
-EPUB
- ↓
-Validation
-```
 
 ## 2. Non-goals
 
@@ -200,20 +176,6 @@ An invalid boundary must not fail the entire pipeline. The user may correct the 
 The renderer consumes semantic document information and converts it into EPUB-compatible HTML/CSS.
 
 The renderer must not merge paragraphs, split paragraphs, rewrite paragraph text, normalize punctuation, perform OpenCC conversion, or infer missing scene breaks.
-
-The rendering flow is:
-
-```text
-Book semantics
- ↓
-Semantic HTML
- ↓
-Typography/layout configuration
- ↓
-CSS
- ↓
-EPUB
-```
 
 ### 6.1 Paragraph HTML
 
