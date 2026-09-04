@@ -99,12 +99,16 @@ def parse_lines(
             preamble_boundary = boundary
         pending_blank_count = 0
 
-    def add_chapter(cm, line_no: int):
-        nonlocal chapter_sequence, current_chapter, paragraph_boundary, preamble_boundary
-        flush_current()
+    def reset_content_boundary() -> None:
+        nonlocal pending_blank_count, paragraph_boundary, preamble_boundary
         pending_blank_count = 0
         paragraph_boundary = ParagraphBoundary.NORMAL
         preamble_boundary = ParagraphBoundary.NORMAL
+
+    def add_chapter(cm, line_no: int):
+        nonlocal chapter_sequence, current_chapter
+        flush_current()
+        reset_content_boundary()
         chapter_sequence += 1
         groups = cm.groupdict()
         raw_number = groups.get("number")
@@ -135,9 +139,7 @@ def parse_lines(
         vm = volume_re.match(stripped)
         if vm:
             flush_current()
-            pending_blank_count = 0
-            paragraph_boundary = ParagraphBoundary.NORMAL
-            preamble_boundary = ParagraphBoundary.NORMAL
+            reset_content_boundary()
             volume_sequence += 1
             number = vm.groupdict().get("number") or ""
             label = vm.groupdict().get("label") or vm.group(0).strip()
@@ -167,9 +169,7 @@ def parse_lines(
             label = groups.get("label") or em.group(0).strip()
             chapter_title = (groups.get("title") or "").strip()
             flush_current()
-            pending_blank_count = 0
-            paragraph_boundary = ParagraphBoundary.NORMAL
-            preamble_boundary = ParagraphBoundary.NORMAL
+            reset_content_boundary()
             chapter_sequence += 1
             current_chapter = Chapter(sequence=chapter_sequence, number=None, label=label, title=chapter_title)
             if current_volume is not None:
@@ -179,8 +179,6 @@ def parse_lines(
             continue
 
         if current_chapter is None:
-            if not preamble_paragraph_lines:
-                preamble_boundary = preamble_boundary
             preamble_paragraph_lines.append(stripped)
             continue
 
