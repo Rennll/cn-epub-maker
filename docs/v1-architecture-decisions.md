@@ -25,7 +25,7 @@ Book
            └── Paragraph
 ```
 
-`Book` contains title, author, language, optional cover, optional preamble, volumes, and top-level chapters. A book may contain both volume-contained chapters and top-level chapters. `iter_chapters()` traverses chapters regardless of whether they belong to a volume.
+`Book` contains title, author, language, optional cover, optional preamble, volumes, and top-level chapters. A book may contain both volume-contained chapters and top-level chapters. `iter_chapters()` traverses all chapters in structural order regardless of whether they belong to a volume.
 
 `Volume` contains structural sequence, parsed/source number, source label, title, and chapters.
 
@@ -43,7 +43,9 @@ Book
 
 ### Normalization
 
-The normalization layer handles source encoding, UTF-8 BOM, newline representation, and the defined leading full-width-space indentation. Parser matching also tolerates the whitespace forms covered by its grammar.
+The normalization layer decodes supported TXT encodings and normalizes line endings before parsing. Automatic encoding detection tries `utf-8-sig`, `utf-8`, `gb18030`, `gbk`, and `big5` in that order after BOM handling. Explicitly supplied encodings are also supported.
+
+Newline forms `CRLF` and `CR` are normalized to `LF`. The line-level normalization removes only leading U+3000 IDEOGRAPHIC SPACE characters. It does not generally trim whitespace, collapse whitespace, or otherwise rewrite content.
 
 Normalization provides predictable parser input but does not infer document structure.
 
@@ -65,6 +67,12 @@ The parsed `number` is derived data; the source `label` remains available so str
 
 Explicit forms `番外1`, `番外一`, `番外篇1`, and `番外篇一` become ordinary Chapters with `number=None`, the source label, and a structural sequence. Ordinary prose containing `番外` is not treated as a chapter unless the explicit grammar matches.
 
+### Parser Failure and Warning Semantics
+
+Parser diagnostics distinguish between structurally suspicious input and a matched chapter-like heading whose number cannot be parsed. An `unparsed_chapter_number` warning means a chapter-shaped heading matched the relevant grammar but its number could not be converted, so no chapter is created from that heading. A `suspicious_chapter_heading` warning means a line appears chapter-like but does not satisfy the chapter grammar; it remains ordinary content rather than being guessed into a chapter. These cases are intentionally different because they imply different recovery behavior.
+
+Other structural warnings such as duplicate chapter/volume numbers do not cause automatic renumbering.
+
 ### Preamble
 
 Non-empty content before the first detected chapter becomes `Book.preamble`. Blank lines delimit preamble paragraphs. Preamble content flows through Parser → Book.preamble → Intermediate → `EPUB/text/preamble.xhtml`, is placed before chapter content, and is included in navigation. It does not itself produce a warning merely because it occurs before the first chapter.
@@ -79,9 +87,23 @@ Consecutive non-empty lines form one paragraph; a blank line flushes the paragra
 
 ## Intermediate Representation
 
-Intermediate separates parsing from EPUB rendering and provides a stable serialization boundary. It includes `book.json`, chapter-scale data serialized independently, and `preamble.json` when preamble content exists. The representation is intended to support works with thousands of chapters and downstream processing without coupling parsing to EPUB packaging.
+Intermediate separates parsing from EPUB rendering and provides a stable serialization boundary. Its current on-disk layout is:
 
-The V1 Intermediate representation preserves the information required to reconstruct the V1 book model.
+```text
+intermediate/
+├── book.json
+├── preamble.json        (optional)
+└── chapters/
+    ├── 000001.json
+    ├── 000002.json
+    └── ...
+```
+
+`book.json` stores book metadata, volume structure, and chapter entries that reference the corresponding chapter files. Each chapter is serialized independently rather than embedding every paragraph into one large `book.json` document.
+
+This chapter-per-file layout is intentional: it keeps the serialization boundary manageable for works with thousands of chapters and allows downstream tooling to inspect or process chapters independently without constructing one giant JSON document.
+
+The V1 Intermediate representation preserves the information required to reconstruct the V1 book model. It is a serialization boundary, not merely a temporary cache format.
 
 ## EPUB Generation Decisions
 
@@ -95,7 +117,7 @@ The ZIP package keeps `mimetype` uncompressed and deflates other entries. Pandoc
 
 Built-in structural validation checks EPUB package relationships such as the container, OPF, manifest, spine, navigation, and referenced resources. EPUBCheck is optional and provides additional standards validation.
 
-Missing EPUBCheck is a warning; actual EPUBCheck errors fail validation. Warnings are nonfatal; errors indicate that the output cannot be treated as a reliably valid artifact.
+The validation architecture has three layers: model validation of the structured `Book` before rendering, built-in EPUB package validation after generation, and optional external EPUBCheck validation. Missing EPUBCheck is a warning/optional condition; actual EPUBCheck errors fail validation. Warnings are nonfatal; errors indicate that the output cannot be treated as a reliably valid artifact.
 
 Typical parser warnings include `duplicate_chapter_number`, `duplicate_volume_number`, `unparsed_chapter_number`, `suspicious_chapter_heading`, and `no_chapters`. Duplicate numbers are preserved. Unparseable numbers warn instead of guessing. Suspicious headings may be reported without becoming chapters. No chapters produces a warning.
 
