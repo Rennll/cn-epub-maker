@@ -43,23 +43,23 @@ def test_parser_maps_blank_runs_to_following_paragraph():
 
 
 @pytest.mark.parametrize(
-    ("blank_lines", "expected"),
+    ("blank_lines", "expected_boundaries"),
     [
-        (0, ParagraphBoundary.NORMAL),
-        (1, ParagraphBoundary.NORMAL),
-        (2, ParagraphBoundary.EXPANDED),
-        (3, ParagraphBoundary.SCENE_BREAK),
-        (5, ParagraphBoundary.SCENE_BREAK),
+        (0, [ParagraphBoundary.NORMAL]),
+        (1, [ParagraphBoundary.NORMAL, ParagraphBoundary.NORMAL]),
+        (2, [ParagraphBoundary.NORMAL, ParagraphBoundary.EXPANDED]),
+        (3, [ParagraphBoundary.NORMAL, ParagraphBoundary.SCENE_BREAK]),
+        (5, [ParagraphBoundary.NORMAL, ParagraphBoundary.SCENE_BREAK]),
     ],
 )
-def test_parser_maps_blank_run_cardinality_to_following_paragraph(blank_lines, expected):
+def test_parser_maps_blank_run_cardinality_to_following_paragraph(blank_lines, expected_boundaries):
     result = parse_lines(
         ["第1章 開始", "前一段", *([""] * blank_lines), "後一段"],
         title="書",
         author="作者",
     )
     paragraphs = result.book.chapters[0].paragraphs
-    assert [p.boundary for p in paragraphs] == [ParagraphBoundary.NORMAL, expected]
+    assert [p.boundary for p in paragraphs] == expected_boundaries
 
 
 def test_parser_does_not_apply_chapter_start_blank_run_to_previous_paragraph():
