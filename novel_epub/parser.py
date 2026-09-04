@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 
 from .chinese_numerals import chinese_numeral_to_int
-from .models import Book, Chapter, Paragraph, Volume
+from .models import Book, Chapter, Paragraph, ParagraphBoundary, Volume
 from .normalize import normalize_line
 
 DEFAULT_VOLUME_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s卷部冊]+)\s*(?P<unit>[卷部冊]))(?:[\s　]+(?P<title>.*?))?\s*$"
@@ -34,6 +34,14 @@ def _parse_number(raw: str) -> int | None:
     return chinese_numeral_to_int(value)
 
 
+def _boundary_for_blank_run(blank_count: int) -> ParagraphBoundary:
+    if blank_count >= 3:
+        return ParagraphBoundary.SCENE_BREAK
+    if blank_count == 2:
+        return ParagraphBoundary.EXPANDED
+    return ParagraphBoundary.NORMAL
+
+
 def parse_lines(
     lines: list[str], *, title: str, author: str, language: str = "zh-CN",
     cover: str | None = None, volume_pattern: str = DEFAULT_VOLUME_PATTERN,
@@ -52,20 +60,39 @@ def parse_lines(
     seen_volume_numbers: set[str] = set()
     paragraph_lines: list[str] = []
     preamble_paragraph_lines: list[str] = []
+    pending_blank_count = 0
 
-    def flush_paragraph() -> None:
+    def flush_paragraph(boundary: ParagraphBoundary | None = None) -> None:
         if current_chapter is not None and paragraph_lines:
-            current_chapter.paragraphs.append(Paragraph(text="\n".join(paragraph_lines)))
+            current_chapter.paragraphs.append(
+                Paragraph(
+                    text="\n".join(paragraph_lines),
+                    boundary=boundary or ParagraphBoundary.NORMAL,
+                )
+            )
         paragraph_lines.clear()
 
-    def flush_preamble_paragraph() -> None:
+    def flush_preamble_paragraph(boundary: ParagraphBoundary | None = None) -> None:
         if preamble_paragraph_lines:
-            book.preamble.append(Paragraph(text="\n".join(preamble_paragraph_lines)))
+            book.preamble.append(
+                Paragraph(
+                    text="\n".join(preamble_paragraph_lines),
+                    boundary=boundary or ParagraphBoundary.NORMAL,
+                )
+            )
             preamble_paragraph_lines.clear()
+
+    def flush_content_boundary() -> None:
+        nonlocal pending_blank_count
+        if current_chapter is not None:
+            flush_paragraph(_boundary_for_blank_run(pending_blank_count))
+        else:
+            flush_preamble_paragraph(_boundary_for_blank_run(pending_blank_count))
+        pending_blank_count = 0
 
     def add_chapter(cm, line_no: int):
         nonlocal chapter_sequence, current_chapter
-        flush_paragraph()
+        flush_content_boundary()
         flush_preamble_paragraph()
         chapter_sequence += 1
         groups = cm.groupdict()
@@ -87,15 +114,15 @@ def parse_lines(
         line = normalize_line(raw).rstrip()
         stripped = line.strip()
         if not stripped:
-            if current_chapter is not None:
-                flush_paragraph()
-            else:
-                flush_preamble_paragraph()
+            pending_blank_count += 1
             continue
+
+        if pending_blank_count:
+            flush_content_boundary()
 
         vm = volume_re.match(stripped)
         if vm:
-            flush_paragraph()
+            flush_content_boundary()
             flush_preamble_paragraph()
             volume_sequence += 1
             number = vm.groupdict().get("number") or ""
@@ -125,7 +152,7 @@ def parse_lines(
             groups = em.groupdict()
             label = groups.get("label") or em.group(0).strip()
             chapter_title = (groups.get("title") or "").strip()
-            flush_paragraph()
+            flush_content_boundary()
             flush_preamble_paragraph()
             chapter_sequence += 1
             current_chapter = Chapter(sequence=chapter_sequence, number=None, label=label, title=chapter_title)
@@ -143,6 +170,8 @@ def parse_lines(
         if stripped.startswith("第") and re.search(r"[章集篇回]", stripped):
             warnings.append(WarningItem("suspicious_chapter_heading", line_no, f"possible chapter heading not matched: {stripped[:80]}"))
 
+    if pending_blank_count:
+        flush_content_boundary()
     flush_paragraph()
     flush_preamble_paragraph()
     if not book.chapter_count:
