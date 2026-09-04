@@ -51,7 +51,7 @@ Normalization provides predictable parser input but does not infer document stru
 
 ### Volume and Chapter Structure
 
-The default grammar recognizes volume headings using units such as `卷`/`部`/`冊`, and chapter headings using `章`/`集`/`篇`/`回`, with optional whitespace and titles. Custom volume/chapter patterns can be supplied through the parser interface.
+The default grammar recognizes volume headings using units such as `卷`/`部`/`冊`, and chapter headings using `章`/`集`/`篇`/`回`, with optional whitespace and titles. Chapter titles may begin immediately after the chapter unit; whitespace between the chapter unit and title is not required. For example, both `第1章 殺豬美人` and `第1章殺豬美人` are valid chapter headings. Custom volume/chapter patterns can be supplied through the parser interface.
 
 Parsing is grammar-based and does not infer document structure from general prose.
 
@@ -127,6 +127,7 @@ V1 guarantees that:
 
 - Arabic and supported Chinese chapter numbers are deterministic;
 - supported traditional/simplified numeral variants are handled by the converter;
+- chapter titles may be separated from the chapter unit by whitespace, but such whitespace is not required;
 - empty titles are valid;
 - preamble is preserved;
 - extra chapters are preserved with `number=None`;
