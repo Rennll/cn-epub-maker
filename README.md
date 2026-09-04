@@ -2,8 +2,6 @@
 
 將中文小說 TXT 轉換成 EPUB 的 Python 工具。適合希望把整理過的中文小說文字轉成可閱讀 EPUB 的使用者，也提供 Intermediate JSON 供後續處理與除錯。
 
-目前 V1 與 V2 已完成。V1 提供穩定的 TXT 解析、Intermediate、Pandoc EPUB 產生與驗證；V2 在 V1 之上加入 Normalize、Junk Cleaner、OpenCC、Punctuation Conversion，以及 CLI 與 Intermediate audit metadata 整合。下一階段的 `Intermediate → Book → EPUB` rebuilding 屬於 V2.x，不是目前 V2 的未完成部分。
-
 ## 安裝
 
 需要：
@@ -231,17 +229,11 @@ novel-epub build novel.txt \
 
 使用 `--no-punctuation`。這不會停用 OpenCC。
 
-## V1、V2 與 V2.x
+## 功能
 
-V1 是穩定核心，負責：
-
-```text
-TXT → Normalize → Parser → Intermediate → Pandoc → EPUB → Validation
-```
-
-V2 是已完成的 transformation 與 integration 階段，建立在 V1 核心之上，而不是取代 V1。其主要新增能力包括 OpenCC、Junk Cleaner、Punctuation Conversion、Full Source Mode，以及 transformation audit metadata。
-
-V2.x 將用於後續架構演進，例如 `Intermediate → Book → EPUB` rebuilding。這屬於新的功能與 contract，不應視為目前 V2 的缺漏。
+- **V1** — 穩定的 TXT 解析、Intermediate、Pandoc EPUB 產生與驗證。
+- **V2** — Normalize、Junk Cleaner、OpenCC、Punctuation Conversion、Full Source Mode、CLI、transformation audit metadata，以及相關 transformation / integration 能力。
+- **V2.1 Typography / Layout** — 建立段落邊界語義、hard line break、語義化 HTML/CSS、章節分頁意圖與基礎排版支援。
 
 ## 文件
 
@@ -250,6 +242,7 @@ V2.x 將用於後續架構演進，例如 `Intermediate → Book → EPUB` rebui
 - `docs/README.md` — 文件地圖與資訊分層。
 - `docs/v1-architecture-decisions.md` — V1 canonical architecture / behavior。
 - `docs/v2-migration-and-design-decisions.md` — V2 canonical architecture / decisions。
+- `docs/v2.1-typography-and-layout.md` — V2.1 Typography / Layout design baseline。
 - `docs/next-session-handoff.md` — 下一個未完成工作的短期交接狀態。
 
 ## 授權
