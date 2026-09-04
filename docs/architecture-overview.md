@@ -33,6 +33,8 @@ Validation
 
 The exact transformation set and presentation semantics may evolve. This overview defines the architectural roles and boundaries rather than a fixed implementation sequence for every version.
 
+The CLI is the orchestration layer around this pipeline. Conceptually it coordinates reading, normalization, transformation, parsing, model validation, optional Intermediate serialization, rendering, and EPUB validation; it does not own the semantics of those stages.
+
 ## Component Responsibilities
 
 ### Normalize
@@ -65,17 +67,27 @@ Convert the structured book representation into the publication representation u
 
 The renderer owns output semantics such as semantic HTML structure, paragraph presentation classes, hard line-break representation, and chapter pagination intent. It should not infer or silently rewrite source semantics owned by the parser or Intermediate model.
 
+The current Pandoc-based renderer uses Pandoc to convert chapter content from the project's intermediate Markdown form to HTML fragments, then applies project-specific semantic post-processing before EPUB assembly. Pandoc is therefore a rendering backend, not the owner of the complete EPUB package.
+
 ### EPUB Generation
 
 Package rendered content and supporting resources into the final EPUB artifact.
 
-EPUB generation is an output concern. It should consume renderer output rather than reimplement parsing, transformation, or book-structure decisions.
+EPUB generation is an output concern. It consumes renderer output and assembles the package-level resources and relationships required by the project, rather than reimplementing parsing, transformation, or book-structure decisions.
 
 ### Validation
 
-Verify that generated EPUB output satisfies the project's required structural and packaging guarantees.
+Verify that generated output satisfies the project's required structural and packaging guarantees.
 
-Validation checks the produced artifact rather than defining upstream semantics.
+Validation has three conceptual layers:
+
+1. **Book/model validation:** check the structured `Book` result before rendering, including required metadata and chapter presence.
+2. **EPUB structural validation:** inspect the generated ZIP/package relationships, including `mimetype`, container, OPF, manifest, spine, navigation, and referenced targets.
+3. **EPUBCheck:** optionally run the external EPUBCheck tool for additional standards validation.
+
+The first two layers are built into the project. EPUBCheck is an optional external dependency; when it is unavailable, built-in structural validation can still determine whether the generated package satisfies the project's own structural guarantees.
+
+Validation checks produced results rather than defining upstream semantics.
 
 ## Architectural Boundaries
 
