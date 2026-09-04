@@ -8,7 +8,7 @@ from .models import Book, Chapter, Paragraph, ParagraphBoundary, Volume
 from .normalize import normalize_line
 
 DEFAULT_VOLUME_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s卷部冊]+)\s*(?P<unit>[卷部冊]))(?:[\s　]+(?P<title>.*?))?\s*$"
-DEFAULT_CHAPTER_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s章集篇回]+)\s*(?P<unit>[章集篇回]))(?:[\s　]+(?P<title>.*?))?\s*$"
+DEFAULT_CHAPTER_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s章集篇回]+)\s*(?P<unit>[章集篇回]))(?:[\s　]*(?P<title>.*?))?\s*$"
 DEFAULT_EXTRA_PATTERN = r"^\s*(?P<label>番外(?:篇)?(?:\s*[0-9一二三四五六七八九十百千万萬零〇兩两]+))(?:\s*[：:]?\s*(?P<title>.*?))?\s*$"
 
 
