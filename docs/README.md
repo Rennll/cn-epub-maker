@@ -96,7 +96,7 @@ V2 documentation should not duplicate the implementation details of individual t
 
 ### V2.1 Typography / Layout
 
-`v2.1-typography-and-layout.md`
+`v2x-typography-and-layout.md`
 
 Canonical description of the V2.1 typography and layout semantics.
 
