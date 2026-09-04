@@ -92,11 +92,11 @@ def parse_lines(
         nonlocal pending_blank_count, paragraph_boundary, preamble_boundary
         if not pending_blank_count:
             return
-        boundary = _boundary_for_blank_run(pending_blank_count)
         if current_chapter is not None:
-            paragraph_boundary = boundary
-        else:
-            preamble_boundary = boundary
+            if current_chapter.paragraphs:
+                paragraph_boundary = _boundary_for_blank_run(pending_blank_count)
+        elif book.preamble:
+            preamble_boundary = _boundary_for_blank_run(pending_blank_count)
         pending_blank_count = 0
 
     def reset_content_boundary() -> None:
