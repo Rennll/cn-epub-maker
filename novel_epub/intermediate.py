@@ -1,10 +1,36 @@
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 
-from .models import Book
+from .models import Book, Paragraph, ParagraphBoundary
 from .transforms import TransformAudit
+
+
+def paragraph_from_dict(value: dict) -> Paragraph:
+    """Deserialize a paragraph with backward-compatible boundary handling."""
+    text = value.get("text", "")
+    raw_boundary = value.get("boundary")
+    if raw_boundary is None:
+        return Paragraph(text=text)
+    try:
+        boundary = ParagraphBoundary(raw_boundary)
+    except (TypeError, ValueError):
+        warnings.warn(
+            f"invalid paragraph boundary {raw_boundary!r}; using normal",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        boundary = ParagraphBoundary.NORMAL
+    return Paragraph(text=text, boundary=boundary)
+
+
+def _paragraph_dict(paragraph: Paragraph) -> dict[str, str]:
+    value: dict[str, str] = {"text": paragraph.text}
+    if paragraph.boundary is not ParagraphBoundary.NORMAL:
+        value["boundary"] = paragraph.boundary.value
+    return value
 
 
 def write_intermediate(
@@ -37,14 +63,14 @@ def write_intermediate(
                 "number": chapter.number,
                 "label": chapter.label,
                 "title": chapter.title,
-                "paragraphs": [{"text": p.text} for p in chapter.paragraphs],
+                "paragraphs": [_paragraph_dict(p) for p in chapter.paragraphs],
             },
         )
 
     if book.preamble:
         _write_json(
             root / "preamble.json",
-            {"paragraphs": [{"text": p.text} for p in book.preamble]},
+            {"paragraphs": [_paragraph_dict(p) for p in book.preamble]},
         )
 
     metadata = {

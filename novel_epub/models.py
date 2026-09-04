@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from enum import Enum
 from typing import Any
+
+
+class ParagraphBoundary(str, Enum):
+    NORMAL = "normal"
+    EXPANDED = "expanded"
+    SCENE_BREAK = "scene-break"
 
 
 @dataclass
 class Paragraph:
     text: str
+    boundary: ParagraphBoundary = ParagraphBoundary.NORMAL
 
 
 @dataclass

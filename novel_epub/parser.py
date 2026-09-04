@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 
 from .chinese_numerals import chinese_numeral_to_int
-from .models import Book, Chapter, Paragraph, Volume
+from .models import Book, Chapter, Paragraph, ParagraphBoundary, Volume
 from .normalize import normalize_line
 
 DEFAULT_VOLUME_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s卷部冊]+)\s*(?P<unit>[卷部冊]))(?:[\s　]+(?P<title>.*?))?\s*$"
@@ -34,6 +34,14 @@ def _parse_number(raw: str) -> int | None:
     return chinese_numeral_to_int(value)
 
 
+def _boundary_for_blank_run(blank_count: int) -> ParagraphBoundary:
+    if blank_count >= 3:
+        return ParagraphBoundary.SCENE_BREAK
+    if blank_count == 2:
+        return ParagraphBoundary.EXPANDED
+    return ParagraphBoundary.NORMAL
+
+
 def parse_lines(
     lines: list[str], *, title: str, author: str, language: str = "zh-CN",
     cover: str | None = None, volume_pattern: str = DEFAULT_VOLUME_PATTERN,
@@ -52,21 +60,55 @@ def parse_lines(
     seen_volume_numbers: set[str] = set()
     paragraph_lines: list[str] = []
     preamble_paragraph_lines: list[str] = []
+    pending_blank_count = 0
+    paragraph_boundary = ParagraphBoundary.NORMAL
+    preamble_boundary = ParagraphBoundary.NORMAL
 
     def flush_paragraph() -> None:
+        nonlocal paragraph_boundary
         if current_chapter is not None and paragraph_lines:
-            current_chapter.paragraphs.append(Paragraph(text="\n".join(paragraph_lines)))
+            current_chapter.paragraphs.append(
+                Paragraph(text="\n".join(paragraph_lines), boundary=paragraph_boundary)
+            )
         paragraph_lines.clear()
+        paragraph_boundary = ParagraphBoundary.NORMAL
 
     def flush_preamble_paragraph() -> None:
+        nonlocal preamble_boundary
         if preamble_paragraph_lines:
-            book.preamble.append(Paragraph(text="\n".join(preamble_paragraph_lines)))
+            book.preamble.append(
+                Paragraph(text="\n".join(preamble_paragraph_lines), boundary=preamble_boundary)
+            )
             preamble_paragraph_lines.clear()
+        preamble_boundary = ParagraphBoundary.NORMAL
+
+    def flush_current() -> None:
+        if current_chapter is not None:
+            flush_paragraph()
+        else:
+            flush_preamble_paragraph()
+
+    def consume_pending_boundary() -> None:
+        nonlocal pending_blank_count, paragraph_boundary, preamble_boundary
+        if not pending_blank_count:
+            return
+        if current_chapter is not None:
+            if current_chapter.paragraphs:
+                paragraph_boundary = _boundary_for_blank_run(pending_blank_count)
+        elif book.preamble:
+            preamble_boundary = _boundary_for_blank_run(pending_blank_count)
+        pending_blank_count = 0
+
+    def reset_content_boundary() -> None:
+        nonlocal pending_blank_count, paragraph_boundary, preamble_boundary
+        pending_blank_count = 0
+        paragraph_boundary = ParagraphBoundary.NORMAL
+        preamble_boundary = ParagraphBoundary.NORMAL
 
     def add_chapter(cm, line_no: int):
         nonlocal chapter_sequence, current_chapter
-        flush_paragraph()
-        flush_preamble_paragraph()
+        flush_current()
+        reset_content_boundary()
         chapter_sequence += 1
         groups = cm.groupdict()
         raw_number = groups.get("number")
@@ -87,16 +129,17 @@ def parse_lines(
         line = normalize_line(raw).rstrip()
         stripped = line.strip()
         if not stripped:
-            if current_chapter is not None:
-                flush_paragraph()
-            else:
-                flush_preamble_paragraph()
+            flush_current()
+            pending_blank_count += 1
             continue
+
+        if pending_blank_count:
+            consume_pending_boundary()
 
         vm = volume_re.match(stripped)
         if vm:
-            flush_paragraph()
-            flush_preamble_paragraph()
+            flush_current()
+            reset_content_boundary()
             volume_sequence += 1
             number = vm.groupdict().get("number") or ""
             label = vm.groupdict().get("label") or vm.group(0).strip()
@@ -125,8 +168,8 @@ def parse_lines(
             groups = em.groupdict()
             label = groups.get("label") or em.group(0).strip()
             chapter_title = (groups.get("title") or "").strip()
-            flush_paragraph()
-            flush_preamble_paragraph()
+            flush_current()
+            reset_content_boundary()
             chapter_sequence += 1
             current_chapter = Chapter(sequence=chapter_sequence, number=None, label=label, title=chapter_title)
             if current_volume is not None:
@@ -143,8 +186,7 @@ def parse_lines(
         if stripped.startswith("第") and re.search(r"[章集篇回]", stripped):
             warnings.append(WarningItem("suspicious_chapter_heading", line_no, f"possible chapter heading not matched: {stripped[:80]}"))
 
-    flush_paragraph()
-    flush_preamble_paragraph()
+    flush_current()
     if not book.chapter_count:
         warnings.append(WarningItem("no_chapters", 0, "no chapters were detected"))
     return ParseResult(book=book, warnings=warnings)

@@ -9,22 +9,25 @@ from html import escape
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from ..models import Book, Chapter
+from ..models import Book, Chapter, Paragraph, ParagraphBoundary
 
 CSS = """@charset "UTF-8";
-body { font-size: 1em; line-height: 1.8; margin: 1em; text-align: justify; }
+body { font-size: 1em; line-height: 1.7; margin: 1em; text-align: left; }
 p { text-indent: 2em; margin: 0; padding: 0; }
-h1 { text-align: center; }
+p.paragraph-expanded { margin-top: 1.5em; }
+p.paragraph-scene-break { margin-top: 2.5em; }
+h1 { text-align: center; break-before: page; page-break-before: always; }
 """
 
 _MARKDOWN_CHARS = re.compile(r"([\\`*{}\[\]()#+.!_>|~-])")
+_P_OPEN = re.compile(r"<p(\s[^>]*)?>")
 _NS_EPUB = "http://www.idpf.org/2007/ops"
 _NS_OPF = "http://www.idpf.org/2007/opf"
 _NS_DC = "http://purl.org/dc/elements/1.1/"
 
 
 def _escape_markdown(text: str) -> str:
-    return "\n".join(_MARKDOWN_CHARS.sub(r"\\\1", line) for line in text.split("\n"))
+    return "  \n".join(_MARKDOWN_CHARS.sub(r"\\\1", line) for line in text.split("\n"))
 
 
 def _chapter_heading(chapter: Chapter, level: int = 1) -> str:
@@ -83,6 +86,28 @@ def _validate_book(book: Book) -> None:
             raise ValueError(f"unsupported cover media type: {cover.name}")
 
 
+def _paragraph_class(boundary: ParagraphBoundary) -> str:
+    if boundary is ParagraphBoundary.EXPANDED:
+        return ' class="paragraph-expanded"'
+    if boundary is ParagraphBoundary.SCENE_BREAK:
+        return ' class="paragraph-scene-break"'
+    return ""
+
+
+def _apply_paragraph_boundaries(body: str, paragraphs: list[Paragraph]) -> str:
+    index = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal index
+        if index >= len(paragraphs):
+            return match.group(0)
+        boundary = paragraphs[index].boundary
+        index += 1
+        return f"<p{_paragraph_class(boundary)}>"
+
+    return _P_OPEN.sub(replace, body)
+
+
 def _pandoc_chapter(chapter: Chapter, destination: Path, language: str) -> None:
     source = destination.with_suffix(".md")
     fragment = destination.with_suffix(".html")
@@ -97,6 +122,7 @@ def _pandoc_chapter(chapter: Chapter, destination: Path, language: str) -> None:
         errors="replace",
     )
     body = fragment.read_text(encoding="utf-8").strip()
+    body = _apply_paragraph_boundaries(body, chapter.paragraphs)
     chapter_title = escape(f"{chapter.label} {chapter.title}".rstrip())
     language = escape(language)
     xhtml = (
@@ -129,6 +155,7 @@ def _pandoc_preamble(book: Book, destination: Path) -> None:
         errors="replace",
     )
     body = fragment.read_text(encoding="utf-8").strip()
+    body = _apply_paragraph_boundaries(body, book.preamble)
     language = escape(book.language)
     xhtml = (
         '<?xml version="1.0" encoding="utf-8"?>\n'
