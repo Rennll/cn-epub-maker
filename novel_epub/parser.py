@@ -61,21 +61,26 @@ def parse_lines(
     paragraph_lines: list[str] = []
     preamble_paragraph_lines: list[str] = []
     pending_blank_count = 0
-    pending_boundary = ParagraphBoundary.NORMAL
+    paragraph_boundary = ParagraphBoundary.NORMAL
+    preamble_boundary = ParagraphBoundary.NORMAL
 
     def flush_paragraph() -> None:
+        nonlocal paragraph_boundary
         if current_chapter is not None and paragraph_lines:
             current_chapter.paragraphs.append(
-                Paragraph(text="\n".join(paragraph_lines), boundary=ParagraphBoundary.NORMAL)
+                Paragraph(text="\n".join(paragraph_lines), boundary=paragraph_boundary)
             )
         paragraph_lines.clear()
+        paragraph_boundary = ParagraphBoundary.NORMAL
 
     def flush_preamble_paragraph() -> None:
+        nonlocal preamble_boundary
         if preamble_paragraph_lines:
             book.preamble.append(
-                Paragraph(text="\n".join(preamble_paragraph_lines), boundary=ParagraphBoundary.NORMAL)
+                Paragraph(text="\n".join(preamble_paragraph_lines), boundary=preamble_boundary)
             )
             preamble_paragraph_lines.clear()
+        preamble_boundary = ParagraphBoundary.NORMAL
 
     def flush_current() -> None:
         if current_chapter is not None:
@@ -83,17 +88,23 @@ def parse_lines(
         else:
             flush_preamble_paragraph()
 
-    def start_next_paragraph() -> None:
-        nonlocal pending_blank_count, pending_boundary
-        if pending_blank_count:
-            pending_boundary = _boundary_for_blank_run(pending_blank_count)
-            pending_blank_count = 0
+    def consume_pending_boundary() -> None:
+        nonlocal pending_blank_count, paragraph_boundary, preamble_boundary
+        if not pending_blank_count:
+            return
+        boundary = _boundary_for_blank_run(pending_blank_count)
+        if current_chapter is not None:
+            paragraph_boundary = boundary
+        else:
+            preamble_boundary = boundary
+        pending_blank_count = 0
 
     def add_chapter(cm, line_no: int):
-        nonlocal chapter_sequence, current_chapter, pending_boundary
+        nonlocal chapter_sequence, current_chapter, paragraph_boundary, preamble_boundary
         flush_current()
-        pending_boundary = ParagraphBoundary.NORMAL
-        flush_preamble_paragraph()
+        pending_blank_count = 0
+        paragraph_boundary = ParagraphBoundary.NORMAL
+        preamble_boundary = ParagraphBoundary.NORMAL
         chapter_sequence += 1
         groups = cm.groupdict()
         raw_number = groups.get("number")
@@ -119,14 +130,14 @@ def parse_lines(
             continue
 
         if pending_blank_count:
-            start_next_paragraph()
+            consume_pending_boundary()
 
         vm = volume_re.match(stripped)
         if vm:
             flush_current()
             pending_blank_count = 0
-            pending_boundary = ParagraphBoundary.NORMAL
-            flush_preamble_paragraph()
+            paragraph_boundary = ParagraphBoundary.NORMAL
+            preamble_boundary = ParagraphBoundary.NORMAL
             volume_sequence += 1
             number = vm.groupdict().get("number") or ""
             label = vm.groupdict().get("label") or vm.group(0).strip()
@@ -157,8 +168,8 @@ def parse_lines(
             chapter_title = (groups.get("title") or "").strip()
             flush_current()
             pending_blank_count = 0
-            pending_boundary = ParagraphBoundary.NORMAL
-            flush_preamble_paragraph()
+            paragraph_boundary = ParagraphBoundary.NORMAL
+            preamble_boundary = ParagraphBoundary.NORMAL
             chapter_sequence += 1
             current_chapter = Chapter(sequence=chapter_sequence, number=None, label=label, title=chapter_title)
             if current_volume is not None:
@@ -169,24 +180,11 @@ def parse_lines(
 
         if current_chapter is None:
             if not preamble_paragraph_lines:
-                preamble_paragraph_lines.append(stripped)
-                if pending_boundary is not ParagraphBoundary.NORMAL:
-                    book.preamble.append(Paragraph(text="\n".join(preamble_paragraph_lines), boundary=pending_boundary))
-                    preamble_paragraph_lines.clear()
-                    pending_boundary = ParagraphBoundary.NORMAL
-            else:
-                preamble_paragraph_lines.append(stripped)
+                preamble_boundary = preamble_boundary
+            preamble_paragraph_lines.append(stripped)
             continue
 
-        if not paragraph_lines:
-            paragraph_boundary = pending_boundary
-            pending_boundary = ParagraphBoundary.NORMAL
-        else:
-            paragraph_boundary = ParagraphBoundary.NORMAL
         paragraph_lines.append(line)
-        if paragraph_boundary is not ParagraphBoundary.NORMAL and len(paragraph_lines) == 1:
-            # Store the pending semantic boundary on the paragraph when it is flushed.
-            pass
         if stripped.startswith("第") and re.search(r"[章集篇回]", stripped):
             warnings.append(WarningItem("suspicious_chapter_heading", line_no, f"possible chapter heading not matched: {stripped[:80]}"))
 
