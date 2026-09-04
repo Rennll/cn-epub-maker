@@ -1,18 +1,31 @@
-# V2 Design
+# V2 Migration and Design Decisions
 
 ## Status
 
-V2 is the completed transformation and integration stage built on top of V1. The decisions in this document define the V2 architectural baseline and its completed scope.
+V2 is the completed transformation and integration stage built on top of V1. The decisions in this document define the V2-specific transformation contracts, migration decisions, integration boundaries, and compatibility constraints.
 
 V2 extends completed V1. It does not replace the V1 model, Intermediate boundary, parser contract, or Pandoc-first renderer merely to reproduce legacy behavior.
 
+## Scope
+
+V2 adds isolated transformation and orchestration capabilities around the V1 structural core:
+
+- Junk Cleaner;
+- OpenCC conversion;
+- punctuation conversion;
+- Full Source Mode;
+- transformation ordering and configuration;
+- CLI/configuration integration;
+- Intermediate audit metadata;
+- migration compatibility with the V1 architecture.
+
+The overall system architecture and major pipeline stages are defined in `architecture-overview.md`. This document focuses on the V2 changes within that architecture.
+
 ## Relationship to V1
 
-V1 remains the stable core:
+V1 remains the stable structural core. V2 adds content transformation and integration capabilities without redefining the established `Book → Volume → Chapter → Paragraph` model.
 
-Normalize → Parser → Intermediate → Pandoc EPUB → Validation
-
-V2 adds isolated transformation and orchestration capabilities around that core. Legacy compatibility is subordinate to predictable behavior, explicit configuration, and preservation of the V1 architecture.
+Legacy compatibility is subordinate to predictable behavior, explicit configuration, and preservation of the V1 architecture.
 
 ## Migration Decisions
 
@@ -26,24 +39,14 @@ V2 adds isolated transformation and orchestration capabilities around that core.
 
 V2 is not intended to become a complete behavioral clone of the legacy implementation.
 
-## Architecture
-
-### Transform Pipeline
-
-The V2 content pipeline is:
-
-TXT → Normalize → Junk Cleaner → OpenCC → Punctuation → Parser → Intermediate → EPUB → Validation
-
-The order is intentional. Content transformations are separate from structural parsing and should not be silently embedded in Parser or Renderer behavior.
-
-### Common Transform Contract
+## Common Transform Contract
 
 Each transformation receives text and, when successful, produces a `TransformResult` conceptually containing:
 
-- `text`: transformed text.
-- `changed`: whether the output text differs from the input.
-- `warnings`: recoverable problems encountered during the transformation.
-- `stats`: optional transformer-specific execution statistics.
+- `text`: transformed text;
+- `changed`: whether the output text differs from the input;
+- `warnings`: recoverable problems encountered during the transformation;
+- `stats`: optional transformer-specific execution statistics;
 - `metadata`: optional information describing the transformation/configuration used.
 
 `text`, `changed`, and `warnings` are common fields. `stats` is intentionally not a universal schema: each transformer may report only statistics that are meaningful for it. `metadata` describes configuration or transformation identity rather than execution counts.
@@ -52,9 +55,9 @@ Zero changes and zero matches are normal successful results and do not produce w
 
 The CLI is responsible for presenting transformation results; transformers should return structured information rather than constructing CLI-specific messages. For example, OpenCC may be displayed simply as `✅ 使用 OpenCC（s2twp）` rather than reporting character-level conversion counts.
 
-Transformers do not directly modify Book, Chapter, Volume, EPUB, or other structural objects, and they do not invoke other transformers. The pipeline owns transformation order.
+Transformers do not directly modify Book, Chapter, Volume, EPUB, or other structural objects, and they do not invoke other transformers. The processing pipeline owns transformation order.
 
-### Failure and Auditability
+## Failure and Auditability
 
 Recoverable problems produce warnings and skip only the affected operation/rule when possible. The pipeline continues. Unrecoverable problems, or output that can no longer be trusted, produce an error and stop the pipeline.
 
@@ -64,9 +67,7 @@ Configuration errors and runtime/system errors are both fatal when they prevent 
 
 Transformation metadata belongs in Intermediate rather than EPUB metadata so transformed output remains auditable and reproducible. Transformations should be deterministic and idempotent where practical.
 
-## Transforms
-
-### OpenCC
+## OpenCC
 
 OpenCC is retained as a V2 transformation and is enabled by default. The default profile is `s2twp`, matching the legacy implementation. The user may disable OpenCC or select a supported conversion profile.
 
@@ -80,14 +81,14 @@ Zero changes are normal success. OpenCC does not need character-level conversion
 
 OpenCC should be deterministic and idempotent.
 
-### Junk Cleaner
+## Junk Cleaner
 
 Junk Cleaner is a parser-preprocessing transformation. Users explicitly select what counts as junk; there is no heuristic junk detection.
 
 Its configuration is separate from general book configuration. A rule specifies a target and matcher:
 
-- `line` targets one normalized source line and cannot cross a newline.
-- `block` targets one or more continuous non-blank lines. One or more blank lines form the boundary between blocks.
+- `line` targets one normalized source line and cannot cross a newline;
+- `block` targets one or more continuous non-blank lines. One or more blank lines form the boundary between blocks;
 - `exact`, `contains`, and `regex` are supported matchers.
 
 A matching rule removes the entire target. `contains` and `regex` do not replace only the matching substring.
@@ -108,26 +109,26 @@ Each rule reports match/removal counts. Zero matches are normal. Invalid regex/c
 
 Junk Cleaner is remove-only. Arbitrary replacement is intentionally a separate future transformation concern.
 
-### Punctuation Conversion
+## Punctuation Conversion
 
 Punctuation Conversion is an independent transformation that converts applicable Simplified-Chinese-style punctuation to common Taiwan Traditional Chinese full-width punctuation while preserving English content and punctuation outside Chinese context.
 
 Direct quote conversions are:
 
-- `“` → `「`
-- `”` → `」`
-- `‘` → `『`
-- `’` → `』`
+- `“` → `「`;
+- `”` → `」`;
+- `‘` → `『`;
+- `’` → `』`.
 
 In Chinese context, the following conversions apply:
 
-- `,` → `，`
-- `!` → `！`
-- `?` → `？`
-- `:` → `：`
-- `;` → `；`
-- `.` → `。` when it is a Chinese sentence-ending period
-- three or more consecutive ASCII periods → one `……`
+- `,` → `，`;
+- `!` → `！`;
+- `?` → `？`;
+- `:` → `：`;
+- `;` → `；`;
+- `.` → `。` when it is a Chinese sentence-ending period;
+- three or more consecutive ASCII periods → one `……`.
 
 Existing `……` remains unchanged. The ellipsis rule is evaluated before the single-period rule.
 
@@ -141,15 +142,9 @@ The transform does not repair quote pairing, collapse repeated `?`/`!`, remove c
 
 Punctuation Conversion is idempotent and runs after OpenCC and before Parser.
 
-## Modes
+## Full Source Mode
 
-### Full Source Mode
-
-Full Source Mode runs:
-
-TXT → Normalize → Parser
-
-Content transformations are disabled, but Normalize still runs. Therefore this mode is source-content-preserving rather than byte-for-byte preservation: encoding interpretation, BOM handling, newline normalization, and the defined leading full-width-space normalization may still change representation.
+Full Source Mode disables content transformations while retaining Normalize. It is therefore source-content-preserving rather than byte-for-byte preservation: encoding interpretation, BOM handling, newline normalization, and the defined leading full-width-space normalization may still change representation.
 
 ## Parser and Renderer Extensions
 
@@ -176,10 +171,6 @@ V2 does not include global Arabic numeral conversion, automatic chapter renumber
 ## Implementation Status
 
 The V2 implementation is complete for the scope defined above. The completed work includes the common transformation contract and pipeline, Junk Cleaner, OpenCC, Punctuation Conversion, CLI orchestration, transformation audit metadata at the Intermediate boundary, focused and integration tests, and real TXT → CLI → Pandoc → EPUB black-box validation.
-
-The completed V2 path preserves the V1 structural core:
-
-Normalize → V2 Transformations → Parser → Intermediate → V1 EPUB Renderer → Validation
 
 ## Future Evolution: V2.x
 
