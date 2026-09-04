@@ -1,8 +1,10 @@
-# V2.x Typography and Layout Design
+# V2.1 Typography and Layout Design
 
 ## Status
 
-This document defines the design baseline for the V2.x typography and layout evolution of the existing EPUB renderer.
+V2.1 Typography / Layout is the first V2.x architecture-evolution milestone. Its semantic baseline has been implemented and merged.
+
+This document records the V2.1 design baseline for typography and layout. Real-device presentation tuning and cross-reader validation are follow-up work, not prerequisites for the semantic implementation to be considered complete.
 
 The core V1/V2 domain model, parser model, Intermediate representation, and Pandoc-first rendering architecture remain unchanged except for the small semantic extension described here.
 
@@ -10,13 +12,14 @@ Typography and layout numeric values are candidate values for initial implementa
 
 ## 1. Scope
 
-V2.x improves presentation while preserving the semantic content and structural guarantees established by V1 and V2.
+V2.1 improves presentation while preserving the semantic content and structural guarantees established by V1 and V2.
 
 The goals are:
 
 - preserve paragraph and chapter semantics;
 - represent meaningful differences in paragraph spacing without preserving raw blank-line counts;
 - provide semantic information to the renderer for normal, expanded, and scene-break paragraphs;
+- preserve hard line breaks within paragraphs;
 - provide predictable EPUB pagination intent;
 - keep presentation decisions separate from parsing and text transformation;
 - preserve existing Intermediate artifacts and backward compatibility.
@@ -236,7 +239,7 @@ Chapter boundaries remain structural. A chapter start may carry new-page paginat
 
 EPUB 2-era implementations commonly relied on CSS `page-break-before`, `page-break-after`, and `page-break-inside`. Modern CSS fragmentation uses `break-before`, `break-after`, and `break-inside`.
 
-V2.x should prefer standard modern pagination properties while retaining legacy declarations where they provide useful compatibility with older reading environments.
+V2.1 should prefer standard modern pagination properties while retaining legacy declarations where they provide useful compatibility with older reading environments.
 
 The project contract is semantic pagination intent, not identical physical pagination on every reader. A chapter may express the intent to begin on a new page, but the actual reader controls page layout, viewport, font rendering, and pagination details.
 
@@ -346,7 +349,7 @@ Real-device presentation testing is separate from semantic correctness and is us
 
 ## 12. Explicit Design Summary
 
-The V2.x design treats typography as a rendering concern built on explicit semantic information.
+V2.1 treats typography as a rendering concern built on explicit semantic information.
 
 The parser interprets source blank-line runs into three semantic boundary states. The Intermediate representation stores those states without retaining arbitrary raw blank counts. The renderer converts those states into semantic HTML/CSS while preserving document text and paragraph structure. Chapter pagination is expressed as standard EPUB/HTML/CSS intent rather than reader-specific behavior.
 
