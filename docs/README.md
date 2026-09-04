@@ -74,6 +74,14 @@ Do not preserve session history merely for completeness.
 
 ## Document Map
 
+### Architecture Overview
+
+`architecture-overview.md`
+
+Canonical high-level map of the current system architecture, including major pipeline stages, component responsibilities, cross-stage boundaries, orchestration, and validation layers.
+
+Use this document to understand how the system fits together. Keep version- or component-specific behavioral contracts in their respective canonical documents.
+
 ### V1 Architecture
 
 `v1-architecture-decisions.md`
