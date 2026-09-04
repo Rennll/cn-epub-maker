@@ -59,6 +59,21 @@ def test_chapter_number_may_be_spaced_and_chapter_may_have_no_title():
     assert not any(w.kind == "empty_chapter" for w in result.warnings)
 
 
+def test_chapter_title_may_touch_the_chapter_unit():
+    result = parse_lines([
+        "第1章殺豬美人",
+        "正文A",
+        "第 2 章落魄男人",
+        "正文B",
+    ], title="書", author="作者")
+
+    chapters = list(result.book.iter_chapters())
+    assert [(c.number, c.label, c.title) for c in chapters] == [
+        (1, "第1章", "殺豬美人"),
+        (2, "第 2 章", "落魄男人"),
+    ]
+
+
 def test_unparseable_chapter_number_is_not_forced_into_a_chapter():
     result = parse_lines([
         "第十百章 看起來像章節但格式不可靠",
