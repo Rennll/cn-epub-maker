@@ -57,6 +57,8 @@ The CLI is responsible for presenting transformation results; transformers shoul
 
 Transformers do not directly modify Book, Chapter, Volume, EPUB, or other structural objects, and they do not invoke other transformers. The processing pipeline owns transformation order.
 
+`TransformPipeline` is intentionally a composable abstraction over an ordered list of transformers. The current V2 transforms are not the complete definition of the abstraction; future content transforms can participate through the same contract without changing the pipeline architecture.
+
 ## Failure and Auditability
 
 Recoverable problems produce warnings and skip only the affected operation/rule when possible. The pipeline continues. Unrecoverable problems, or output that can no longer be trusted, produce an error and stop the pipeline.
@@ -134,7 +136,9 @@ Existing `……` remains unchanged. The ellipsis rule is evaluated before the s
 
 Parentheses `(` `)`, square brackets `[` `]`, and curly braces `{` `}` remain unchanged. Other ASCII symbols such as `/`, `\\`, `|`, `_`, `=`, `+`, `-`, `*`, `%`, `#`, `@`, `<`, `>`, and `~` are not converted by this transformer in the V2 implementation.
 
-Chinese-context detection is local rather than based on whether an entire line contains Chinese. Punctuation is considered in Chinese context when the nearest meaningful preceding content is Chinese CJK text; English and numbers do not establish Chinese context. Leading punctuation with no preceding Chinese context is preserved. Whitespace does not itself establish or remove context.
+Chinese-context detection is local rather than based on whether an entire line contains Chinese. A punctuation character is considered to be in Chinese context when the nearest meaningful preceding character is CJK. A meaningful character for this purpose is an ASCII alphanumeric character or a CJK character; whitespace and punctuation do not update the context. Therefore an ASCII letter or digit resets the context to non-Chinese, while a CJK character sets it to Chinese. Leading punctuation with no preceding meaningful character is preserved.
+
+This definition is intentionally about the nearest meaningful preceding character, not simply whether Chinese text occurs somewhere earlier in the paragraph. It is the local context rule used by the current implementation.
 
 Obvious URLs and email addresses are protected from punctuation conversion. The V2 implementation does not attempt broad Markdown/HTML/code parsing beyond the explicitly protected URL/email cases.
 
@@ -145,6 +149,8 @@ Punctuation Conversion is idempotent and runs after OpenCC and before Parser.
 ## Full Source Mode
 
 Full Source Mode disables content transformations while retaining Normalize. It is therefore source-content-preserving rather than byte-for-byte preservation: encoding interpretation, BOM handling, newline normalization, and the defined leading full-width-space normalization may still change representation.
+
+In particular, Full Source Mode bypasses the transformation pipeline after Normalize rather than merely disabling a selected subset of transformers. No transformation audit entries are produced for skipped transformation stages.
 
 ## Parser and Renderer Extensions
 
