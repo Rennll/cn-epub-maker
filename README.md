@@ -62,6 +62,17 @@ python3 -m novel_epub.cli build novel.txt \
   --output book.epub
 ```
 
+## 常用操作
+
+| 操作 | 參數 | 說明 |
+|---|---|---|
+| 指定輸出 | `--output` | 指定 EPUB 輸出檔案 |
+| 指定段落模式 | `--paragraph-mode` | [`wrapped`（預設）或 `line`](#段落模式) |
+| 停用 OpenCC | `--no-opencc` | 不進行簡體／繁體轉換 |
+| 停用標點轉換 | `--no-punctuation` | 不進行標點轉換 |
+| 保留 Intermediate | `--keep-intermediate` | [輸出中間 JSON 資料供檢查](#intermediate) |
+| 原始內容流程 | `--full-source` | [停用內容 transformation，但仍執行 Normalize](#full-source-mode) |
+
 ## 來源編碼
 
 程式會自動嘗試常見中文編碼。若知道來源編碼，建議直接指定：
