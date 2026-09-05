@@ -57,7 +57,9 @@ def build(args: argparse.Namespace) -> int:
             author=args.author,
             language=args.lang,
             cover=args.cover,
-            paragraph_mode=args.paragraph_mode,
+            # Keep build() compatible with callers that construct a Namespace
+            # directly instead of going through argparse.
+            paragraph_mode=getattr(args, "paragraph_mode", "wrapped"),
         )
         report = validate_book(result.book, result.warnings)
         if report.errors:
