@@ -57,6 +57,9 @@ def build(args: argparse.Namespace) -> int:
             author=args.author,
             language=args.lang,
             cover=args.cover,
+            # Keep build() compatible with callers that construct a Namespace
+            # directly instead of going through argparse.
+            paragraph_mode=getattr(args, "paragraph_mode", "wrapped"),
         )
         report = validate_book(result.book, result.warnings)
         if report.errors:
@@ -141,6 +144,12 @@ def main() -> int:
     build_parser.add_argument("--no-opencc", dest="opencc", action="store_false")
     build_parser.add_argument("--no-punctuation", dest="punctuation", action="store_false")
     build_parser.add_argument("--full-source", action="store_true")
+    build_parser.add_argument(
+        "--paragraph-mode",
+        choices=("wrapped", "line"),
+        default="wrapped",
+        help="paragraph boundary semantics: blank-line wrapped paragraphs or one source line per paragraph",
+    )
     build_parser.set_defaults(func=build, opencc=True, punctuation=True, full_source=False)
 
     validate_parser = sub.add_parser("validate", help="validate an EPUB archive")
