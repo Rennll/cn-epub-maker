@@ -126,6 +126,21 @@ novel-epub build novel.txt \
 
 Junk Cleaner 是 V2 pipeline 的固定階段，目前使用內建預設規則；它採 remove-only 設計，不會把它當成任意文字取代工具。
 
+## 段落模式
+
+Parser 預設使用 `wrapped` 模式：連續的非空白行視為同一個邏輯段落，空白行才結束段落。這保留傳統 TXT 的多行段落行為。
+
+對於中文網路小說常見的「一行就是一個段落」TXT，可以明確指定 `line` 模式：
+
+```bash
+novel-epub build novel.txt \
+  --title "侯夫人与杀猪刀" \
+  --author "作者" \
+  --paragraph-mode line
+```
+
+`line` 模式只改變段落邊界，不依靠標點、句長或其他內容啟發式來推測結構；章節與番外標題仍由既有 grammar 獨立辨識。空白行也不會產生空的 `Paragraph`。
+
 ## Full Source Mode
 
 如果希望停用內容 transformation，可以使用：
