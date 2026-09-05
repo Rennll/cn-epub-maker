@@ -78,18 +78,20 @@ The preamble is its own content region. Chapters and volumes are structural boun
 
 ### 3.2 Paragraph text and line breaks
 
-Consecutive non-empty source lines remain one paragraph. An embedded `\n` in `Paragraph.text` represents a hard line break within that paragraph and does not create another `Paragraph`.
+In the default `wrapped` paragraph mode, consecutive non-empty source lines remain one paragraph. In the explicit `line` paragraph mode, each non-empty source line becomes its own paragraph. An embedded `\n` in `Paragraph.text` represents a hard line break within a paragraph and does not create another `Paragraph`.
 
-For example:
+For example, under the default `wrapped` mode:
 
 ```text
 line A
 line B
 ```
 
-is one paragraph whose text contains `line A\nline B`.
+is one paragraph whose text contains `line A\nline B`. Under `line` mode, the same two non-empty source lines produce two paragraphs instead.
 
-A blank line separates paragraphs.
+A blank line separates paragraphs in `wrapped` mode and remains a structural boundary in `line` mode; it does not create an empty `Paragraph`.
+
+Paragraph mode is an explicit source-format choice rather than an inferred semantic property. The default remains `wrapped` for backward compatibility with conventional TXT input.
 
 ## 4. Source Layout Semantics
 
@@ -131,7 +133,7 @@ The Intermediate representation stores the semantic value only. It does not stor
 
 ## 5. Intermediate Representation
 
-The Intermediate representation remains the stable serialization boundary between parsing and rendering.
+The Intermediate representation remains the stable serialization boundary between parsing, serialization, and later processing.
 
 ### 5.1 Backward compatibility
 
