@@ -24,9 +24,9 @@ def test_one_line_web_novel_mode_splits_each_body_line():
 
     chapter = result.book.chapters[0]
     assert [p.text for p in chapter.paragraphs] == [
-        "　　腊月的天飘着雪，院子里一口大锅正烧着热水……",
-        "　　地上的积雪被踩化了，一片泥泞……",
-        "　　锅炉旁边用板凳架起一张门板……",
+        "腊月的天飘着雪，院子里一口大锅正烧着热水……",
+        "地上的积雪被踩化了，一片泥泞……",
+        "锅炉旁边用板凳架起一张门板……",
     ]
     assert all("\n" not in p.text for p in chapter.paragraphs)
 
