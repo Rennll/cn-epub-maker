@@ -97,16 +97,7 @@ EPUB
 Validation
 ```
 
-OpenCC 預設啟用，預設 profile 為 `s2twp`：
-
-```bash
-novel-epub build novel.txt \
-  --title "書名" \
-  --author "作者" \
-  --opencc-profile s2twp
-```
-
-目前也提供 `s2t` profile。可以用 `--no-opencc` 停用 OpenCC：
+OpenCC 預設啟用，可以用 `--no-opencc` 停用：
 
 ```bash
 novel-epub build novel.txt \
@@ -124,7 +115,101 @@ novel-epub build novel.txt \
   --no-punctuation
 ```
 
-Junk Cleaner 是 V2 pipeline 的固定階段，目前使用內建預設規則；它採 remove-only 設計，不會把它當成任意文字取代工具。
+### Junk Cleaner
+
+Junk Cleaner 是文字處理 pipeline 中的固定階段，負責依照明確規則移除來源文字中的非正文內容。目前 CLI 建立的 Junk Cleaner 沒有套用預設規則，因此**不會主動刪除任何小說內容**。
+
+Junk Cleaner 的規則目前是程式內部的 `JunkRule`，每條規則包含三個欄位：
+
+- `target`：匹配範圍，目前支援 `line` 與 `block`。
+- `matcher`：匹配方式，目前支援 `exact`、`contains` 與 `regex`。
+- `pattern`：要匹配的文字或正則表達式。
+
+例如，規則可以表示為：
+
+```python
+JunkRule(
+    target="line",
+    matcher="exact",
+    pattern="本章節完",
+)
+```
+
+`target="line"` 表示逐行判斷。上面的規則只有在某一整行完全等於 `本章節完` 時才會移除該行。
+
+`target="block"` 則以空白行分隔的連續非空白行作為一個區塊判斷。例如：
+
+```python
+JunkRule(
+    target="block",
+    matcher="contains",
+    pattern="本章由",
+)
+```
+
+如果某個連續文字區塊中包含 `本章由`，整個區塊會被移除。因此 `block` 規則要比 `line` 規則更加謹慎。
+
+三種 matcher 的行為如下：
+
+- `exact`：目標內容必須與 `pattern` 完全相等。
+- `contains`：目標內容只要包含 `pattern` 即視為命中。
+- `regex`：使用 Python 正則表達式進行匹配。
+
+例如，固定文字適合使用 `exact`：
+
+```python
+JunkRule(
+    target="line",
+    matcher="exact",
+    pattern="請收藏本書",
+)
+```
+
+文字可能出現在不同位置時，可以使用 `contains`：
+
+```python
+JunkRule(
+    target="line",
+    matcher="contains",
+    pattern="本小說由",
+)
+```
+
+需要處理固定結構、但部分文字會變動時，可以使用 `regex`：
+
+```python
+JunkRule(
+    target="line",
+    matcher="regex",
+    pattern=r"^本章由.*整理$",
+)
+```
+
+多條規則可以組合使用：
+
+```python
+rules = [
+    JunkRule(
+        target="line",
+        matcher="exact",
+        pattern="本章節完",
+    ),
+    JunkRule(
+        target="line",
+        matcher="contains",
+        pattern="請收藏本書",
+    ),
+    JunkRule(
+        target="line",
+        matcher="regex",
+        pattern=r"^本章由.*整理$",
+    ),
+]
+```
+
+目前這些規則並不是使用者可直接透過 CLI 指定的設定檔；它們是 `JunkCleaner` 的程式內部介面。這部分的使用者自訂規則與規則載入方式尚未定義，因此 README 目前不提供虛構的 `--junk-rules` 或 JSON/YAML 設定檔用法。
+
+撰寫規則時，應盡量使用最具體的匹配條件，只移除可以明確判定為非正文的內容。尤其是 `contains` 與 `regex`，如果條件過於寬鬆，可能誤刪正常小說內容。Junk Cleaner 的用途是 remove-only，不應拿來進行一般文字替換或正文改寫。
 
 ## 段落模式
 
@@ -190,7 +275,7 @@ novel-epub build novel.txt \
 
 ## Intermediate
 
-如果需要保留 Intermediate JSON：
+Intermediate 是 build 過程中的結構化書籍資料。只有使用 `--keep-intermediate` 時，程式才會把它寫到磁碟，方便檢查 Parser 結果與 transformation audit。
 
 ```bash
 novel-epub build novel.txt \
@@ -199,7 +284,7 @@ novel-epub build novel.txt \
   --keep-intermediate
 ```
 
-預設會在目前目錄建立 `<輸入檔名>.intermediate`。也可以指定目錄或路徑：
+如果沒有指定 `--intermediate`，例如輸入檔為 `novel.txt`，預設會在目前目錄建立 `novel.intermediate/`。也可以指定 Intermediate 根目錄：
 
 ```bash
 novel-epub build novel.txt \
@@ -209,7 +294,19 @@ novel-epub build novel.txt \
   --intermediate book.intermediate
 ```
 
-Intermediate 中會包含 transformation audit metadata，方便確認這次 build 使用了哪些 transformation 及其結果。
+Intermediate 實際輸出結構如下：
+
+```text
+novel.intermediate/
+├── book.json
+├── preamble.json          # 有前言時才會產生
+└── chapters/
+    ├── 000001.json
+    ├── 000002.json
+    └── ...
+```
+
+`book.json` 保存書籍 metadata、卷章索引，以及這次 build 的 transformation audit。各章內容則寫在 `chapters/` 下的 JSON 檔案中；如果書籍有 preamble，則另外保存為 `preamble.json`。
 
 ## 驗證 EPUB
 
@@ -251,22 +348,6 @@ novel-epub build novel.txt \
 ### 不想轉換標點
 
 使用 `--no-punctuation`。這不會停用 OpenCC。
-
-## 功能
-
-- **V1** — 穩定的 TXT 解析、Intermediate、Pandoc EPUB 產生與驗證。
-- **V2** — Normalize、Junk Cleaner、OpenCC、Punctuation Conversion、Full Source Mode、CLI、transformation audit metadata，以及相關 transformation / integration 能力。
-- **V2.1 Typography / Layout** — 建立段落邊界語義、hard line break、語義化 HTML/CSS、章節分頁意圖與基礎排版支援。
-
-## 文件
-
-`docs/` 主要保存專案架構、設計決策與跨 session 的工作交接資訊：
-
-- `docs/README.md` — 文件地圖與資訊分層。
-- `docs/v1-architecture-decisions.md` — V1 canonical architecture / behavior。
-- `docs/v2-migration-and-design-decisions.md` — V2 canonical architecture / decisions。
-- `docs/v2.1-typography-and-layout.md` — V2.1 Typography / Layout design baseline。
-- `docs/next-session-handoff.md` — 下一個未完成工作的短期交接狀態。
 
 ## 授權
 
