@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from novel_epub.normalize import read_lines
 from novel_epub.parser import parse_lines
 from novel_epub.renderers.pandoc import render
 
@@ -49,7 +50,7 @@ def test_wrapped_mode_remains_default_and_preserves_multiline_paragraphs():
     ]
 
 
-def test_line_mode_keeps_blank_lines_as_boundary_metadata_without_empty_paragraphs():
+def test_line_mode_keeps_blank_lines_without_empty_paragraphs():
     result = parse_lines(
         ["第1章 開始", "第一段。", "", "第二段。"],
         title="書",
@@ -92,18 +93,19 @@ def test_line_mode_does_not_change_chapter_or_extra_heading_detection():
 
 
 @pytest.mark.skipif(shutil.which("pandoc") is None, reason="Pandoc is not installed")
-def test_line_mode_produces_paragraph_level_epub_xhtml(tmp_path: Path):
-    result = parse_lines(
-        [
-            "第1章 開始",
-            "　　第一個段落。",
-            "　　第二個段落。",
-            "　　第三個段落。",
-        ],
-        title="書",
-        author="作者",
-        paragraph_mode="line",
+def test_txt_to_epub_pipeline_produces_paragraph_level_xhtml(tmp_path: Path):
+    source = tmp_path / "novel.txt"
+    source.write_text(
+        "第1章 開始\n"
+        "　　第一個段落。\n"
+        "　　第二個段落。\n"
+        "　　第三個段落。\n",
+        encoding="utf-8",
     )
+    lines, encoding = read_lines(source, "utf-8")
+    assert encoding == "utf-8"
+
+    result = parse_lines(lines, title="書", author="作者", paragraph_mode="line")
     output = tmp_path / "book.epub"
     render(result.book, output)
 
@@ -114,3 +116,8 @@ def test_line_mode_produces_paragraph_level_epub_xhtml(tmp_path: Path):
     assert "第一個段落。" in xhtml
     assert "第二個段落。" in xhtml
     assert "第三個段落。" in xhtml
+
+
+def test_line_mode_is_explicitly_rejected_for_unknown_values():
+    with pytest.raises(ValueError, match="unsupported paragraph mode"):
+        parse_lines(["第1章 開始", "正文"], title="書", author="作者", paragraph_mode="auto")
