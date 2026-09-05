@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Literal
 
 from .chinese_numerals import chinese_numeral_to_int
 from .models import Book, Chapter, Paragraph, ParagraphBoundary, Volume
@@ -10,6 +11,7 @@ from .normalize import normalize_line
 DEFAULT_VOLUME_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s卷部冊]+)\s*(?P<unit>[卷部冊]))(?:[\s　]+(?P<title>.*?))?\s*$"
 DEFAULT_CHAPTER_PATTERN = r"^\s*(?P<label>第\s*(?P<number>[^\s章集篇回]+)\s*(?P<unit>[章集篇回]))(?:[\s　]*(?P<title>.*?))?\s*$"
 DEFAULT_EXTRA_PATTERN = r"^\s*(?P<label>番外(?:篇)?(?:\s*[0-9一二三四五六七八九十百千万萬零〇兩两]+))(?:\s*[：:]?\s*(?P<title>.*?))?\s*$"
+ParagraphMode = Literal["wrapped", "line"]
 
 
 @dataclass
@@ -46,7 +48,12 @@ def parse_lines(
     lines: list[str], *, title: str, author: str, language: str = "zh-CN",
     cover: str | None = None, volume_pattern: str = DEFAULT_VOLUME_PATTERN,
     chapter_pattern: str = DEFAULT_CHAPTER_PATTERN,
+    paragraph_mode: ParagraphMode = "wrapped",
 ) -> ParseResult:
+    """Parse TXT lines with explicit conventional or one-line paragraph semantics."""
+    if paragraph_mode not in {"wrapped", "line"}:
+        raise ValueError(f"unsupported paragraph mode: {paragraph_mode}")
+
     volume_re = re.compile(volume_pattern)
     chapter_re = re.compile(chapter_pattern)
     extra_re = re.compile(DEFAULT_EXTRA_PATTERN)
@@ -180,11 +187,15 @@ def parse_lines(
 
         if current_chapter is None:
             preamble_paragraph_lines.append(stripped)
+            if paragraph_mode == "line":
+                flush_preamble_paragraph()
             continue
 
         paragraph_lines.append(line)
         if stripped.startswith("第") and re.search(r"[章集篇回]", stripped):
             warnings.append(WarningItem("suspicious_chapter_heading", line_no, f"possible chapter heading not matched: {stripped[:80]}"))
+        if paragraph_mode == "line":
+            flush_paragraph()
 
     flush_current()
     if not book.chapter_count:
