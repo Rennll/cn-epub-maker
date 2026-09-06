@@ -6,6 +6,8 @@ V2 is the completed transformation and integration stage built on top of V1. The
 
 V2 extends completed V1. It does not replace the V1 model, Intermediate boundary, parser contract, or Pandoc-first renderer merely to reproduce legacy behavior.
 
+The overall V1 → V2 architecture is mapped in `architecture-overview.md`. This document focuses on V2-specific decisions and contracts.
+
 ## Scope
 
 V2 adds isolated transformation and orchestration capabilities around the V1 structural core:
@@ -18,8 +20,6 @@ V2 adds isolated transformation and orchestration capabilities around the V1 str
 - CLI/configuration integration;
 - Intermediate audit metadata;
 - migration compatibility with the V1 architecture.
-
-The overall system architecture and major pipeline stages are defined in `architecture-overview.md`. This document focuses on the V2 changes within that architecture.
 
 ## Relationship to V1
 
@@ -53,7 +53,7 @@ Each transformation receives text and, when successful, produces a `TransformRes
 
 Zero changes and zero matches are normal successful results and do not produce warnings.
 
-The CLI is responsible for presenting transformation results; transformers should return structured information rather than constructing CLI-specific messages. For example, OpenCC may be displayed simply as `✅ 使用 OpenCC（s2twp）` rather than reporting character-level conversion counts.
+The CLI is responsible for presenting transformation results; transformers should return structured information rather than constructing CLI-specific messages. For example, OpenCC may be displayed simply as `使用 OpenCC（s2twp）` rather than reporting character-level conversion counts.
 
 Transformers do not directly modify Book, Chapter, Volume, EPUB, or other structural objects, and they do not invoke other transformers. The processing pipeline owns transformation order.
 
@@ -79,7 +79,7 @@ The first V2 implementation exposes built-in profile names only. The internal de
 
 An invalid or nonexistent profile is a configuration error: the pipeline stops and the user is told to provide a valid profile. There is no silent fallback. OpenCC initialization/dependency failures are also fatal when the transformation cannot be performed reliably.
 
-Zero changes are normal success. OpenCC does not need character-level conversion statistics; profile identity is sufficient for normal reporting, e.g. `✅ 使用 OpenCC（s2twp）`.
+Zero changes are normal success. OpenCC does not need character-level conversion statistics; profile identity is sufficient for normal reporting.
 
 OpenCC should be deterministic and idempotent.
 
@@ -177,12 +177,6 @@ V2 does not include global Arabic numeral conversion, automatic chapter renumber
 ## Implementation Status
 
 The V2 implementation is complete for the scope defined above. The completed work includes the common transformation contract and pipeline, Junk Cleaner, OpenCC, Punctuation Conversion, CLI orchestration, transformation audit metadata at the Intermediate boundary, focused and integration tests, and real TXT → CLI → Pandoc → EPUB black-box validation.
-
-## Future Evolution: V2.x
-
-`Intermediate → Book → EPUB` rebuilding is not a missing V2 implementation step. It is a separate V2.x feature/architectural evolution and requires its own explicit data-model contract, implementation, and tests.
-
-Other future capabilities may also be considered under V2.x when they extend or revise the completed V2 architecture without changing the V1/V2 contracts implicitly.
 
 ## Design Principles
 
