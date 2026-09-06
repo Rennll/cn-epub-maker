@@ -135,22 +135,23 @@ def main() -> int:
     build_parser.add_argument("-o", "--output")
     build_parser.add_argument("-t", "--title", required=True)
     build_parser.add_argument("-a", "--author", required=True)
-    build_parser.add_argument("--lang", default="zh-CN")
+    build_parser.add_argument("--lang")
     build_parser.add_argument("--cover")
     build_parser.add_argument("--encoding")
     build_parser.add_argument("--keep-intermediate", action="store_true")
     build_parser.add_argument("--intermediate")
-    build_parser.add_argument("--opencc-profile", default="s2twp", choices=OpenCCTransformer.available_profiles())
+    build_parser.add_argument(
+        "--opencc-profile",
+        choices=OpenCCTransformer.available_profiles(),
+    )
     build_parser.add_argument("--no-opencc", dest="opencc", action="store_false")
     build_parser.add_argument("--no-punctuation", dest="punctuation", action="store_false")
     build_parser.add_argument("--full-source", action="store_true")
     build_parser.add_argument(
         "--paragraph-mode",
         choices=("wrapped", "line"),
-        default="wrapped",
         help="paragraph boundary semantics: blank-line wrapped paragraphs or one source line per paragraph",
     )
-    build_parser.set_defaults(func=build, opencc=True, punctuation=True, full_source=False)
 
     validate_parser = sub.add_parser("validate", help="validate an EPUB archive")
     validate_parser.add_argument("epub")
