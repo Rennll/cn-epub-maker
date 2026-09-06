@@ -90,3 +90,11 @@ This boundary also avoids reproducing the previous architecture's pattern of gen
 No implementation is required solely to reserve this future capability. The current text transformation pipeline, parser, semantic models, Intermediate serialization, and renderer boundaries should remain independently usable without annotations.
 
 When a concrete annotation feature is eventually implemented, first introduce the smallest book-level extension point required by that feature. Do not generalize the architecture beyond demonstrated requirements.
+
+## Intermediate → Book → EPUB Rebuilding
+
+Explore whether Intermediate should eventually become a stable, independently rebuildable artifact that can serve as an input to later Book/EPUB generation stages.
+
+This is intentionally deferred until a concrete use case requires a stronger Intermediate semantic and compatibility contract.
+
+Related decision: DD-04 — Intermediate semantics.
