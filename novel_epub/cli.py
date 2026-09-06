@@ -3,11 +3,27 @@ from __future__ import annotations
 import argparse
 import sys
 
+from . import execution as _execution
 from .cli_adapter import namespace_to_inputs
 from .configuration_resolver import resolve_conversion_request
-from .execution import execute
-from .transforms import OpenCCTransformer
+from .transforms import (
+    JunkCleaner,
+    OpenCCTransformer,
+    PunctuationTransformer,
+    TransformAudit,
+    TransformPipeline,
+    TransformationError,
+)
 from .validator import run_epubcheck, validate_epub
+
+
+# Compatibility entry point for callers that historically imported build from cli.
+def build(request, *, keep_intermediate=False, intermediate=None):
+    return _execution.execute(
+        request,
+        keep_intermediate=keep_intermediate,
+        intermediate=intermediate,
+    )
 
 
 def validate(args: argparse.Namespace) -> int:
@@ -62,7 +78,7 @@ def main() -> int:
     args = parser.parse_args()
     if args.command == "build":
         request = resolve_conversion_request(namespace_to_inputs(args))
-        return execute(
+        return build(
             request,
             keep_intermediate=args.keep_intermediate,
             intermediate=args.intermediate,
