@@ -162,7 +162,7 @@ def test_build_reports_transformation_error(tmp_path, monkeypatch, capsys):
     def fail_transformations(lines, policy, *, full_source):
         raise TransformationError("OpenCC conversion failed")
 
-    monkeypatch.setattr("novel_epub.cli._run_transformations", fail_transformations)
+    monkeypatch.setattr("novel_epub.execution._run_transformations", fail_transformations)
     assert build(_build_request(tmp_path)) == 1
     captured = capsys.readouterr()
     assert captured.out == ""
@@ -188,9 +188,9 @@ def test_build_transformation_order(tmp_path, monkeypatch):
                 metadata={},
             )
 
-    monkeypatch.setattr("novel_epub.cli.JunkCleaner", lambda: FakeTransformer("junk_cleaner"))
-    monkeypatch.setattr("novel_epub.cli.OpenCCTransformer", lambda profile: FakeTransformer("opencc"))
-    monkeypatch.setattr("novel_epub.cli.PunctuationTransformer", lambda: FakeTransformer("punctuation"))
+    monkeypatch.setattr("novel_epub.execution.JunkCleaner", lambda: FakeTransformer("junk_cleaner"))
+    monkeypatch.setattr("novel_epub.execution.OpenCCTransformer", lambda profile: FakeTransformer("opencc"))
+    monkeypatch.setattr("novel_epub.execution.PunctuationTransformer", lambda: FakeTransformer("punctuation"))
 
     assert build(_build_request(tmp_path)) == 0
     assert calls == [
@@ -214,7 +214,7 @@ def test_build_writes_transformation_audit_to_intermediate(tmp_path, monkeypatch
         )
     ]
     monkeypatch.setattr(
-        "novel_epub.cli._run_transformations",
+        "novel_epub.execution._run_transformations",
         lambda lines, policy, *, full_source: (lines, audit),
     )
     monkeypatch.setattr(
