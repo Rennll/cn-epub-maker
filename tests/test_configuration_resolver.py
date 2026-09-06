@@ -7,11 +7,11 @@ from novel_epub.configuration_resolver import resolve_conversion_request
 
 def test_resolver_applies_application_defaults():
     request = resolve_conversion_request(
-        {"source": "book.txt", "title": "書名", "author": "作者", "destination": "book.epub"}
+        {"source": "book.txt", "title": "書名", "author": "作者"}
     )
 
     assert request.source == Path("book.txt")
-    assert request.destination == Path("book.epub")
+    assert request.destination == Path("書名_作者.epub")
     assert request.book_metadata.title == "書名"
     assert request.book_metadata.author == "作者"
     assert request.book_metadata.language == "zh-CN"
@@ -21,6 +21,18 @@ def test_resolver_applies_application_defaults():
     assert request.policy.transformations.opencc.profile == "s2twp"
     assert request.policy.transformations.punctuation_enabled is True
     assert request.policy.full_source is False
+
+
+def test_explicit_destination_overrides_derived_default():
+    request = resolve_conversion_request(
+        {
+            "source": "book.txt",
+            "title": "書名",
+            "author": "作者",
+            "destination": "output.epub",
+        }
+    )
+    assert request.destination == Path("output.epub")
 
 
 def test_resolver_accepts_explicit_policy_values():
@@ -69,6 +81,16 @@ def test_resolver_uses_cli_values_over_config_values():
     assert request.policy.parser.paragraph_mode == "wrapped"
     assert request.policy.transformations.opencc.enabled is True
     assert request.policy.transformations.punctuation_enabled is False
+
+
+def test_unspecified_cli_values_do_not_override_config():
+    request = resolve_conversion_request(
+        {"source": "book.txt", "title": "書名", "author": "作者"},
+        config={"encoding": "big5", "paragraph_mode": "line"},
+        cli={"encoding": None, "paragraph_mode": None},
+    )
+    assert request.policy.encoding == "big5"
+    assert request.policy.parser.paragraph_mode == "line"
 
 
 def test_resolver_rejects_missing_required_fields():
