@@ -60,7 +60,7 @@ def test_adapter_preserves_unspecified_cli_values_as_none():
 
     values = namespace_to_inputs(args)
 
-    assert values["output"] is None
+    assert values["destination"] is None
     assert values["lang"] is None
     assert values["encoding"] is None
     assert values["opencc"] is None
