@@ -468,68 +468,18 @@ The resolved request should not simply be embedded wholesale into the Book seria
 
 Future reproducibility requirements may justify recording selected resolved policy or runtime facts as provenance, but that is a separate architecture decision.
 
-## Execution Boundaries
+## Relationship to Application Architecture
 
-The implemented application architecture is:
+The cross-version application pipeline and stage boundaries are defined in `architecture-overview.md`.
 
-```text
-CLI
-  ↓
-CLI Adapter
-  ↓
-Configuration Resolver
-  ↓
-ConversionRequest
-  ↓
-Application Execution
-  ├── Input / Decode
-  │     └── actual encoding remains runtime-local
-  ├── Normalize
-  ├── Transform
-  │     └── TransformationPolicy
-  ├── Parser
-  │     └── ParserPolicy + BookMetadata
-  ├── Validation
-  ├── Intermediate
-  ├── Renderer
-  └── EPUB Validation
-```
+This document defines the configuration-specific contract at that boundary:
 
-Each stage should consume only the configuration or data it actually needs.
+- CLI and configuration adapters provide configuration inputs;
+- the Configuration Resolver determines application-level meaning and produces a `ConversionRequest`;
+- execution consumes only the relevant resolved policy and data;
+- runtime facts, domain results, and provenance remain outside the request.
 
-The entire `ConversionRequest` should not be passed through every stage merely as a generic container.
-
-### CLI Adapter
-
-The CLI parser produces `argparse.Namespace`, but `cli_adapter.py` is the boundary that converts those CLI-specific values into Resolver inputs. The rest of the application does not use `Namespace` as its configuration contract.
-
-### Configuration Resolution
-
-The Resolver consumes CLI-independent input values, applies defaults, precedence and cross-field semantics, and returns the complete `ConversionRequest`.
-
-### Input / Decode
-
-Input handling receives the request source and encoding policy it needs. With `encoding = "auto"`, it detects the actual encoding and returns that runtime fact separately; the resolved request remains unchanged.
-
-### Normalize
-
-Normalize remains a system-defined source interpretation/normalization layer. It does not become a generic configuration consumer.
-
-### Transform
-
-Transformation orchestration receives `TransformationPolicy` and derives the required runtime transformer instances. It does not receive CLI syntax. `full_source` is resolved before execution and disables effective transformations rather than being interpreted by individual transformers.
-
-### Parser
-
-The parser remains responsible for structural parsing and consumes parser-specific policy/data. It receives relevant metadata and `paragraph_mode`; it does not need to understand the entire application request or CLI syntax.
-
-### Renderer
-
-The renderer consumes the `Book` and rendering-specific inputs. It does not depend on CLI syntax or the application request as a generic configuration object.
-
-### Intermediate
-
-Intermediate serializes the established domain structure and provenance/audit information. It is not an execution context.
+`ConversionRequest` must not be passed through every stage as a generic configuration container.
 
 ## Responsibility Matrix
 
@@ -557,46 +507,6 @@ Intermediate serializes the established domain structure and provenance/audit in
 | EPUB | Final Artifact |
 | EPUB validation | Validation / Runtime |
 
-## Refactoring Direction
-
-The primary change is not renaming `args` to `config`. The architectural boundary is now implemented as an adapter → resolver → request flow.
-
-Historical conceptual flow:
-
-```text
-CLI
- ↓
-argparse.Namespace
- ↓
-build(args)
- ↓
-stages read CLI arguments directly
-```
-
-Implemented target flow:
-
-```text
-CLI
- ↓
-CLI Adapter
- ↓
-Configuration Resolver
- ↓
-ConversionRequest
- ↓
-Application Execution
- ↓
-stages receive only relevant policy/data
-```
-
-In the current implementation:
-
-- `build()` receives `ConversionRequest` rather than an argparse namespace;
-- transformation orchestration receives `TransformationPolicy` rather than CLI arguments;
-- input handling receives source and encoding policy rather than the whole request;
-- `parse_lines()` remains parser-specific and receives parser-relevant data rather than the entire request;
-- rendering receives the resulting `Book` and destination rather than CLI arguments or the entire request.
-
 ## Anti-Patterns
 
 The implementation must avoid the following:
@@ -607,61 +517,60 @@ Do not create a configuration object that knows all component implementation det
 
 ### Generic Config Passing
 
-Do not pass the complete `ConversionRequest` to every stage simply because it is convenient.
+Do not pass the complete `ConversionRequest` into every stage merely because it is available. Stages should receive only the relevant policy/data.
 
 ### Configuration-owned Runtime Objects
 
-Do not make configuration construct or own transformer, parser, renderer, or other runtime instances.
+Do not store transformer, parser, renderer, or other runtime instances inside configuration objects.
 
 ### Duplicate Application Defaults
 
-Do not let CLI, Resolver, and components independently claim authority over application defaults.
+Do not maintain competing application-default definitions in CLI parsing, configuration adapters, and the Resolver.
 
 ### Request Mutation
 
-Do not write runtime facts, actual encoding, audits, results, or execution state back into the resolved request.
+Do not mutate `ConversionRequest` with runtime facts such as detected encoding or execution results.
 
 ## Non-Goals
 
-This architecture does not by itself introduce:
+This document does not define:
 
-1. a configuration-file format;
-2. a complete provenance schema;
-3. Intermediate → Book → EPUB rebuilding;
-4. fully user-configurable Parser Grammar;
-5. renderer layout configuration;
-6. real-device typography tuning;
-7. an EPUBCheck release-gate policy;
-8. final JunkCleaner default-rule content;
-9. automatic chapter renumbering;
-10. generic semantic chapter inference;
-11. global Arabic numeral conversion;
-12. punctuation/sentence-length heuristics for paragraph splitting.
+- a complete configuration file format;
+- the complete provenance schema;
+- Intermediate → Book → EPUB rebuilding;
+- fully user-configurable parser grammar;
+- renderer layout configuration;
+- real-device typography tuning;
+- EPUBCheck as a release gate;
+- final JunkCleaner default rules;
+- automatic chapter renumbering;
+- generic semantic chapter inference;
+- global Arabic numeral conversion;
+- punctuation/sentence-length paragraph heuristics.
 
-These remain separate decisions or future work.
+These remain separate concerns or deferred decisions.
 
 ## Acceptance Criteria
 
-An implementation conforms to this architecture when:
+The configuration architecture is considered coherent when:
 
-1. CLI parsing is no longer the application-level configuration authority.
-2. `ConversionRequest` is usable without importing or depending on `argparse`.
-3. The Resolver can produce a `ConversionRequest` from CLI-independent configuration inputs.
-4. Application defaults have a single authority.
-5. `full_source` cross-field semantics are resolved centrally.
-6. `ConversionRequest` contains no runtime component instances.
-7. Execution does not mutate the resolved request.
-8. Actual detected encoding does not overwrite the requested encoding policy.
-9. Component-specific semantic validation remains owned by components.
-10. Parser code does not need to understand CLI syntax.
-11. Renderer code does not need to understand CLI syntax.
-12. The existing Intermediate contract is not changed merely because the configuration model exists.
-13. `ConversionRequest` is explicitly treated as resolved configuration/request, not as an execution plan.
-14. Semantic groupings become dedicated types only when they carry meaningful responsibility, invariants, validation, or public API value.
+- CLI syntax is not the application configuration contract;
+- `ConversionRequest` is independent of `argparse.Namespace`;
+- the Resolver can resolve from CLI-independent inputs;
+- application defaults have one authoritative location;
+- Full Source Mode semantics are resolved centrally;
+- runtime instances do not live in the request;
+- the request is not mutated during execution;
+- actual encoding does not overwrite requested encoding;
+- component-specific validation remains owned by components;
+- parser and renderer do not need to know CLI syntax;
+- the Intermediate contract is not changed merely to accommodate configuration;
+- the request remains a request rather than an execution plan;
+- stages consume relevant policy/data instead of a generic request container.
 
 ## Final Architectural Statement
 
-The V2.x Configuration Model establishes the following boundary:
+The intended boundary is:
 
 ```text
 User Intent
@@ -675,8 +584,16 @@ Execution
 Runtime Facts / Domain Results / Provenance
 ```
 
-`ConversionRequest` is the resolved representation of user/application intent for one conversion operation.
+`ConversionRequest` is the resolved representation of application intent for one conversion operation.
 
-It is not the CLI argument namespace, raw configuration, execution plan, execution context, runtime state, Book, or provenance record.
+It is not:
 
-The CLI expresses the request. The CLI Adapter removes CLI-specific representation. The Resolver determines the resolved meaning. `ConversionRequest` records that meaning. Execution performs the conversion. Runtime and provenance record what actually happened. `Book` records the resulting domain structure. EPUB is the final artifact.
+- a CLI namespace;
+- raw configuration syntax;
+- an execution plan;
+- a generic execution context;
+- runtime state;
+- a `Book`;
+- provenance.
+
+The CLI expresses intent through frontend-specific syntax. Adapters remove that syntax. The Resolver determines application meaning. The request records that meaning. Execution performs the conversion. Runtime and provenance record what actually happened. The `Book` represents the resulting domain structure, and EPUB is the final artifact.
