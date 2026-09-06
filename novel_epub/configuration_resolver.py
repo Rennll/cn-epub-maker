@@ -34,18 +34,17 @@ def resolve_conversion_request(
     """Resolve user-facing inputs into a complete, CLI-independent request.
 
     Precedence is explicit CLI value > explicit config value > application default.
-    ``values`` is the required/base input layer and is treated like config input.
-    Values with ``None`` are considered unspecified so adapters can preserve
-    argparse's distinction between omitted and explicitly supplied options.
+    ``values`` supplies the base request data and may also contain optional values.
+    ``None`` means unspecified so adapters can preserve argparse's omission state.
     """
     resolved: dict[str, Any] = dict(_DEFAULTS)
     resolved.update(_specified(values))
     resolved.update(_specified(config or {}))
     resolved.update(_specified(cli or {}))
 
-    _require(resolved, "source")
-    _require(resolved, "title")
-    _require(resolved, "author")
+    source = Path(_require(resolved, "source"))
+    title = _require(resolved, "title")
+    author = _require(resolved, "author")
 
     encoding = resolved["encoding"]
     if not isinstance(encoding, str) or not encoding.strip():
@@ -61,6 +60,14 @@ def resolve_conversion_request(
         if not isinstance(resolved[key], bool):
             raise ValueError(f"{key} must be a boolean")
 
+    language = resolved["lang"]
+    if not isinstance(language, str) or not language.strip():
+        raise ValueError("lang must be a non-empty string")
+
+    cover = resolved.get("cover")
+    if cover is not None and not isinstance(cover, (str, Path)):
+        raise ValueError("cover must be a path-like string or None")
+
     opencc_enabled = resolved["opencc"]
     punctuation_enabled = resolved["punctuation"]
     junk_rules = tuple(resolved.get("junk_rules", ()))
@@ -71,10 +78,10 @@ def resolve_conversion_request(
         junk_rules = ()
 
     metadata = BookMetadata(
-        title=_require(resolved, "title"),
-        author=_require(resolved, "author"),
-        language=resolved["lang"],
-        cover=resolved.get("cover"),
+        title=title,
+        author=author,
+        language=language,
+        cover=str(cover) if cover is not None else None,
     )
     transformations = TransformationPolicy(
         opencc=OpenCCConfig(
@@ -90,10 +97,17 @@ def resolve_conversion_request(
         transformations=transformations,
         full_source=resolved["full_source"],
     )
+
+    destination_value = resolved.get("destination")
+    if destination_value is None:
+        destination = source.with_name(f"{title}_{author}.epub")
+    else:
+        destination = Path(destination_value)
+
     return ConversionRequest(
-        source=Path(_require(resolved, "source")),
+        source=source,
         book_metadata=metadata,
-        destination=Path(resolved["destination"]) if resolved.get("destination") else None,
+        destination=destination,
         policy=policy,
     )
 
