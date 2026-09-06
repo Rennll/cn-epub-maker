@@ -2,15 +2,11 @@
 
 ## Status
 
-This document records the architectural decisions that were intentionally deferred during the V2 and V2.x design work. It is a decision-tracking document, not a list of implementation tasks.
+This document is the decision register for architectural and behavioral questions that were intentionally left open, partially resolved, resolved, or frozen during V2 and V2.x work. It records decision status, current position, provenance, and conditions for revisiting a decision.
 
-The purpose is to make three things explicit for each decision:
+Detailed technical definitions belong to the canonical documents referenced by each decision. This document should not duplicate architecture documentation or serve as an implementation task list.
 
-1. what remains undecided,
-2. what architectural work has already constrained the decision, and
-3. what evidence or implementation work is required before the decision can be considered complete.
-
-The audit covers DD-01 through DD-15.
+The audit currently covers DD-01 through DD-14. DD-15 has been moved to `future-directions.md` because it describes a future architecture direction rather than a current decision that needs tracking.
 
 ## Decision Status
 
@@ -20,7 +16,7 @@ The audit covers DD-01 through DD-15.
 | DD-02 | JunkCleaner rule input | Open, ready to decide | Configuration Model |
 | DD-03 | JunkCleaner default rules | Open, ready to decide | Configuration Model + DD-02 |
 | DD-04 | Intermediate semantics | Partially resolved | Configuration Model + provenance model |
-| DD-05 | Paragraph mode vs. source-format profile | Deferred | Parser architecture |
+| DD-05 | Paragraph mode vs. source-format profile | Resolved | Parser architecture |
 | DD-06 | Normalize vs. Transformer responsibility | Resolved | Configuration Model + stage boundaries |
 | DD-07 | Real-device typography completion criteria | Open | EPUB rendering behavior |
 | DD-08 | EPUBCheck role | Open | Release/CI policy |
@@ -30,7 +26,6 @@ The audit covers DD-01 through DD-15.
 | DD-12 | Generic semantic chapter inference | Frozen | Parser conservatism |
 | DD-13 | Punctuation/sentence-length paragraph splitting | Frozen | Paragraph semantics |
 | DD-14 | Global Arabic numeral conversion | Frozen | Transformation conservatism |
-| DD-15 | Intermediate → Book → EPUB rebuilding | Deferred future architecture | Intermediate evolution |
 
 ## How to Read This Audit
 
@@ -39,8 +34,6 @@ A decision marked **Resolved** has a stable architectural answer and should not 
 A decision marked **Partially resolved** has a stable architectural direction, but one or more operational or implementation-level questions remain.
 
 A decision marked **Open, ready to decide** has enough architectural foundation to make the remaining product or behavior decision without changing the Configuration Model.
-
-A decision marked **Deferred** is intentionally left for later because the required evidence or architecture is not yet mature enough.
 
 A decision marked **Frozen** is an explicit non-goal or invariant. It should not be reintroduced through convenience heuristics or implementation shortcuts without a deliberate architectural revision.
 
@@ -52,181 +45,76 @@ A decision marked **Frozen** is an explicit non-goal or invariant. It should not
 
 ### Decision
 
-The application-level configuration model is represented by a `ConversionRequest` containing source information, book metadata, destination information, and a `ConversionPolicy`.
+V2.x uses `ConversionRequest` as the application-level conversion request, with configuration expressed through typed policy objects. CLI-specific arguments and runtime execution state remain outside the request model.
 
-The conceptual model is:
+### Canonical
 
-```text
-ConversionRequest
-├── source
-├── book_metadata: BookMetadata
-├── destination
-└── policy: ConversionPolicy
-    ├── encoding
-    ├── parser: ParserPolicy
-    │   └── paragraph_mode
-    ├── transformations: TransformationPolicy
-    │   ├── opencc: OpenCCConfig
-    │   ├── punctuation_enabled
-    │   └── junk_cleaner: JunkCleanerConfig
-    │       └── rules
-    └── full_source
-```
+`v2x-configuration-model.md`
 
-`ConversionRequest` describes one requested conversion operation. It is not a `Book`, not an execution context, and not a pipeline implementation object.
+### Evidence
 
-### Implemented and verified
+V2.x configuration/resolver implementation and architecture tests.
 
-The V2.x implementation now contains the frozen dataclass model in `novel_epub/configuration.py`: `BookMetadata`, `ParserPolicy`, `OpenCCConfig`, `JunkCleanerConfig`, `TransformationPolicy`, `ConversionPolicy`, and `ConversionRequest`.
+### Reopen when
 
-`ConversionRequest` is immutable through the frozen dataclass hierarchy, and `JunkCleanerConfig.rules` is exposed as a tuple rather than mutable runtime state.
-
-`novel_epub/configuration_resolver.py` resolves application defaults, precedence, cross-field semantics, and configuration-level validation into a complete `ConversionRequest`. The resolver does not perform source I/O, encoding detection, parsing, transformation execution, or rendering.
-
-`novel_epub/cli_adapter.py` is the CLI boundary. It converts the CLI `argparse.Namespace` into plain application inputs; `argparse.Namespace` does not cross into execution or domain code.
-
-`novel_epub/execution.py` accepts `ConversionRequest` rather than `argparse.Namespace`, and architecture tests verify the separation. The merged V2.x refactor was verified by the repository CI, including the post-merge main run.
-
-### Architectural consequences
-
-The CLI is an adapter into the application configuration model. `argparse.Namespace` is not the application configuration model.
-
-Configuration resolution is a separate boundary:
-
-```text
-CLI / config file / API
-        ↓
-configuration resolution
-        ↓
-ConversionRequest
-        ↓
-execution
-```
-
-The resolver owns application defaults, precedence, cross-field semantics, and configuration-level validation. It does not read source files, detect encodings, instantiate transformers, compile regular expressions, parse books, or render EPUBs.
-
-Component-specific validation remains owned by the component. Runtime failures remain runtime concerns.
-
-### Completion criteria
-
-DD-01 is considered complete when new frontends can construct the same application-level request without depending on CLI syntax, and when execution stages consume only the policy they require. This criterion is satisfied by the current V2.x architecture.
+The current request/policy boundary can no longer represent the required configuration surface.
 
 ---
 
 ## DD-02 — JunkCleaner Rule Input
 
-**Status: Open, ready to decide**
+**Status: Open**
 
 ### Question
 
 How should users define and provide `JunkRule` entries?
 
-### Architectural foundation
+### Current position
 
-The Configuration Model already provides the correct ownership boundary:
+The typed `JunkRule` schema belongs under `JunkCleanerConfig.rules`. The remaining decision concerns the public loading/input mechanism.
 
-```text
-ConversionRequest
-└── policy
-    └── transformations
-        └── junk_cleaner
-            └── rules
-```
+### Decision needed
 
-The rule configuration is component-local configuration. It should not become a generic pipeline configuration mechanism.
+- external configuration representation;
+- CLI shorthand, if any;
+- ordering guarantees;
+- malformed-rule behavior;
+- invalid-regex behavior;
+- representation of rule provenance in transformation audit.
 
-The existing JunkCleaner design defines the semantic schema as:
+### Canonical
 
-```text
-JunkRule
-├── target
-├── matcher
-└── pattern
-```
+JunkCleaner component semantics and `v2x-configuration-model.md`.
 
-The intended target values are `line` and `block`. The intended matcher values are `exact`, `contains`, and `regex`.
+### Resolve when
 
-### Implemented foundation
-
-The typed `JunkRule` schema and component behavior are already implemented in `novel_epub/transforms.py`, and `JunkCleanerConfig.rules` now carries those typed rules into the application policy.
-
-The execution path constructs `JunkCleaner` from the configured rules rather than placing regex compilation, matching, or runtime matcher state in the configuration model. Regression coverage also verifies that configured rules actually reach the execution pipeline.
-
-What remains undecided is the public loading/input mechanism. The existing implementation therefore establishes the semantic and ownership foundation without prematurely choosing a configuration-file syntax or CLI shorthand.
-
-### Current semantic contract
-
-`line` targets one normalized source line and cannot cross a newline boundary.
-
-`block` targets one or more consecutive non-blank lines. Blank lines are boundaries between blocks.
-
-`exact` matches the complete target against the pattern.
-
-`contains` matches when the pattern occurs within the target.
-
-`regex` uses regular-expression search semantics against the current target.
-
-JunkCleaner is remove-only. A matching rule removes the entire target; it does not replace only the matching substring.
-
-Rules are applied in user-defined order. Each rule operates on the result of the previous rule.
-
-An invalid regular expression is a rule-level configuration error that may be reported as a warning and skipped without aborting the entire conversion, according to the existing V2 transformation contract.
-
-### Remaining decision
-
-The public input mechanism still needs to be chosen. The architectural preference is to define the typed rule schema first and keep the external representation replaceable. A future configuration file format should map into the same `JunkCleanerConfig` rather than define a second semantic model.
-
-The decision should explicitly cover:
-
-- programmatic/API representation,
-- external configuration representation, if any,
-- whether CLI-only shorthand is supported,
-- rule ordering guarantees,
-- malformed rule behavior,
-- invalid regex behavior,
-- audit representation of rule matches and removals.
-
-### Completion criteria
-
-DD-02 is complete when the public rule schema and loading path are documented, implemented, and covered by unit and integration tests, including `line`, `block`, `exact`, `contains`, `regex`, ordering, no-match behavior, and invalid regex behavior.
+The public rule schema and loading path are documented, implemented, and covered by tests.
 
 ---
 
 ## DD-03 — JunkCleaner Default Rules
 
-**Status: Open, ready to decide**
+**Status: Open**
 
 ### Question
 
-Should JunkCleaner have built-in default rules, and if so, which rules are safe enough to enable by default?
+Should JunkCleaner provide built-in default rules, and if so, which rules are safe enough to enable by default?
 
-### Architectural foundation
+### Decision principles
 
-The Configuration Model establishes the correct authority boundary: application defaults are resolved by the Configuration Resolver, while JunkCleaner owns the semantics of individual rules.
+Default rules must have strong evidence that they identify non-content material. Rules with plausible 正文 false positives should not be enabled globally.
 
-This means default rules should not be hidden inside the parser or renderer. They are transformation policy defaults.
+### Decision needed
 
-Issue #17 explicitly identifies this as an unresolved design question and requires conservative behavior so that default cleaning does not remove正文 content without adequate specification and tests.
+- default set;
+- whether defaults can be disabled;
+- whether user rules replace or extend defaults;
+- whether source-specific defaults require a future source profile;
+- provenance of default rules.
 
-### Decision principle
+### Resolve when
 
-A default rule must be justified by strong evidence that it identifies non-content material rather than merely unusual prose.
-
-A rule that can plausibly match legitimate narrative text should not be enabled globally merely because it is useful for one source website or one author's formatting style.
-
-### Remaining decision
-
-The project must decide:
-
-- whether the default rule set is empty, conservative, or source-profile-specific,
-- whether defaults can be disabled as a group,
-- whether user rules replace or extend defaults,
-- whether source-specific defaults belong in a future source-format profile instead,
-- how default-rule provenance is represented in transformation audit data.
-
-### Completion criteria
-
-DD-03 is complete when the default set, precedence with user-defined rules, safety rationale, and test coverage are documented. A default rule should not be introduced without regression coverage for both intended junk and plausible正文 false positives.
+The default set, precedence, safety rationale, and regression coverage are documented.
 
 ---
 
@@ -236,87 +124,49 @@ DD-03 is complete when the default set, precedence with user-defined rules, safe
 
 ### Question
 
-What is the authoritative semantic role of the Intermediate representation?
+What semantic contract should the Intermediate representation provide?
 
-### Current direction
+### Current decision
 
-The Configuration Model clarifies an important distinction:
+Intermediate is a serialization and inspection boundary around `Book` plus transformation provenance. It is not runtime state, raw source text, or a second configuration model.
 
-```text
-ConversionRequest   = requested policy
-Runtime Data        = data while conversion executes
-Book                = parsed domain result
-Intermediate        = serialized Book + provenance/audit metadata
-EPUB                = final rendered result
-```
+### Remaining question
 
-Intermediate is not a pipeline stage and is not a copy of the raw source text.
+Whether Intermediate should become a stable, independently rebuildable artifact with a stronger semantic contract.
 
-The current implementation serializes the `Book` and transformation audit information. It does not reconstruct the `Book` from Intermediate yet.
+### Canonical
 
-### Implemented and verified
+`architecture-overview.md`
 
-The V2.x implementation in `novel_epub/intermediate.py` serializes the `Book` representation together with `TransformAudit` data. The Intermediate schema includes book metadata, chapters/volumes/preamble, and transformation audit information; it does not serialize `ConversionRequest` as the execution model.
+### Evidence
 
-This establishes the current V2.x semantic boundary: Intermediate is an inspection/serialization artifact of conversion output and transformation provenance, not runtime state and not a second configuration model.
+Current V2.x Intermediate serialization and provenance/audit model.
 
-Architecture tests explicitly verify that the Intermediate schema contains transformation audit/provenance information and does not contain `ConversionRequest`.
+### Resolve when
 
-### Decision
-
-For the current V2.x architecture, Intermediate remains a serialization and inspection boundary around the `Book` plus transformation provenance. It should preserve enough information to inspect what conversion produced and what transformations were applied.
-
-The exact question of whether Intermediate must become a canonical, independently rebuildable artifact is intentionally deferred to DD-15.
-
-### Remaining questions
-
-The project still needs to determine:
-
-- which metadata is mandatory for reproducibility,
-- whether request configuration or only effective transformation provenance belongs in Intermediate,
-- versioning and compatibility rules for Intermediate,
-- whether an Intermediate file can become a stable input to a later conversion stage,
-- how schema evolution is handled.
-
-### Completion criteria
-
-DD-04 is complete for the current V2.x scope when the required serialized fields and provenance semantics are documented. It is not necessary to solve full Intermediate round-tripping before V2.x transformation work proceeds.
+The required serialized fields, provenance semantics, and compatibility expectations are sufficiently defined for the current V2.x scope.
 
 ---
 
 ## DD-05 — Paragraph Mode vs. Source-Format Profile
 
-**Status: Deferred**
+**Status: Resolved**
 
-### Question
+### Decision
 
-Should `paragraph_mode` remain a direct parser policy, or should it eventually be part of a higher-level source-format profile?
+`paragraph_mode` remains part of `ParserPolicy`. A separate source-format profile abstraction is not introduced.
 
-### Current decision
+### Canonical
 
-`paragraph_mode` remains part of `ParserPolicy`:
+`v2x-configuration-model.md`
 
-```text
-ConversionPolicy
-└── parser
-    └── paragraph_mode
-```
+### Evidence
 
-The supported semantic modes are currently `wrapped` and `line`.
+V2.x parser policy, resolver validation, and regression coverage.
 
-### Implemented foundation
+### Reopen when
 
-`novel_epub/parser.py` now owns the `ParagraphMode` semantic type and accepts `paragraph_mode` explicitly. The CLI exposes the two supported modes and the resolver validates the selected value before constructing the request.
-
-Regression tests cover both paragraph modes and verify that parser-specific behavior remains at the parser boundary rather than being expanded into a broader configuration abstraction.
-
-### Why it remains deferred
-
-The distinction may become useful if the project accumulates multiple source-specific behaviors such as parser grammar, paragraph conventions, encoding defaults, and known cleanup rules. At present, combining them would create an abstraction before the requirements justify it.
-
-### Completion criteria
-
-Revisit this decision only when multiple source-specific behaviors need to be selected as a coherent profile. Do not create `SourceFormatConfig` merely to group one parser option.
+Multiple source-specific behaviors need to be selected as a coherent profile.
 
 ---
 
@@ -326,29 +176,19 @@ Revisit this decision only when multiple source-specific behaviors need to be se
 
 ### Decision
 
-Normalization remains a system-defined input interpretation stage. It is not part of user-configurable transformation policy.
+Normalization is system-defined input interpretation and is not part of user-configurable transformation policy. Policy-driven transformations run after normalization.
 
-The current normalization responsibilities include:
+### Canonical
 
-- canonicalizing line endings,
-- removing a leading U+3000 from a normalized line,
-- preserving the remaining source content.
+`v2x-configuration-model.md`
 
-Transformers operate after normalization and are policy-driven. They include OpenCC, punctuation transformation, and JunkCleaner.
+### Evidence
 
-### Implemented and verified
+V2.x execution boundary and normalization/transformation tests.
 
-The execution path now has the explicit stage ordering `Input/Decode → Normalize → Transform → Parse`, with normalization handled by `novel_epub/normalize.py` and policy-driven transformation handled by `novel_epub/transforms.py`.
+### Reopen when
 
-Regression tests verify normalization occurs before parsing and that the transformation pipeline receives normalized data. The architecture also keeps transformer implementation details such as regex matching and transformer instances out of `ConversionRequest`.
-
-### Architectural rule
-
-Not everything that changes output is configuration. A behavior belongs in configuration when it represents user-selectable policy. An inherent part of the input grammar or system interpretation remains outside configuration.
-
-### Completion criteria
-
-DD-06 is complete when new normalization behavior is evaluated against this boundary rather than being added to the transformation pipeline simply because it changes text. The current V2.x implementation satisfies this boundary.
+A new normalization behavior cannot be clearly classified as inherent input interpretation rather than user-selectable transformation policy.
 
 ---
 
@@ -360,31 +200,21 @@ DD-06 is complete when new normalization behavior is evaluated against this boun
 
 What evidence is sufficient to declare EPUB typography and layout complete?
 
-### Scope
+### Decision needed
 
-This decision is independent of the Configuration Model. Configuration can expose typography policy in the future, but the completion criterion itself depends on rendered EPUB behavior across real reading environments.
+Define a repeatable acceptance matrix covering representative readers and at least:
 
-### Required evidence
+- paragraph and line spacing;
+- heading hierarchy;
+- margins and page geometry;
+- long chapters;
+- CJK rendering;
+- punctuation and line breaking;
+- metadata, cover, and navigation.
 
-The project should define a repeatable acceptance set covering at least:
+### Resolve when
 
-- paragraph spacing,
-- line spacing,
-- heading hierarchy,
-- margins and page geometry,
-- long chapter behavior,
-- CJK text rendering,
-- punctuation and line breaking,
-- metadata presentation,
-- cover rendering,
-- navigation and table of contents,
-- common EPUB readers or representative device/software combinations.
-
-### Completion criteria
-
-DD-07 is complete when the project has a documented acceptance matrix and can distinguish implementation defects from reader-specific rendering differences.
-
-Typography should not be declared complete solely because an EPUB validates structurally or renders acceptably in one reader.
+The project has a documented acceptance matrix and can distinguish implementation defects from reader-specific rendering differences.
 
 ---
 
@@ -394,25 +224,23 @@ Typography should not be declared complete solely because an EPUB validates stru
 
 ### Question
 
-Is EPUBCheck an optional developer tool, or a required release/CI correctness gate?
+What role should EPUBCheck play in the conversion and release workflow?
 
-### Current architecture
+### Current distinction
 
-The project already has built-in EPUB structural validation and supports optional EPUBCheck integration.
+Built-in structural validation and EPUBCheck serve different levels of validation.
 
-This decision is independent of the Configuration Model. Configuration may eventually control whether validation is requested, but the architectural question is about release policy and correctness guarantees.
+### Decision needed
 
-### Decision to make
+Determine which checks are:
 
-The project should distinguish at least three levels:
+- required for normal conversion;
+- recommended during development;
+- required for release/CI.
 
-1. built-in validation required for normal conversion,
-2. EPUBCheck available for deeper conformance verification,
-3. EPUBCheck required before release or in CI.
+### Resolve when
 
-### Completion criteria
-
-DD-08 is complete when the project explicitly states which checks are mandatory for local conversion, which are recommended for development, and which are required for release.
+The project's validation and release policy explicitly defines the role of EPUBCheck.
 
 ---
 
@@ -424,29 +252,22 @@ DD-08 is complete when the project explicitly states which checks are mandatory 
 
 How should destination paths, generated filenames, collisions, and overwrites be handled?
 
-### Architectural foundation
+### Decision needed
 
-The Configuration Model places the destination in `ConversionRequest`, which is sufficient to represent the requested destination. It does not define filesystem safety policy by itself.
-
-### Remaining questions
-
-The project should decide:
-
-- whether an output filename is explicitly supplied or derived from metadata,
-- how unsafe filesystem characters are handled,
-- whether path traversal is rejected,
-- whether existing files are overwritten by default,
-- whether overwrite requires an explicit option,
-- whether parent directories are created automatically,
-- how output collisions are reported.
+- filename derivation;
+- filesystem character sanitization;
+- path traversal handling;
+- overwrite behavior;
+- parent-directory creation;
+- collision reporting.
 
 ### Architectural boundary
 
-Filename derivation and overwrite behavior are destination/application policy. They should not be implemented inside the renderer as implicit side effects.
+Destination and overwrite behavior are application policy and should not be implicit renderer side effects.
 
-### Completion criteria
+### Resolve when
 
-DD-09 is complete when the destination contract is explicit and CLI/API behavior is consistent.
+CLI/API behavior and the destination contract are explicit and consistent.
 
 ---
 
@@ -454,42 +275,21 @@ DD-09 is complete when the destination contract is explicit and CLI/API behavior
 
 **Status: Partially resolved**
 
-### Decision
+### Question
 
-Encoding selection is an input policy. The request may specify an explicit encoding or `auto`.
+What guarantee should automatic encoding detection provide, and where does it belong in the conversion boundary?
 
-The actual encoding detected at runtime is not configuration. It is runtime/provenance information.
+### Current decision
 
-The conceptual flow is:
-
-```text
-ConversionRequest
-└── policy
-    └── encoding = explicit value | auto
-
-runtime
-└── detected_encoding
-```
-
-### Implemented and verified
-
-`novel_epub/normalize.py` keeps encoding detection in the runtime input stage. When the request uses `encoding = auto`, execution passes the corresponding runtime value to input handling and receives the actual selected encoding separately.
-
-`novel_epub/execution.py` keeps the detected encoding local to execution. It does not mutate `ConversionRequest` to replace `auto` with the detected value.
-
-Regression coverage explicitly verifies the separation between requested encoding and runtime-detected encoding, including request immutability after detection.
-
-The current implementation supports the existing UTF-8/BOM, UTF-8, GB18030, GBK, and Big5 detection behavior, but the project has not yet made a formal guarantee about ambiguity or insufficient-confidence cases.
+Encoding detection remains input/runtime behavior rather than part of the serialized conversion request.
 
 ### Remaining question
 
-The unresolved part is the guarantee provided by `auto` detection. The project must decide whether detection is best-effort, deterministic for the supported encoding set, or required to fail when confidence is insufficient.
+What confidence/failure guarantees should be exposed to users, and how should detection failure or ambiguity be reported?
 
-The request should not be mutated to replace `auto` with the detected encoding. If reproducibility requires recording the actual encoding, it belongs in runtime/provenance or Intermediate metadata.
+### Resolve when
 
-### Completion criteria
-
-DD-10 is complete when auto-detection failure/ambiguity behavior is documented and tested, including the relationship between requested encoding and actual detected encoding.
+Detection behavior, failure semantics, and user-visible guarantees are explicitly defined.
 
 ---
 
@@ -499,17 +299,15 @@ DD-10 is complete when auto-detection failure/ambiguity behavior is documented a
 
 ### Decision
 
-The parser must not automatically renumber chapters.
+Do not automatically renumber chapters.
 
-Sequence discovery follows source order. Missing numbers, duplicate numbers, or irregular numbering may produce validation warnings, but the system must not silently rewrite the source structure.
+### Reason
 
-### Rationale
+Preserve source structure and avoid implicit structural rewriting.
 
-Renumbering changes source semantics and makes the generated Book differ from the user's source without explicit transformation policy.
+### Reopen when
 
-### Consequence
-
-If renumbering is ever required, it must be introduced as an explicit transformation or a separately defined structural operation. It must not appear as a parser convenience feature.
+A future requirement explicitly introduces structural normalization.
 
 ---
 
@@ -519,39 +317,33 @@ If renumbering is ever required, it must be introduced as an explicit transforma
 
 ### Decision
 
-The parser must not infer chapters from generic semantic cues such as arbitrary heading-like text, sentence content, or contextual guesses.
+Do not introduce generic semantic chapter inference as an implicit conversion heuristic.
 
-Chapter recognition remains based on explicit parser grammar and supported structural patterns.
+### Reason
 
-### Rationale
+Prefer conservative parsing over speculative structural interpretation.
 
-Generic semantic inference creates false positives and makes source preservation unpredictable. The V1 and V2 architecture deliberately prefers conservative recognition and warnings over guessing.
+### Reopen when
 
-### Consequence
-
-Adding a new structural pattern requires an explicit grammar decision and test coverage rather than a broad heuristic.
+An explicit product requirement establishes a defined semantic inference contract.
 
 ---
 
-## DD-13 — Punctuation or Sentence-Length Paragraph Splitting
+## DD-13 — Punctuation / Sentence-Length Paragraph Splitting
 
 **Status: Frozen**
 
 ### Decision
 
-Punctuation density, sentence length, or similar linguistic heuristics must not be used to infer paragraph boundaries.
+Do not split paragraphs implicitly based on punctuation or sentence length.
 
-Paragraph boundaries are determined by source structure and explicit parser policy.
+### Reason
 
-### Rationale
+Paragraph boundaries should not be inferred from heuristic sentence characteristics.
 
-Sentence-level heuristics are language-dependent and can change the semantic structure of a source in ways that are difficult to predict or audit.
+### Reopen when
 
-The current parser therefore treats blank-line boundaries and the explicit `paragraph_mode` as authoritative structural signals.
-
-### Consequence
-
-If future linguistic segmentation is introduced, it must be an explicit, separately scoped feature rather than a hidden parser heuristic.
+An explicit parsing requirement defines a reliable semantic contract.
 
 ---
 
@@ -561,137 +353,12 @@ If future linguistic segmentation is introduced, it must be an explicit, separat
 
 ### Decision
 
-The system must not perform global Arabic numeral conversion as an implicit transformation.
+Do not perform global Arabic numeral conversion as an implicit transformation.
 
-For example, changing all Arabic digits to another numeral representation is outside the default structural conversion pipeline.
+### Reason
 
-### Rationale
+Global character-level rewriting can alter legitimate source content.
 
-Numerals may represent chapter numbers, dates, measurements, identifiers, quantities, names, or literal source content. A global conversion rule cannot safely infer the intended semantic role.
+### Reopen when
 
-### Consequence
-
-Numeral conversion, if ever required, must be an explicit and narrowly defined transformation with a documented scope.
-
----
-
-## DD-15 — Intermediate → Book → EPUB Rebuilding
-
-**Status: Deferred future architecture**
-
-### Question
-
-Should Intermediate become a canonical, rebuildable artifact that can independently feed the Book and EPUB stages?
-
-### Current architecture
-
-The current V2.x path is:
-
-```text
-Source
-  ↓
-Normalize
-  ↓
-Transform
-  ↓
-Parser
-  ↓
-Book
-  ├── Intermediate
-  └── EPUB
-```
-
-A future architecture may support:
-
-```text
-Intermediate
-  ↓
-Book
-  ↓
-EPUB
-```
-
-### Relationship to DD-04
-
-DD-04 establishes the current semantic boundary of Intermediate. DD-15 asks whether that boundary should become a first-class reconstruction interface.
-
-The Configuration Model does not solve this decision. It only makes the distinction between request policy, runtime state, Book, and Intermediate clearer.
-
-### Why it is deferred
-
-Rebuildability affects schema versioning, compatibility, provenance, asset handling, validation, and the long-term contract of the Intermediate format. Solving it prematurely would constrain the current transformation work without enough evidence.
-
-### Completion criteria
-
-DD-15 should be revisited when there is a concrete use case for:
-
-- editing or inspecting Intermediate and rebuilding EPUB,
-- resuming conversion without reparsing source text,
-- deterministic regeneration from serialized Book data,
-- tooling that consumes Intermediate as a stable interchange format.
-
-The decision should then define schema versioning, compatibility guarantees, asset representation, provenance requirements, and rebuild validation.
-
----
-
-## Dependency Map
-
-The decisions do not form one linear sequence. Their dependencies are better represented as a small set of architectural groups.
-
-```text
-Configuration Model
-        │
-        ├── DD-02 JunkCleaner rule input
-        │       │
-        │       └── DD-03 JunkCleaner defaults
-        │
-        ├── DD-06 Normalize vs Transformer
-        │
-        ├── DD-10 Encoding policy
-        │
-        ├── DD-04 Intermediate semantics
-        │       │
-        │       └── DD-15 Intermediate rebuildability
-        │
-        └── DD-05 Paragraph mode vs source profile
-
-Independent runtime / release decisions
-        ├── DD-07 Typography completion
-        ├── DD-08 EPUBCheck role
-        └── DD-09 Output destination policy
-
-Frozen structural invariants
-        ├── DD-11 No automatic chapter renumbering
-        ├── DD-12 No generic semantic chapter inference
-        ├── DD-13 No heuristic paragraph splitting
-        └── DD-14 No implicit global numeral conversion
-```
-
-## Recommended Decision Order
-
-The recommended next sequence is:
-
-1. **DD-02 — JunkCleaner rule input**
-2. **DD-03 — JunkCleaner default rules**
-3. **DD-04 — Intermediate semantics**
-4. **DD-10 — Encoding auto-detection guarantee**
-5. **DD-05 — Paragraph mode vs. source-format profile**, only if new source-format requirements emerge
-6. **DD-09 — Output filename and overwrite policy**
-7. **DD-08 — EPUBCheck release/CI role**
-8. **DD-07 — Real-device typography completion criteria**
-9. **DD-15 — Intermediate rebuildability**, when a concrete use case justifies it
-
-DD-11 through DD-14 should remain frozen unless the project explicitly changes its source-preservation philosophy.
-
-## Architectural Principle
-
-The purpose of this audit is not to eliminate every future design question. It is to make the boundary between solved architecture, implementation policy, empirical validation, and deliberate non-goals explicit.
-
-The current V2.x architecture therefore follows four rules:
-
-1. Resolve architectural boundaries before adding implementation options.
-2. Keep user-selectable policy in the Configuration Model and inherent system interpretation outside it.
-3. Prefer explicit behavior and warnings over semantic guessing.
-4. Do not turn a deferred question into an accidental behavior through implementation convenience.
-
-A deferred decision is not permission for code to choose implicitly. Until a decision is resolved, the implementation should follow the safest behavior already established by the current architecture.
+A future transformation policy explicitly defines the scope and semantics.
