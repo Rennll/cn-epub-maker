@@ -83,25 +83,25 @@ selects an OpenCC policy. It does not mean that `ConversionRequest` owns an `Ope
 
 `ConversionRequest` represents one complete, resolved conversion request.
 
-Conceptually:
+The current Python model is a frozen dataclass with these fields:
 
 ```text
 ConversionRequest
-├── source
+├── source: Path
 ├── book_metadata: BookMetadata
-├── destination
+├── destination: Path
 └── policy: ConversionPolicy
-    ├── encoding
+    ├── encoding: str
     ├── parser: ParserPolicy
-    │   └── paragraph_mode
+    │   └── paragraph_mode: str
     ├── transformations: TransformationPolicy
     │   ├── opencc: OpenCCConfig
-    │   │   ├── enabled
-    │   │   └── profile
-    │   ├── punctuation_enabled
+    │   │   ├── enabled: bool
+    │   │   └── profile: str
+    │   ├── punctuation_enabled: bool
     │   └── junk_cleaner: JunkCleanerConfig
-    │       └── rules: JunkRule[...]
-    └── full_source
+    │       └── rules: tuple[JunkRule, ...]
+    └── full_source: bool
 ```
 
 This is a semantic model. Not every conceptual grouping must become a dedicated Python type. A type should be introduced when it has its own responsibility, invariant, validation, or public API value.
@@ -153,9 +153,9 @@ Execution Result / Provenance
 
 ### Immutability
 
-After resolution, `ConversionRequest` is logically immutable. Execution reads the request but does not modify it.
+After resolution, `ConversionRequest` is logically immutable. The current implementation enforces this with `@dataclass(frozen=True)` on the request and its nested configuration dataclasses; the `JunkCleanerConfig.rules` collection is also represented as a tuple.
 
-The architecture does not currently mandate a specific implementation such as `dataclass(frozen=True)`. Deep immutability is an implementation concern. Nested configuration should follow the same read-only semantic contract.
+Execution reads the request but does not modify it. Runtime facts such as detected encoding remain local to execution/provenance rather than being written back into the request.
 
 `ConversionRequest` must not become an execution context that is progressively populated with runtime facts.
 
@@ -216,7 +216,7 @@ Runtime:
     actual encoding = "gb18030"
 ```
 
-The actual detected encoding is runtime/provenance information. It must not be written back into or mutate the `ConversionRequest`.
+The actual detected encoding is a runtime/provenance value returned by input handling and retained by execution for reporting/audit purposes. It must not be written back into or mutate the `ConversionRequest`.
 
 The storage and schema of detailed provenance remain a separate architectural decision.
 
@@ -280,7 +280,7 @@ The conceptual configuration is:
 
 ```text
 JunkCleanerConfig
-└── rules: JunkRule[...]
+└── rules: tuple[JunkRule, ...]
 ```
 
 The existing `JunkRule` already represents configuration data with `target`, `matcher`, and `pattern`. A separate `JunkRuleConfig` type is not required unless a future responsibility requires the separation of public schema from the current rule representation.
@@ -291,7 +291,7 @@ The central configuration model may carry `JunkCleanerConfig`, but it must not a
 
 `full_source` is a Conversion Policy / pipeline execution policy.
 
-When `full_source = true`, the effective behavior is to bypass the transformation pipeline after Normalize.
+When `full_source = true`, the effective behavior is to bypass the transformation pipeline after Normalize. The current execution path passes this resolved policy into transformation orchestration, which produces no effective transformations in this mode.
 
 Configuration resolution may therefore derive the effective transformation state as:
 
@@ -300,7 +300,7 @@ full_source = true
         ↓
 opencc.enabled = false
 punctuation_enabled = false
-junk_cleaner = disabled / empty effective rules
+junk_cleaner = empty effective rules
 ```
 
 The cross-field semantics belong to Configuration Resolution. Individual transformers do not need to know that Full Source Mode exists.
@@ -470,20 +470,25 @@ Future reproducibility requirements may justify recording selected resolved poli
 
 ## Execution Boundaries
 
-The intended application architecture is:
+The implemented application architecture is:
 
 ```text
+CLI
+  ↓
 CLI Adapter
   ↓
 Configuration Resolver
   ↓
 ConversionRequest
   ↓
-Execution
+Application Execution
   ├── Input / Decode
+  │     └── actual encoding remains runtime-local
   ├── Normalize
   ├── Transform
+  │     └── TransformationPolicy
   ├── Parser
+  │     └── ParserPolicy + BookMetadata
   ├── Validation
   ├── Intermediate
   ├── Renderer
@@ -494,9 +499,17 @@ Each stage should consume only the configuration or data it actually needs.
 
 The entire `ConversionRequest` should not be passed through every stage merely as a generic container.
 
-### Input
+### CLI Adapter
 
-Input handling receives the source and encoding policy it needs. It should not depend on `argparse.Namespace` or the complete CLI argument set.
+The CLI parser produces `argparse.Namespace`, but `cli_adapter.py` is the boundary that converts those CLI-specific values into Resolver inputs. The rest of the application does not use `Namespace` as its configuration contract.
+
+### Configuration Resolution
+
+The Resolver consumes CLI-independent input values, applies defaults, precedence and cross-field semantics, and returns the complete `ConversionRequest`.
+
+### Input / Decode
+
+Input handling receives the request source and encoding policy it needs. With `encoding = "auto"`, it detects the actual encoding and returns that runtime fact separately; the resolved request remains unchanged.
 
 ### Normalize
 
@@ -504,15 +517,15 @@ Normalize remains a system-defined source interpretation/normalization layer. It
 
 ### Transform
 
-The transformation layer receives `TransformationPolicy` or the corresponding component configuration. It does not receive CLI syntax.
+Transformation orchestration receives `TransformationPolicy` and derives the required runtime transformer instances. It does not receive CLI syntax. `full_source` is resolved before execution and disables effective transformations rather than being interpreted by individual transformers.
 
 ### Parser
 
-The parser remains responsible for structural parsing and consumes parser-specific policy/data. It does not need to understand the entire application request.
+The parser remains responsible for structural parsing and consumes parser-specific policy/data. It receives relevant metadata and `paragraph_mode`; it does not need to understand the entire application request or CLI syntax.
 
 ### Renderer
 
-The renderer consumes the `Book` and rendering-specific inputs. It should not depend on CLI syntax or the application request as a generic configuration object.
+The renderer consumes the `Book` and rendering-specific inputs. It does not depend on CLI syntax or the application request as a generic configuration object.
 
 ### Intermediate
 
@@ -546,9 +559,9 @@ Intermediate serializes the established domain structure and provenance/audit in
 
 ## Refactoring Direction
 
-The primary change is not renaming `args` to `config`. The architectural boundary must change.
+The primary change is not renaming `args` to `config`. The architectural boundary is now implemented as an adapter → resolver → request flow.
 
-Current conceptual flow:
+Historical conceptual flow:
 
 ```text
 CLI
@@ -560,7 +573,7 @@ build(args)
 stages read CLI arguments directly
 ```
 
-Target flow:
+Implemented target flow:
 
 ```text
 CLI
@@ -576,13 +589,13 @@ Application Execution
 stages receive only relevant policy/data
 ```
 
-This implies, for example:
+In the current implementation:
 
-- `build()` should no longer use an argparse namespace as its application contract;
-- transformation orchestration should receive transformation policy rather than CLI arguments;
-- input handling should receive source and encoding policy rather than the whole request;
-- `parse_lines()` should remain parser-specific rather than accepting the entire request;
-- rendering should not depend on CLI arguments or the entire request.
+- `build()` receives `ConversionRequest` rather than an argparse namespace;
+- transformation orchestration receives `TransformationPolicy` rather than CLI arguments;
+- input handling receives source and encoding policy rather than the whole request;
+- `parse_lines()` remains parser-specific and receives parser-relevant data rather than the entire request;
+- rendering receives the resulting `Book` and destination rather than CLI arguments or the entire request.
 
 ## Anti-Patterns
 
@@ -666,4 +679,4 @@ Runtime Facts / Domain Results / Provenance
 
 It is not the CLI argument namespace, raw configuration, execution plan, execution context, runtime state, Book, or provenance record.
 
-The CLI expresses the request. The Resolver determines its resolved meaning. `ConversionRequest` records that meaning. Execution performs the conversion. Runtime and provenance record what actually happened. `Book` records the resulting domain structure. EPUB is the final artifact.
+The CLI expresses the request. The CLI Adapter removes CLI-specific representation. The Resolver determines the resolved meaning. `ConversionRequest` records that meaning. Execution performs the conversion. Runtime and provenance record what actually happened. `Book` records the resulting domain structure. EPUB is the final artifact.
