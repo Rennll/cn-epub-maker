@@ -75,6 +75,18 @@ ConversionRequest
 
 `ConversionRequest` describes one requested conversion operation. It is not a `Book`, not an execution context, and not a pipeline implementation object.
 
+### Implemented and verified
+
+The V2.x implementation now contains the frozen dataclass model in `novel_epub/configuration.py`: `BookMetadata`, `ParserPolicy`, `OpenCCConfig`, `JunkCleanerConfig`, `TransformationPolicy`, `ConversionPolicy`, and `ConversionRequest`.
+
+`ConversionRequest` is immutable through the frozen dataclass hierarchy, and `JunkCleanerConfig.rules` is exposed as a tuple rather than mutable runtime state.
+
+`novel_epub/configuration_resolver.py` resolves application defaults, precedence, cross-field semantics, and configuration-level validation into a complete `ConversionRequest`. The resolver does not perform source I/O, encoding detection, parsing, transformation execution, or rendering.
+
+`novel_epub/cli_adapter.py` is the CLI boundary. It converts the CLI `argparse.Namespace` into plain application inputs; `argparse.Namespace` does not cross into execution or domain code.
+
+`novel_epub/execution.py` accepts `ConversionRequest` rather than `argparse.Namespace`, and architecture tests verify the separation. The merged V2.x refactor was verified by the repository CI, including the post-merge main run.
+
 ### Architectural consequences
 
 The CLI is an adapter into the application configuration model. `argparse.Namespace` is not the application configuration model.
@@ -97,7 +109,7 @@ Component-specific validation remains owned by the component. Runtime failures r
 
 ### Completion criteria
 
-DD-01 is considered complete when new frontends can construct the same application-level request without depending on CLI syntax, and when execution stages consume only the policy they require.
+DD-01 is considered complete when new frontends can construct the same application-level request without depending on CLI syntax, and when execution stages consume only the policy they require. This criterion is satisfied by the current V2.x architecture.
 
 ---
 
@@ -133,6 +145,14 @@ JunkRule
 ```
 
 The intended target values are `line` and `block`. The intended matcher values are `exact`, `contains`, and `regex`.
+
+### Implemented foundation
+
+The typed `JunkRule` schema and component behavior are already implemented in `novel_epub/transforms.py`, and `JunkCleanerConfig.rules` now carries those typed rules into the application policy.
+
+The execution path constructs `JunkCleaner` from the configured rules rather than placing regex compilation, matching, or runtime matcher state in the configuration model. Regression coverage also verifies that configured rules actually reach the execution pipeline.
+
+What remains undecided is the public loading/input mechanism. The existing implementation therefore establishes the semantic and ownership foundation without prematurely choosing a configuration-file syntax or CLI shorthand.
 
 ### Current semantic contract
 
@@ -234,6 +254,14 @@ Intermediate is not a pipeline stage and is not a copy of the raw source text.
 
 The current implementation serializes the `Book` and transformation audit information. It does not reconstruct the `Book` from Intermediate yet.
 
+### Implemented and verified
+
+The V2.x implementation in `novel_epub/intermediate.py` serializes the `Book` representation together with `TransformAudit` data. The Intermediate schema includes book metadata, chapters/volumes/preamble, and transformation audit information; it does not serialize `ConversionRequest` as the execution model.
+
+This establishes the current V2.x semantic boundary: Intermediate is an inspection/serialization artifact of conversion output and transformation provenance, not runtime state and not a second configuration model.
+
+Architecture tests explicitly verify that the Intermediate schema contains transformation audit/provenance information and does not contain `ConversionRequest`.
+
 ### Decision
 
 For the current V2.x architecture, Intermediate remains a serialization and inspection boundary around the `Book` plus transformation provenance. It should preserve enough information to inspect what conversion produced and what transformations were applied.
@@ -276,7 +304,11 @@ ConversionPolicy
 
 The supported semantic modes are currently `wrapped` and `line`.
 
-This is preferable to introducing a broader `SourceFormatConfig` before there is a concrete set of source-format policies that belong together.
+### Implemented foundation
+
+`novel_epub/parser.py` now owns the `ParagraphMode` semantic type and accepts `paragraph_mode` explicitly. The CLI exposes the two supported modes and the resolver validates the selected value before constructing the request.
+
+Regression tests cover both paragraph modes and verify that parser-specific behavior remains at the parser boundary rather than being expanded into a broader configuration abstraction.
 
 ### Why it remains deferred
 
@@ -304,17 +336,11 @@ The current normalization responsibilities include:
 
 Transformers operate after normalization and are policy-driven. They include OpenCC, punctuation transformation, and JunkCleaner.
 
-The resulting boundary is:
+### Implemented and verified
 
-```text
-Decode
-  ↓
-Normalize
-  ↓
-Transform
-  ↓
-Parse
-```
+The execution path now has the explicit stage ordering `Input/Decode → Normalize → Transform → Parse`, with normalization handled by `novel_epub/normalize.py` and policy-driven transformation handled by `novel_epub/transforms.py`.
+
+Regression tests verify normalization occurs before parsing and that the transformation pipeline receives normalized data. The architecture also keeps transformer implementation details such as regex matching and transformer instances out of `ConversionRequest`.
 
 ### Architectural rule
 
@@ -322,7 +348,7 @@ Not everything that changes output is configuration. A behavior belongs in confi
 
 ### Completion criteria
 
-DD-06 is complete when new normalization behavior is evaluated against this boundary rather than being added to the transformation pipeline simply because it changes text.
+DD-06 is complete when new normalization behavior is evaluated against this boundary rather than being added to the transformation pipeline simply because it changes text. The current V2.x implementation satisfies this boundary.
 
 ---
 
@@ -445,7 +471,15 @@ runtime
 └── detected_encoding
 ```
 
-The current supported encodings are UTF-8 with BOM, UTF-8, GB18030, GBK, and Big5, with BOM-aware and trial-based detection behavior.
+### Implemented and verified
+
+`novel_epub/normalize.py` keeps encoding detection in the runtime input stage. When the request uses `encoding = auto`, execution passes the corresponding runtime value to input handling and receives the actual selected encoding separately.
+
+`novel_epub/execution.py` keeps the detected encoding local to execution. It does not mutate `ConversionRequest` to replace `auto` with the detected value.
+
+Regression coverage explicitly verifies the separation between requested encoding and runtime-detected encoding, including request immutability after detection.
+
+The current implementation supports the existing UTF-8/BOM, UTF-8, GB18030, GBK, and Big5 detection behavior, but the project has not yet made a formal guarantee about ambiguity or insufficient-confidence cases.
 
 ### Remaining question
 
