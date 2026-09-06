@@ -46,6 +46,8 @@ Documentation may summarize these sources when the summary provides architectura
 
 Do not repeat the same requirement across multiple canonical documents merely to associate it with different versions. Prefer one authoritative description and reference it from related documents.
 
+Do not create a version-wide architecture document merely because a new version label exists. Put cross-version architecture in `architecture-overview.md`; keep a version-specific document only when it contains decisions, contracts, migration constraints, or other detail that cannot be cleanly represented in the overview.
+
 ### Session Context
 
 `next-session-handoff.md` is temporary continuation state.
@@ -78,39 +80,55 @@ Do not preserve session history merely for completeness.
 
 `architecture-overview.md`
 
-Canonical high-level map of the current system architecture, including major pipeline stages, component responsibilities, cross-stage boundaries, orchestration, and validation layers.
+Canonical high-level map of the current system architecture and its V1 → V2 → V2.x evolution, including major pipeline stages, component responsibilities, cross-stage boundaries, application orchestration, and validation layers.
 
 Use this document to understand how the system fits together. Keep version- or component-specific behavioral contracts in their respective canonical documents.
 
-### V1 Architecture
+### V1 Structural Decisions
 
 `v1-architecture-decisions.md`
 
-Canonical description of the stable V1 architecture and behavioral contract.
+Canonical V1-specific decisions and stable behavioral contracts, including parsing semantics, Intermediate details, EPUB guarantees, and V1 non-goals.
 
-Use this document for durable V1 decisions involving the core data model, parsing behavior, Intermediate boundary, EPUB generation, validation, and V1 non-goals.
-
-It should describe the stable contract rather than the chronological history of V1 development.
+It should not duplicate the overall V1 architecture map already documented in `architecture-overview.md`.
 
 ### V2 Transformation and Integration
 
 `v2-migration-and-design-decisions.md`
 
-Canonical description of the completed V2 transformation and integration architecture.
+Canonical V2-specific transformation contracts, migration decisions, integration boundaries, and compatibility constraints.
 
-Use this document for durable decisions concerning transformations, transformation ordering, configuration, CLI orchestration, audit metadata, migration decisions, and the boundaries between V1 and V2.
+It should not duplicate the overall V2 architecture map already documented in `architecture-overview.md`.
 
-V2 documentation should not duplicate the implementation details of individual transformers when those details are already represented by source code and tests.
+### V2.x Configuration
 
-### V2.1 Typography / Layout
+`v2x-configuration-model.md`
+
+Canonical V2.x application configuration and execution-boundary contract, including `ConversionRequest`, policy objects, resolution, validation, and separation of configuration from runtime state and provenance.
+
+### V2.x Typography / Layout
 
 `v2x-typography-and-layout.md`
 
-Canonical description of the V2.1 typography and layout semantics.
+Canonical V2.x typography and layout semantics, including paragraph-boundary semantics, hard line breaks, semantic rendering, chapter pagination intent, and presentation constraints.
 
-Use this document for paragraph-boundary semantics, hard line breaks, semantic rendering, chapter pagination intent, typography/layout responsibilities, and related presentation constraints.
+### Decision Register
 
-V2.1 is a project milestone within the broader V2.x evolution path. Its documentation is kept separately because typography/layout forms a coherent design concern, not simply because it has a different version number.
+`deferred-decision-audit.md`
+
+Decision register for open, partially resolved, resolved, and frozen architectural or behavioral questions. It records current status and points to the canonical source; it is not an architecture document or implementation task list.
+
+### Future Directions
+
+`future-directions.md`
+
+Canonical record of deliberately deferred architecture directions and capabilities that are not part of the current implementation contract.
+
+### Audits
+
+`audits/`
+
+Historical maintenance, provenance, and licensing records. These are retained when the history itself is durable project knowledge and should not be treated as current architecture documentation.
 
 ### Current Session
 
@@ -124,15 +142,13 @@ Keep this file short and replace obsolete content as the current task changes. I
 
 The project uses version labels to describe architectural evolution, but version boundaries and documentation boundaries are not identical.
 
-V1 is the stable structural and EPUB-generation baseline.
+V1 established the stable structural and EPUB-generation baseline.
 
-V2 is the completed transformation and integration stage built on top of V1.
+V2 extended that baseline with isolated content transformations and application integration without replacing the V1 structural model, Intermediate boundary, or renderer foundation.
 
-V2.1 is the typography/layout milestone within the broader V2.x evolution.
+V2.x continues the same architecture by refining application configuration, execution boundaries, and presentation semantics. It is an evolution path rather than a separate architecture.
 
-Future V2.x work may introduce new capabilities or revise completed architecture. Such work should receive its own canonical documentation when it establishes a durable contract, but it does not automatically require a new version-wide document.
-
-When a subject crosses version boundaries, prefer documenting the subject in the place that provides the clearest canonical source rather than duplicating it into every affected version document.
+When a subject crosses version boundaries, prefer documenting the architecture in `architecture-overview.md` and the detailed contract in the document that owns that subject. Do not duplicate the same architecture merely to associate it with a version label.
 
 ## Handling Conflicts
 
