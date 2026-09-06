@@ -110,6 +110,52 @@ def test_build_passes_resolved_paragraph_mode(tmp_path, monkeypatch):
     assert captured["lines"] == ["簡體，中文"]
 
 
+def test_build_uses_runtime_detected_encoding_without_mutating_request(tmp_path, monkeypatch):
+    captured = {}
+    _stub_build_dependencies(monkeypatch, captured)
+    request = _build_request(tmp_path)
+    original = request
+
+    def fake_read_lines(path, encoding):
+        captured["requested_encoding"] = encoding
+        return (["簡體,中文"], "gb18030")
+
+    monkeypatch.setattr("novel_epub.cli.read_lines", fake_read_lines)
+    assert build(request) == 0
+    assert captured["requested_encoding"] is None
+    assert request == original
+    assert request.policy.encoding == "auto"
+
+
+def test_build_passes_only_relevant_data_to_parser(tmp_path, monkeypatch):
+    captured = {}
+    _stub_build_dependencies(monkeypatch, captured)
+    request = _build_request(tmp_path, paragraph_mode="line")
+
+    def fake_parse_lines(lines, **kwargs):
+        captured["kwargs"] = kwargs
+        return SimpleNamespace(
+            book=SimpleNamespace(
+                title=kwargs["title"],
+                author=kwargs["author"],
+                volumes=[],
+                chapter_count=0,
+                paragraph_count=1,
+            ),
+            warnings=[],
+        )
+
+    monkeypatch.setattr("novel_epub.cli.parse_lines", fake_parse_lines)
+    assert build(request) == 0
+    assert captured["kwargs"] == {
+        "title": "書名",
+        "author": "作者",
+        "language": "zh-CN",
+        "cover": None,
+        "paragraph_mode": "line",
+    }
+
+
 def test_build_reports_transformation_error(tmp_path, monkeypatch, capsys):
     _stub_build_dependencies(monkeypatch, {})
 
