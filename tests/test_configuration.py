@@ -14,20 +14,15 @@ from novel_epub.configuration import (
 from novel_epub.transforms import JunkRule
 
 
-def test_default_conversion_request_has_v2_policy_defaults():
-    request = ConversionRequest(
-        source=Path("book.txt"),
-        book_metadata=BookMetadata(title="書名", author="作者"),
-        destination=Path("book.epub"),
-    )
-
-    assert request.policy.encoding == "auto"
-    assert request.policy.parser.paragraph_mode == "wrapped"
-    assert request.policy.transformations.opencc.enabled is True
-    assert request.policy.transformations.opencc.profile == "s2twp"
-    assert request.policy.transformations.punctuation_enabled is True
-    assert request.policy.transformations.junk_cleaner.rules == ()
-    assert request.policy.full_source is False
+def test_configuration_model_requires_resolved_values():
+    with pytest.raises(TypeError):
+        BookMetadata(title="書名", author="作者")
+    with pytest.raises(TypeError):
+        ParserPolicy()
+    with pytest.raises(TypeError):
+        OpenCCConfig()
+    with pytest.raises(TypeError):
+        ConversionPolicy()
 
 
 def test_conversion_request_contains_request_data_but_not_execution_state():
@@ -40,6 +35,16 @@ def test_conversion_request_contains_request_data_but_not_execution_state():
             cover="cover.jpg",
         ),
         destination=Path("book.epub"),
+        policy=ConversionPolicy(
+            encoding="auto",
+            parser=ParserPolicy(paragraph_mode="wrapped"),
+            transformations=TransformationPolicy(
+                opencc=OpenCCConfig(enabled=True, profile="s2twp"),
+                punctuation_enabled=True,
+                junk_cleaner=JunkCleanerConfig(rules=()),
+            ),
+            full_source=False,
+        ),
     )
 
     assert request.source == Path("book.txt")
@@ -52,14 +57,27 @@ def test_conversion_request_contains_request_data_but_not_execution_state():
 
 
 def test_configuration_is_immutable():
+    policy = ConversionPolicy(
+        encoding="auto",
+        parser=ParserPolicy(paragraph_mode="wrapped"),
+        transformations=TransformationPolicy(
+            opencc=OpenCCConfig(enabled=True, profile="s2twp"),
+            punctuation_enabled=True,
+            junk_cleaner=JunkCleanerConfig(rules=()),
+        ),
+        full_source=False,
+    )
     request = ConversionRequest(
         source=Path("book.txt"),
-        book_metadata=BookMetadata(title="書名", author="作者"),
+        book_metadata=BookMetadata(
+            title="書名", author="作者", language="zh-CN", cover=None
+        ),
         destination=Path("book.epub"),
+        policy=policy,
     )
 
     with pytest.raises(AttributeError):
-        request.policy = ConversionPolicy()
+        request.policy = policy
 
     with pytest.raises(AttributeError):
         request.policy.transformations.opencc.enabled = False
