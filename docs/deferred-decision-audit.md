@@ -84,7 +84,11 @@ The typed `JunkRule` schema belongs under `JunkCleanerConfig.rules`. The remaini
 
 ### Canonical
 
-JunkCleaner component semantics and `v2x-configuration-model.md`.
+`novel_epub/transforms.py`
+
+### Related
+
+`v2x-configuration-model.md`
 
 ### Resolve when
 
@@ -128,23 +132,27 @@ What semantic contract should the Intermediate representation provide?
 
 ### Current decision
 
-Intermediate is a serialization and inspection boundary around `Book` plus transformation provenance. It is not runtime state, raw source text, or a second configuration model.
+Intermediate is the structured serialization boundary around `Book` plus transformation provenance. It is not runtime state, raw source text, or a second configuration model.
 
 ### Remaining question
 
-Whether Intermediate should become a stable, independently rebuildable artifact with a stronger semantic contract.
+Whether Intermediate should become a stable, independently rebuildable artifact with a stronger semantic and compatibility contract.
 
 ### Canonical
 
 `architecture-overview.md`
 
+### Related
+
+`future-directions.md`
+
 ### Evidence
 
-Current V2.x Intermediate serialization and provenance/audit model.
+Current Intermediate serialization and provenance/audit model.
 
 ### Resolve when
 
-The required serialized fields, provenance semantics, and compatibility expectations are sufficiently defined for the current V2.x scope.
+The required serialized fields, provenance semantics, and compatibility expectations are sufficiently defined for the intended scope.
 
 ---
 
@@ -286,6 +294,14 @@ Encoding detection remains input/runtime behavior rather than part of the serial
 ### Remaining question
 
 What confidence/failure guarantees should be exposed to users, and how should detection failure or ambiguity be reported?
+
+### Canonical
+
+`novel_epub/normalize.py`
+
+### Related
+
+`v2x-configuration-model.md`
 
 ### Resolve when
 
