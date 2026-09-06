@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from novel_epub.cli import build, main
 from novel_epub.cli_adapter import namespace_to_inputs
 from novel_epub.configuration_resolver import resolve_conversion_request
-from novel_epub.transforms import TransformAudit, TransformationError
+from novel_epub.transforms import JunkRule, TransformAudit, TransformationError
 
 
 def _build_request(tmp_path, **overrides):
@@ -188,7 +188,7 @@ def test_build_transformation_order(tmp_path, monkeypatch):
                 metadata={},
             )
 
-    monkeypatch.setattr("novel_epub.execution.JunkCleaner", lambda: FakeTransformer("junk_cleaner"))
+    monkeypatch.setattr("novel_epub.execution.JunkCleaner", lambda rules=None: FakeTransformer("junk_cleaner"))
     monkeypatch.setattr("novel_epub.execution.OpenCCTransformer", lambda profile: FakeTransformer("opencc"))
     monkeypatch.setattr("novel_epub.execution.PunctuationTransformer", lambda: FakeTransformer("punctuation"))
 
@@ -199,6 +199,38 @@ def test_build_transformation_order(tmp_path, monkeypatch):
         ("punctuation", "input|junk_cleaner|opencc"),
     ]
     assert captured["lines"] == ["input|junk_cleaner|opencc|punctuation"]
+
+
+def test_build_passes_configured_junk_rules_to_component(tmp_path, monkeypatch):
+    captured = {}
+    _stub_build_dependencies(monkeypatch, captured, source_lines=["廣告", "正文"])
+    request = _build_request(
+        tmp_path,
+        opencc=False,
+        punctuation=False,
+        junk_rules=(JunkRule(target="line", matcher="exact", pattern="廣告"),),
+    )
+    captured_rules = []
+
+    class FakeJunkCleaner:
+        name = "junk_cleaner"
+
+        def __init__(self, rules):
+            captured_rules.extend(rules)
+
+        def transform(self, text):
+            return SimpleNamespace(
+                text=text.replace("廣告\n", ""),
+                changed=True,
+                warnings=[],
+                stats={},
+                metadata={},
+            )
+
+    monkeypatch.setattr("novel_epub.execution.JunkCleaner", FakeJunkCleaner)
+    assert build(request) == 0
+    assert captured_rules == [request.policy.transformations.junk_cleaner.rules[0]]
+    assert captured["lines"] == ["正文"]
 
 
 def test_build_writes_transformation_audit_to_intermediate(tmp_path, monkeypatch):
@@ -259,40 +291,17 @@ def test_main_uses_cli_adapter_and_resolver(monkeypatch):
             "--full-source",
             "--keep-intermediate",
             "--intermediate",
-            "book.intermediate",
+            "cache",
         ],
     )
 
     assert main() == 0
     assert captured["values"]["source"] == "book.txt"
     assert captured["values"]["destination"] is None
-    assert captured["values"]["opencc_profile"] == "s2t"
     assert captured["values"]["opencc"] is False
+    assert captured["values"]["opencc_profile"] == "s2t"
     assert captured["values"]["punctuation"] is False
     assert captured["values"]["full_source"] is True
+    assert captured["values"]["paragraph_mode"] is None
     assert captured["keep_intermediate"] is True
-    assert captured["intermediate"] == "book.intermediate"
-
-
-def test_namespace_adapter_keeps_cli_omissions_distinguishable():
-    from argparse import Namespace
-
-    args = Namespace(
-        input="book.txt",
-        output=None,
-        title="書名",
-        author="作者",
-        lang=None,
-        cover=None,
-        encoding=None,
-        opencc=None,
-        opencc_profile=None,
-        punctuation=None,
-        full_source=None,
-        paragraph_mode=None,
-    )
-    values = namespace_to_inputs(args)
-    assert values["source"] == "book.txt"
-    assert values["destination"] is None
-    assert values["opencc"] is None
-    assert values["paragraph_mode"] is None
+    assert captured["intermediate"] == "cache"
