@@ -4,7 +4,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from .configuration import ConversionRequest
+from .cli_adapter import namespace_to_inputs
+from .configuration import ConversionRequest, TransformationPolicy
 from .configuration_resolver import resolve_conversion_request
 from .intermediate import write_intermediate
 from .normalize import normalize_line, read_lines
@@ -21,15 +22,19 @@ from .transforms import (
 from .validator import run_epubcheck, validate_book, validate_epub
 
 
-def _run_transformations(lines: list[str], request: ConversionRequest) -> tuple[list[str], list[TransformAudit]]:
-    if request.policy.full_source:
+def _run_transformations(
+    lines: list[str],
+    policy: TransformationPolicy,
+    *,
+    full_source: bool,
+) -> tuple[list[str], list[TransformAudit]]:
+    if full_source:
         return lines, []
 
-    transformation_policy = request.policy.transformations
     transformers = [JunkCleaner()]
-    if transformation_policy.opencc.enabled:
-        transformers.append(OpenCCTransformer(profile=transformation_policy.opencc.profile))
-    if transformation_policy.punctuation_enabled:
+    if policy.opencc.enabled:
+        transformers.append(OpenCCTransformer(profile=policy.opencc.profile))
+    if policy.punctuation_enabled:
         transformers.append(PunctuationTransformer())
 
     text, audit = TransformPipeline(transformers).run("\n".join(lines))
@@ -49,29 +54,21 @@ def _print_transform_audit(audit: list[TransformAudit]) -> None:
             print(f"WARNING: {stage.name}: {warning}", file=sys.stderr)
 
 
-def build(args: argparse.Namespace) -> int:
-    request = resolve_conversion_request(
-        {
-            "source": args.input,
-            "destination": args.output,
-            "title": args.title,
-            "author": args.author,
-            "lang": args.lang,
-            "cover": args.cover,
-            "encoding": args.encoding,
-            "opencc": args.opencc,
-            "opencc_profile": args.opencc_profile,
-            "punctuation": args.punctuation,
-            "full_source": args.full_source,
-            "paragraph_mode": getattr(args, "paragraph_mode", None),
-        }
-    )
-
+def build(
+    request: ConversionRequest,
+    *,
+    keep_intermediate: bool = False,
+    intermediate: str | None = None,
+) -> int:
     try:
         requested_encoding = None if request.policy.encoding == "auto" else request.policy.encoding
         lines, encoding = read_lines(request.source, requested_encoding)
         lines = [normalize_line(line) for line in lines]
-        lines, audit = _run_transformations(lines, request)
+        lines, audit = _run_transformations(
+            lines,
+            request.policy.transformations,
+            full_source=request.policy.full_source,
+        )
         result = parse_lines(
             lines,
             title=request.book_metadata.title,
@@ -99,10 +96,12 @@ def build(args: argparse.Namespace) -> int:
             where = f" at line {warning.line}" if warning.line else ""
             print(f"WARNING: {warning.message}{where}", file=sys.stderr)
 
-        if args.keep_intermediate:
-            intermediate = Path(args.intermediate or Path(request.source).with_suffix("").name + ".intermediate")
-            write_intermediate(result.book, intermediate, transformations=audit)
-            print(f"Intermediate: {intermediate}")
+        if keep_intermediate:
+            intermediate_path = Path(
+                intermediate or Path(request.source).with_suffix("").name + ".intermediate"
+            )
+            write_intermediate(result.book, intermediate_path, transformations=audit)
+            print(f"Intermediate: {intermediate_path}")
 
         render(result.book, request.destination)
         epub_errors = validate_epub(request.destination)
@@ -115,11 +114,11 @@ def build(args: argparse.Namespace) -> int:
     except TransformationError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-    except (OSError, ValueError, UnicodeError) as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
     except FileNotFoundError as exc:
         print(f"ERROR: required executable or file not found: {exc}", file=sys.stderr)
+        return 1
+    except (OSError, ValueError, UnicodeError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
 
@@ -173,7 +172,14 @@ def main() -> int:
     validate_parser.add_argument("epub")
     validate_parser.set_defaults(func=validate)
     args = parser.parse_args()
-    return build(args) if args.command == "build" else args.func(args)
+    if args.command == "build":
+        request = resolve_conversion_request(namespace_to_inputs(args))
+        return build(
+            request,
+            keep_intermediate=args.keep_intermediate,
+            intermediate=args.intermediate,
+        )
+    return args.func(args)
 
 
 if __name__ == "__main__":
