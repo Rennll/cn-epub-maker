@@ -27,7 +27,7 @@ def _build_request(tmp_path, **overrides):
 
 def _stub_build_dependencies(monkeypatch, captured, source_lines=None):
     monkeypatch.setattr(
-        "novel_epub.cli.read_lines",
+        "novel_epub.execution.read_lines",
         lambda path, encoding: (source_lines or ["简体,中文"], "utf-8"),
     )
 
@@ -44,13 +44,13 @@ def _stub_build_dependencies(monkeypatch, captured, source_lines=None):
             warnings=[],
         )
 
-    monkeypatch.setattr("novel_epub.cli.parse_lines", fake_parse_lines)
+    monkeypatch.setattr("novel_epub.execution.parse_lines", fake_parse_lines)
     monkeypatch.setattr(
-        "novel_epub.cli.validate_book",
+        "novel_epub.execution.validate_book",
         lambda book, warnings: SimpleNamespace(errors=[]),
     )
-    monkeypatch.setattr("novel_epub.cli.render", lambda book, output: None)
-    monkeypatch.setattr("novel_epub.cli.validate_epub", lambda output: [])
+    monkeypatch.setattr("novel_epub.execution.render", lambda book, output: None)
+    monkeypatch.setattr("novel_epub.execution.validate_epub", lambda output: [])
 
 
 def test_build_applies_default_v2_transformations(tmp_path, monkeypatch):
@@ -97,7 +97,7 @@ def test_build_preserves_newlines_and_normalizes_before_parser(tmp_path, monkeyp
         captured["paragraphs"] = [paragraph.text for paragraph in result.book.preamble]
         return result
 
-    monkeypatch.setattr("novel_epub.cli.parse_lines", fake_parse_lines)
+    monkeypatch.setattr("novel_epub.execution.parse_lines", fake_parse_lines)
     assert build(_build_request(tmp_path, full_source=True)) == 0
     assert captured["lines"] == ["第一行", "第二行", "", "第三行", "", "第四行"]
     assert captured["paragraphs"] == ["第一行\n第二行", "第三行", "第四行"]
@@ -120,7 +120,7 @@ def test_build_uses_runtime_detected_encoding_without_mutating_request(tmp_path,
         captured["requested_encoding"] = encoding
         return (["簡體,中文"], "gb18030")
 
-    monkeypatch.setattr("novel_epub.cli.read_lines", fake_read_lines)
+    monkeypatch.setattr("novel_epub.execution.read_lines", fake_read_lines)
     assert build(request) == 0
     assert captured["requested_encoding"] is None
     assert request == original
@@ -145,7 +145,7 @@ def test_build_passes_only_relevant_data_to_parser(tmp_path, monkeypatch):
             warnings=[],
         )
 
-    monkeypatch.setattr("novel_epub.cli.parse_lines", fake_parse_lines)
+    monkeypatch.setattr("novel_epub.execution.parse_lines", fake_parse_lines)
     assert build(request) == 0
     assert captured["kwargs"] == {
         "title": "書名",
@@ -218,7 +218,7 @@ def test_build_writes_transformation_audit_to_intermediate(tmp_path, monkeypatch
         lambda lines, policy, *, full_source: (lines, audit),
     )
     monkeypatch.setattr(
-        "novel_epub.cli.write_intermediate",
+        "novel_epub.execution.write_intermediate",
         lambda book, directory, transformations=None: captured.update(transformations=transformations),
     )
 
