@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from .configuration_resolver import resolve_conversion_request
 from .intermediate import write_intermediate
 from .normalize import normalize_line, read_lines
 from .parser import parse_lines
@@ -47,19 +48,34 @@ def _print_transform_audit(audit: list[TransformAudit]) -> None:
 
 
 def build(args: argparse.Namespace) -> int:
+    request = resolve_conversion_request(
+        {
+            "source": args.input,
+            "destination": args.output,
+            "title": args.title,
+            "author": args.author,
+            "lang": args.lang,
+            "cover": args.cover,
+            "encoding": args.encoding,
+            "opencc": args.opencc,
+            "opencc_profile": args.opencc_profile,
+            "punctuation": args.punctuation,
+            "full_source": args.full_source,
+            "paragraph_mode": args.paragraph_mode,
+        }
+    )
+
     try:
-        lines, encoding = read_lines(args.input, args.encoding)
+        lines, encoding = read_lines(request.source, request.policy.encoding)
         lines = [normalize_line(line) for line in lines]
-        lines, audit = _run_transformations(lines, args)
+        lines, audit = _run_transformations(lines, request)
         result = parse_lines(
             lines,
-            title=args.title,
-            author=args.author,
-            language=args.lang,
-            cover=args.cover,
-            # Keep build() compatible with callers that construct a Namespace
-            # directly instead of going through argparse.
-            paragraph_mode=getattr(args, "paragraph_mode", "wrapped"),
+            title=request.book_metadata.title,
+            author=request.book_metadata.author,
+            language=request.book_metadata.language,
+            cover=request.book_metadata.cover,
+            paragraph_mode=request.policy.parser.paragraph_mode,
         )
         report = validate_book(result.book, result.warnings)
         if report.errors:
@@ -81,20 +97,17 @@ def build(args: argparse.Namespace) -> int:
             print(f"WARNING: {warning.message}{where}", file=sys.stderr)
 
         if args.keep_intermediate:
-            intermediate = Path(args.intermediate or Path(args.input).with_suffix("").name + ".intermediate")
+            intermediate = Path(args.intermediate or Path(request.source).with_suffix("").name + ".intermediate")
             write_intermediate(result.book, intermediate, transformations=audit)
             print(f"Intermediate: {intermediate}")
 
-        output = Path(args.output) if args.output else Path(args.input).with_name(
-            f"{args.title}_{args.author}.epub"
-        )
-        render(result.book, output)
-        epub_errors = validate_epub(output)
+        render(result.book, request.destination)
+        epub_errors = validate_epub(request.destination)
         if epub_errors:
             for error in epub_errors:
                 print(f"ERROR: {error}", file=sys.stderr)
             return 3
-        print(f"EPUB: {output}")
+        print(f"EPUB: {request.destination}")
         return 0
     except TransformationError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -144,9 +157,9 @@ def main() -> int:
         "--opencc-profile",
         choices=OpenCCTransformer.available_profiles(),
     )
-    build_parser.add_argument("--no-opencc", dest="opencc", action="store_false")
-    build_parser.add_argument("--no-punctuation", dest="punctuation", action="store_false")
-    build_parser.add_argument("--full-source", action="store_true")
+    build_parser.add_argument("--no-opencc", dest="opencc", action="store_false", default=None)
+    build_parser.add_argument("--no-punctuation", dest="punctuation", action="store_false", default=None)
+    build_parser.add_argument("--full-source", action="store_true", default=None)
     build_parser.add_argument(
         "--paragraph-mode",
         choices=("wrapped", "line"),
@@ -157,7 +170,7 @@ def main() -> int:
     validate_parser.add_argument("epub")
     validate_parser.set_defaults(func=validate)
     args = parser.parse_args()
-    return args.func(args)
+    return build(args) if args.command == "build" else args.func(args)
 
 
 if __name__ == "__main__":
