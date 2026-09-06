@@ -3,55 +3,20 @@ from __future__ import annotations
 import argparse
 import sys
 
-from . import execution as _execution
 from .cli_adapter import namespace_to_inputs
 from .configuration_resolver import resolve_conversion_request
-from .transforms import (
-    JunkCleaner,
-    OpenCCTransformer,
-    PunctuationTransformer,
-    TransformAudit,
-    TransformPipeline,
-    TransformationError,
-)
+from .execution import execute
+from .transforms import OpenCCTransformer
 from .validator import run_epubcheck, validate_epub
 
 
 def build(request, *, keep_intermediate=False, intermediate=None):
-    # Keep the historical import path working while the application execution
-    # implementation lives in novel_epub.execution.
-    for name in (
-        "JunkCleaner",
-        "OpenCCTransformer",
-        "PunctuationTransformer",
-        "TransformAudit",
-        "TransformPipeline",
-        "TransformationError",
-        "read_lines",
-        "normalize_line",
-        "parse_lines",
-        "validate_book",
-        "render",
-        "validate_epub",
-        "write_intermediate",
-        "_run_transformations",
-    ):
-        if name in globals():
-            setattr(_execution, name, globals()[name])
-    return _execution.execute(
+    """Execute a resolved conversion request."""
+    return execute(
         request,
         keep_intermediate=keep_intermediate,
         intermediate=intermediate,
     )
-
-
-# These names remain import-compatible for existing tests/callers. They are
-# execution dependencies, not configuration inputs.
-from .intermediate import write_intermediate
-from .normalize import normalize_line, read_lines
-from .parser import parse_lines
-from .renderers.pandoc import render
-from .validator import validate_book
 
 
 def validate(args: argparse.Namespace) -> int:
