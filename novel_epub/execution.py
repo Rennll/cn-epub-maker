@@ -28,7 +28,7 @@ def _run_transformations(
     if full_source:
         return lines, []
 
-    transformers = [JunkCleaner()]
+    transformers = [JunkCleaner(rules=list(policy.junk_cleaner.rules))]
     if policy.opencc.enabled:
         transformers.append(OpenCCTransformer(profile=policy.opencc.profile))
     if policy.punctuation_enabled:
