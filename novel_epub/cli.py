@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from .configuration import ConversionRequest
 from .configuration_resolver import resolve_conversion_request
 from .intermediate import write_intermediate
 from .normalize import normalize_line, read_lines
@@ -20,14 +21,15 @@ from .transforms import (
 from .validator import run_epubcheck, validate_book, validate_epub
 
 
-def _run_transformations(lines: list[str], args: argparse.Namespace) -> tuple[list[str], list[TransformAudit]]:
-    if args.full_source:
+def _run_transformations(lines: list[str], request: ConversionRequest) -> tuple[list[str], list[TransformAudit]]:
+    if request.policy.full_source:
         return lines, []
 
+    transformation_policy = request.policy.transformations
     transformers = [JunkCleaner()]
-    if args.opencc:
-        transformers.append(OpenCCTransformer(profile=args.opencc_profile))
-    if args.punctuation:
+    if transformation_policy.opencc.enabled:
+        transformers.append(OpenCCTransformer(profile=transformation_policy.opencc.profile))
+    if transformation_policy.punctuation_enabled:
         transformers.append(PunctuationTransformer())
 
     text, audit = TransformPipeline(transformers).run("\n".join(lines))
@@ -61,12 +63,13 @@ def build(args: argparse.Namespace) -> int:
             "opencc_profile": args.opencc_profile,
             "punctuation": args.punctuation,
             "full_source": args.full_source,
-            "paragraph_mode": args.paragraph_mode,
+            "paragraph_mode": getattr(args, "paragraph_mode", None),
         }
     )
 
     try:
-        lines, encoding = read_lines(request.source, request.policy.encoding)
+        requested_encoding = None if request.policy.encoding == "auto" else request.policy.encoding
+        lines, encoding = read_lines(request.source, requested_encoding)
         lines = [normalize_line(line) for line in lines]
         lines, audit = _run_transformations(lines, request)
         result = parse_lines(
