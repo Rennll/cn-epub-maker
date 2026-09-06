@@ -17,13 +17,41 @@ from .transforms import (
 from .validator import run_epubcheck, validate_epub
 
 
-# Compatibility entry point for callers that historically imported build from cli.
 def build(request, *, keep_intermediate=False, intermediate=None):
+    # Keep the historical import path working while the application execution
+    # implementation lives in novel_epub.execution.
+    for name in (
+        "JunkCleaner",
+        "OpenCCTransformer",
+        "PunctuationTransformer",
+        "TransformAudit",
+        "TransformPipeline",
+        "TransformationError",
+        "read_lines",
+        "normalize_line",
+        "parse_lines",
+        "validate_book",
+        "render",
+        "validate_epub",
+        "write_intermediate",
+        "_run_transformations",
+    ):
+        if name in globals():
+            setattr(_execution, name, globals()[name])
     return _execution.execute(
         request,
         keep_intermediate=keep_intermediate,
         intermediate=intermediate,
     )
+
+
+# These names remain import-compatible for existing tests/callers. They are
+# execution dependencies, not configuration inputs.
+from .intermediate import write_intermediate
+from .normalize import normalize_line, read_lines
+from .parser import parse_lines
+from .renderers.pandoc import render
+from .validator import validate_book
 
 
 def validate(args: argparse.Namespace) -> int:
