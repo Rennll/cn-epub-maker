@@ -2,109 +2,21 @@ from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
-from .intermediate import write_intermediate
-from .normalize import normalize_line, read_lines
-from .parser import parse_lines
-from .renderers.pandoc import render
-from .transforms import (
-    JunkCleaner,
-    OpenCCTransformer,
-    PunctuationTransformer,
-    TransformAudit,
-    TransformPipeline,
-    TransformationError,
-)
-from .validator import run_epubcheck, validate_book, validate_epub
+from .cli_adapter import namespace_to_inputs
+from .configuration_resolver import resolve_conversion_request
+from .execution import execute
+from .transforms import OpenCCTransformer
+from .validator import run_epubcheck, validate_epub
 
 
-def _run_transformations(lines: list[str], args: argparse.Namespace) -> tuple[list[str], list[TransformAudit]]:
-    if args.full_source:
-        return lines, []
-
-    transformers = [JunkCleaner()]
-    if args.opencc:
-        transformers.append(OpenCCTransformer(profile=args.opencc_profile))
-    if args.punctuation:
-        transformers.append(PunctuationTransformer())
-
-    text, audit = TransformPipeline(transformers).run("\n".join(lines))
-    return text.split("\n"), audit
-
-
-def _print_transform_audit(audit: list[TransformAudit]) -> None:
-    for stage in audit:
-        if stage.name == "opencc":
-            profile = stage.metadata.get("profile", "unknown")
-            print(f"Transformation: OpenCC ({profile})")
-        elif stage.name == "punctuation":
-            print("Transformation: Punctuation")
-        elif stage.name == "junk_cleaner":
-            print("Transformation: Junk Cleaner")
-        for warning in stage.warnings:
-            print(f"WARNING: {stage.name}: {warning}", file=sys.stderr)
-
-
-def build(args: argparse.Namespace) -> int:
-    try:
-        lines, encoding = read_lines(args.input, args.encoding)
-        lines = [normalize_line(line) for line in lines]
-        lines, audit = _run_transformations(lines, args)
-        result = parse_lines(
-            lines,
-            title=args.title,
-            author=args.author,
-            language=args.lang,
-            cover=args.cover,
-            # Keep build() compatible with callers that construct a Namespace
-            # directly instead of going through argparse.
-            paragraph_mode=getattr(args, "paragraph_mode", "wrapped"),
-        )
-        report = validate_book(result.book, result.warnings)
-        if report.errors:
-            for error in report.errors:
-                print(f"ERROR: {error}", file=sys.stderr)
-            return 2
-
-        print(f"Encoding: {encoding}")
-        print(f"Book: {result.book.title}")
-        print(f"Author: {result.book.author}")
-        print(f"Volumes: {len(result.book.volumes)}")
-        print(f"Chapters: {result.book.chapter_count}")
-        print(f"Paragraphs: {result.book.paragraph_count}")
-        transformation_warning_count = sum(len(stage.warnings) for stage in audit)
-        print(f"Warnings: {len(result.warnings) + transformation_warning_count}")
-        _print_transform_audit(audit)
-        for warning in result.warnings:
-            where = f" at line {warning.line}" if warning.line else ""
-            print(f"WARNING: {warning.message}{where}", file=sys.stderr)
-
-        if args.keep_intermediate:
-            intermediate = Path(args.intermediate or Path(args.input).with_suffix("").name + ".intermediate")
-            write_intermediate(result.book, intermediate, transformations=audit)
-            print(f"Intermediate: {intermediate}")
-
-        output = Path(args.output) if args.output else Path(args.input).with_name(
-            f"{args.title}_{args.author}.epub"
-        )
-        render(result.book, output)
-        epub_errors = validate_epub(output)
-        if epub_errors:
-            for error in epub_errors:
-                print(f"ERROR: {error}", file=sys.stderr)
-            return 3
-        print(f"EPUB: {output}")
-        return 0
-    except TransformationError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
-    except (OSError, ValueError, UnicodeError) as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
-    except FileNotFoundError as exc:
-        print(f"ERROR: required executable or file not found: {exc}", file=sys.stderr)
-        return 1
+def build(request, *, keep_intermediate=False, intermediate=None):
+    """Execute a resolved conversion request."""
+    return execute(
+        request,
+        keep_intermediate=keep_intermediate,
+        intermediate=intermediate,
+    )
 
 
 def validate(args: argparse.Namespace) -> int:
@@ -135,27 +47,35 @@ def main() -> int:
     build_parser.add_argument("-o", "--output")
     build_parser.add_argument("-t", "--title", required=True)
     build_parser.add_argument("-a", "--author", required=True)
-    build_parser.add_argument("--lang", default="zh-CN")
+    build_parser.add_argument("--lang")
     build_parser.add_argument("--cover")
     build_parser.add_argument("--encoding")
     build_parser.add_argument("--keep-intermediate", action="store_true")
     build_parser.add_argument("--intermediate")
-    build_parser.add_argument("--opencc-profile", default="s2twp", choices=OpenCCTransformer.available_profiles())
-    build_parser.add_argument("--no-opencc", dest="opencc", action="store_false")
-    build_parser.add_argument("--no-punctuation", dest="punctuation", action="store_false")
-    build_parser.add_argument("--full-source", action="store_true")
+    build_parser.add_argument(
+        "--opencc-profile",
+        choices=OpenCCTransformer.available_profiles(),
+    )
+    build_parser.add_argument("--no-opencc", dest="opencc", action="store_false", default=None)
+    build_parser.add_argument("--no-punctuation", dest="punctuation", action="store_false", default=None)
+    build_parser.add_argument("--full-source", action="store_true", default=None)
     build_parser.add_argument(
         "--paragraph-mode",
         choices=("wrapped", "line"),
-        default="wrapped",
         help="paragraph boundary semantics: blank-line wrapped paragraphs or one source line per paragraph",
     )
-    build_parser.set_defaults(func=build, opencc=True, punctuation=True, full_source=False)
 
     validate_parser = sub.add_parser("validate", help="validate an EPUB archive")
     validate_parser.add_argument("epub")
     validate_parser.set_defaults(func=validate)
     args = parser.parse_args()
+    if args.command == "build":
+        request = resolve_conversion_request(namespace_to_inputs(args))
+        return build(
+            request,
+            keep_intermediate=args.keep_intermediate,
+            intermediate=args.intermediate,
+        )
     return args.func(args)
 
 
