@@ -8,8 +8,8 @@ from novel_epub.transforms import TransformAudit, TransformationError
 
 def _build_request(tmp_path, **overrides):
     values = {
-        "input": str(tmp_path / "book.txt"),
-        "output": str(tmp_path / "book.epub"),
+        "source": str(tmp_path / "book.txt"),
+        "destination": str(tmp_path / "book.epub"),
         "title": "書名",
         "author": "作者",
         "lang": "zh-CN",
@@ -218,6 +218,8 @@ def test_main_uses_cli_adapter_and_resolver(monkeypatch):
     )
 
     assert main() == 0
+    assert captured["values"]["source"] == "book.txt"
+    assert captured["values"]["destination"] is None
     assert captured["values"]["opencc_profile"] == "s2t"
     assert captured["values"]["opencc"] is False
     assert captured["values"]["punctuation"] is False
@@ -244,6 +246,7 @@ def test_namespace_adapter_keeps_cli_omissions_distinguishable():
         paragraph_mode=None,
     )
     values = namespace_to_inputs(args)
-    assert values["output"] is None
+    assert values["source"] == "book.txt"
+    assert values["destination"] is None
     assert values["opencc"] is None
     assert values["paragraph_mode"] is None
