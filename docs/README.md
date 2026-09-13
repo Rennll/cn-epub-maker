@@ -16,6 +16,18 @@ When information changes responsibility or becomes part of a more stable contrac
 
 Source code and tests are the canonical source for implemented behavior. Documentation is the canonical source for durable intent, requirements, constraints, and design rationale. These sources answer different questions and may temporarily differ; a conflict should be made explicit and resolved rather than hidden by choosing one source as universally higher priority.
 
+## Session Entry Point
+
+This document is the entry point for continued development sessions.
+
+Before starting technical work, inspect the relevant documents in `docs/`, especially existing contracts, architecture decisions, and the current session handoff. Treat those documents as the current project context rather than re-opening decisions that have already been established.
+
+When a technical detail can be reasonably derived from an existing decision, continue by deriving it. Do not escalate derivations unnecessarily.
+
+If a new decision has multiple reasonable architectural directions that cannot be determined from the existing project context, stop and present the relevant trade-offs before proceeding.
+
+Project-specific architecture, contracts, decisions, and ongoing context belong in `docs/`. This entry point does not replace those documents and should remain lightweight.
+
 ## Information Retention Rules
 
 ### Keep
