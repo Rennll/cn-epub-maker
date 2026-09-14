@@ -41,6 +41,31 @@ def test_analysis_counts_patterns_and_transitions_without_semantic_labels():
     assert not hasattr(analysis, "paragraphs")
 
 
+def test_analysis_preserves_ascii_patterns_and_does_not_cross_blank_runs():
+    document = build_physical_document([
+        " A",
+        "  B",
+        "",
+        "  C",
+        "  D",
+    ])
+    analysis = analyze_document(document)
+
+    assert [line.leading_pattern for line in document.lines if not line.blank] == [
+        "ASCII_SPACE_x1",
+        "ASCII_SPACE_x2",
+        "ASCII_SPACE_x2",
+        "ASCII_SPACE_x2",
+    ]
+    assert {(x.from_pattern, x.to_pattern, x.count) for x in analysis.transitions} == {
+        ("ASCII_SPACE_x1", "ASCII_SPACE_x2", 1),
+        ("ASCII_SPACE_x2", "ASCII_SPACE_x2", 2),
+    }
+    assert analysis.blank_line_runs[0].length == 1
+    assert analysis.blank_line_runs[0].preceding_block == 0
+    assert analysis.blank_line_runs[0].following_block == 1
+
+
 def test_analysis_is_deterministic():
     lines = ["A", "", "\tB", "C", "", "", "D"]
     assert analyze_document(build_physical_document(lines)) == analyze_document(build_physical_document(lines))
