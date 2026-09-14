@@ -124,6 +124,16 @@ Canonical V2.x application configuration and execution-boundary contract, includ
 
 Canonical V2.x typography and layout semantics, including paragraph-boundary semantics, hard line breaks, semantic rendering, chapter pagination intent, and presentation constraints.
 
+### Physical Document and Formatting Contract
+
+`physical-document-and-formatting-contract.md`
+
+Implementation-independent contract for physical document structure, Document Analysis, the Document Formatting Model, and the evidence boundary between analysis and parsing.
+
+This document defines what Physical Lines, Physical Blocks, BlankLineRuns, and LeadingWhitespacePatterns are, and what Document Analysis may and must not classify. It is the canonical source for the evidence/decision boundary between Document Analysis and Parser. Semantic interpretation rules — paragraph modes, structural precedence, blank-run heuristics — belong here rather than in `architecture-overview.md` or version-specific decision documents.
+
+This contract was formalized in V2.x. The analytical behavior existed in earlier versions as internal parser logic; the explicit stage boundary and contract are new.
+
 ### Decision Register
 
 `deferred-decision-audit.md`
@@ -167,6 +177,8 @@ When a subject crosses version boundaries, prefer documenting the architecture i
 Requirements and decisions describe what the project intends to do. Source code and tests describe what the project currently does.
 
 If they disagree, do not treat either side as universally higher priority. Identify the difference and decide whether the requirement/documentation or the implementation should change.
+
+If the conflict touches an existing contract or an architectural boundary, stop and surface the details rather than resolving it unilaterally.
 
 Once the difference is resolved, update the relevant canonical source and tests so that the intended contract and implemented behavior are clear and consistent.
 
