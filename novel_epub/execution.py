@@ -135,7 +135,8 @@ def execute(
         execution.book_summary = _book_summary(result.book)
         report = validate_book(result.book, result.warnings)
         execution.validation = report
-        execution.warnings = _warning_messages(audit, report.warnings)
+        validation_warnings = getattr(report, "warnings", [])
+        execution.warnings = _warning_messages(audit, validation_warnings)
         if report.errors:
             execution.return_code = 2
             execution.errors = list(report.errors)
