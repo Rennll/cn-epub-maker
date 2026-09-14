@@ -11,16 +11,26 @@ from .validator import run_epubcheck, validate_epub
 
 
 def _report_execution(result: ExecutionResult) -> None:
-    if result.book_summary:
-        print(f"Encoding: {result.encoding}")
-        print(f"Book: {result.book_summary['title']}")
-        print(f"Author: {result.book_summary['author']}")
-        print(f"Volumes: {result.book_summary['volumes']}")
-        print(f"Chapters: {result.book_summary['chapters']}")
-        print(f"Paragraphs: {result.book_summary['paragraphs']}")
-        print(f"Warnings: {len(result.warnings)}")
+    book_summary = getattr(result, "book_summary", {})
+    warnings = getattr(result, "warnings", [])
+    audit = getattr(result, "audit", [])
+    validation = getattr(result, "validation", None)
+    errors = getattr(result, "errors", [])
+    intermediate_path = getattr(result, "intermediate_path", None)
+    epub_path = getattr(result, "epub_path", None)
+    return_code = getattr(result, "return_code", 1)
+    encoding = getattr(result, "encoding", "")
 
-    for stage in result.audit:
+    if book_summary:
+        print(f"Encoding: {encoding}")
+        print(f"Book: {book_summary['title']}")
+        print(f"Author: {book_summary['author']}")
+        print(f"Volumes: {book_summary['volumes']}")
+        print(f"Chapters: {book_summary['chapters']}")
+        print(f"Paragraphs: {book_summary['paragraphs']}")
+        print(f"Warnings: {len(warnings)}")
+
+    for stage in audit:
         if stage.name == "opencc":
             print(f"Transformation: OpenCC ({stage.metadata.get('profile', 'unknown')})")
         elif stage.name == "punctuation":
@@ -30,17 +40,17 @@ def _report_execution(result: ExecutionResult) -> None:
         for warning in stage.warnings:
             print(f"WARNING: {stage.name}: {warning}", file=sys.stderr)
 
-    for warning in result.validation.warnings if result.validation else []:
+    for warning in validation.warnings if validation else []:
         where = f" at line {warning.line}" if warning.line else ""
         print(f"WARNING: {warning.message}{where}", file=sys.stderr)
 
-    for error in result.errors:
+    for error in errors:
         print(f"ERROR: {error}", file=sys.stderr)
 
-    if result.intermediate_path is not None:
-        print(f"Intermediate: {result.intermediate_path}")
-    if result.epub_path is not None and result.return_code == 0:
-        print(f"EPUB: {result.epub_path}")
+    if intermediate_path is not None:
+        print(f"Intermediate: {intermediate_path}")
+    if epub_path is not None and return_code == 0:
+        print(f"EPUB: {epub_path}")
 
 
 def build(request, *, keep_intermediate=False, intermediate=None):
