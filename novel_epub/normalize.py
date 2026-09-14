@@ -31,5 +31,5 @@ def read_lines(path: str | Path, encoding: str | None = None) -> tuple[list[str]
 
 
 def normalize_line(line: str) -> str:
-    """Canonicalize a physical line without discarding formatting evidence."""
-    return line
+    """Return the semantic line form used by the legacy parser API."""
+    return line.lstrip("\u3000")
