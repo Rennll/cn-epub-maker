@@ -10,7 +10,7 @@ from .intermediate import write_intermediate
 from .normalize import read_lines
 from .parser import parse_lines
 from .physical import build_physical_document
-from .renderers.pandoc import render
+from .renderers.pandoc import RenderingError, render
 from .transforms import (
     JunkCleaner,
     OpenCCTransformer,
@@ -161,6 +161,8 @@ def execute(
         execution.return_code = 0
         return execution
     except TransformationError as exc:
+        execution.errors = [str(exc)]
+    except RenderingError as exc:
         execution.errors = [str(exc)]
     except FileNotFoundError as exc:
         execution.errors = [f"required executable or file not found: {exc}"]
