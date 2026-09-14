@@ -137,7 +137,7 @@ def test_execute_builds_physical_document_from_transformed_lines(tmp_path, monke
     result = execute(request)
 
     assert result.return_code == 0
-    assert captured["lines"] == ["", "正文"]
-    assert [line.text for line in captured["physical_document"].lines] == ["", "正文"]
+    assert captured["lines"] == ["正文", ""]
+    assert [line.text for line in captured["physical_document"].lines] == ["正文", ""]
     assert result.audit[0].name == "junk_cleaner"
     assert result.audit[0].changed is True
