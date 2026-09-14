@@ -42,21 +42,21 @@ def _boundary_for_blank_run(blank_count: int) -> ParagraphBoundary:
         return ParagraphBoundary.EXPANDED
     return ParagraphBoundary.NORMAL
 
-def parse_lines(
-    lines: list[str], *, title: str, author: str, language: str = "zh-CN",
+def parse_document(
+    document: PhysicalDocument, *, title: str, author: str, language: str = "zh-CN",
     cover: str | None = None, volume_pattern: str = DEFAULT_VOLUME_PATTERN,
     chapter_pattern: str = DEFAULT_CHAPTER_PATTERN,
-    paragraph_mode: ParagraphMode = "wrapped", physical_document: PhysicalDocument | None = None,
-    analysis: DocumentAnalysis | None = None,
+    paragraph_mode: ParagraphMode = "wrapped", analysis: DocumentAnalysis | None = None,
 ) -> ParseResult:
-    """Parse a shared physical document using formatting analysis as evidence."""
+    """Parse the shared physical document; semantic normalization is parser-local."""
     if paragraph_mode not in {"wrapped", "line"}:
         raise ValueError(f"unsupported paragraph mode: {paragraph_mode}")
-    document = physical_document or build_physical_document([normalize_line(line) for line in lines])
     if analysis is None:
         analysis = analyze_document(document)
-    lines = [line.text for line in document.lines]
+    elif analysis.metadata.physical_line_count != len(document.lines):
+        raise ValueError("analysis does not describe the supplied physical document")
 
+    lines = [line.text for line in document.lines]
     volume_re = re.compile(volume_pattern)
     chapter_re = re.compile(chapter_pattern)
     extra_re = re.compile(DEFAULT_EXTRA_PATTERN)
@@ -112,7 +112,8 @@ def parse_lines(
         current_chapter = Chapter(sequence=chapter_sequence, number=number, label=label, title=chapter_title)
         (current_volume.chapters if current_volume is not None else book.chapters).append(current_chapter)
 
-    for line_no, line in enumerate(lines, 1):
+    for line_no, raw_line in enumerate(lines, 1):
+        line = normalize_line(raw_line).rstrip()
         stripped = line.strip()
         if not stripped:
             flush_current(); pending_blank_count += 1; continue
@@ -151,3 +152,19 @@ def parse_lines(
     flush_current()
     if not book.chapter_count: warnings.append(WarningItem("no_chapters", 0, "no chapters were detected"))
     return ParseResult(book=book, warnings=warnings, analysis=analysis)
+
+
+def parse_lines(
+    lines: list[str], *, title: str, author: str, language: str = "zh-CN",
+    cover: str | None = None, volume_pattern: str = DEFAULT_VOLUME_PATTERN,
+    chapter_pattern: str = DEFAULT_CHAPTER_PATTERN,
+    paragraph_mode: ParagraphMode = "wrapped", physical_document: PhysicalDocument | None = None,
+    analysis: DocumentAnalysis | None = None,
+) -> ParseResult:
+    """Compatibility wrapper around the shared physical-document parser."""
+    document = physical_document or build_physical_document(lines)
+    return parse_document(
+        document, title=title, author=author, language=language, cover=cover,
+        volume_pattern=volume_pattern, chapter_pattern=chapter_pattern,
+        paragraph_mode=paragraph_mode, analysis=analysis,
+    )
