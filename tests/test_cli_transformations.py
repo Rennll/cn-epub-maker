@@ -141,6 +141,8 @@ def test_build_passes_physical_document_and_analysis_to_parser(tmp_path, monkeyp
 
     def fake_parse_lines(lines, **kwargs):
         captured["kwargs"] = kwargs
+        captured["physical_document"] = kwargs["physical_document"]
+        captured["analysis"] = kwargs["analysis"]
         return SimpleNamespace(
             book=SimpleNamespace(
                 title=kwargs["title"],
