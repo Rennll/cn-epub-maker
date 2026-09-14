@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .analysis import analyze_document
@@ -19,7 +19,43 @@ from .transforms import (
     TransformPipeline,
     TransformationError,
 )
-from .validator import validate_book, validate_epub
+from .validator import ValidationReport, validate_book, validate_epub
+
+
+@dataclass(frozen=True)
+class BookSummary:
+    title: str
+    author: str
+    volumes: int
+    chapters: int
+    paragraphs: int
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "title": self.title,
+            "author": self.author,
+            "volumes": self.volumes,
+            "chapters": self.chapters,
+            "paragraphs": self.paragraphs,
+        }
+
+
+@dataclass
+class ExecutionResult:
+    return_code: int
+    encoding: str = ""
+    book_summary: dict[str, object] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
+    audit: list[TransformAudit] = field(default_factory=list)
+    epub_path: Path | None = None
+    intermediate_path: Path | None = None
+    errors: list[str] = field(default_factory=list)
+    validation: ValidationReport | None = None
+    epub_validation_errors: list[str] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return self.return_code == 0
 
 
 def _run_transformations(
@@ -41,19 +77,23 @@ def _run_transformations(
     return text.split("\n"), audit
 
 
-def _print_transform_audit(audit: list[TransformAudit]) -> None:
-    for stage in audit:
-        if stage.name == "opencc":
-            print(
-                f"Transformation: OpenCC ({stage.metadata.get('profile', 'unknown')})"
-            )
-        elif stage.name == "punctuation":
-            print("Transformation: Punctuation")
-        elif stage.name == "junk_cleaner":
-            print("Transformation: Junk Cleaner")
+def _book_summary(book) -> dict[str, object]:
+    return BookSummary(
+        title=book.title,
+        author=book.author,
+        volumes=len(book.volumes),
+        chapters=book.chapter_count,
+        paragraphs=book.paragraph_count,
+    ).to_dict()
 
-        for warning in stage.warnings:
-            print(f"WARNING: {stage.name}: {warning}", file=sys.stderr)
+
+def _warning_messages(audit: list[TransformAudit], warnings) -> list[str]:
+    messages = [f"{stage.name}: {warning}" for stage in audit for warning in stage.warnings]
+    messages.extend(
+        f"{warning.message}{f' at line {warning.line}' if warning.line else ''}"
+        for warning in warnings
+    )
+    return messages
 
 
 def execute(
@@ -61,21 +101,23 @@ def execute(
     *,
     keep_intermediate: bool = False,
     intermediate: str | None = None,
-) -> int:
+) -> ExecutionResult:
+    """Execute a conversion without producing console output side effects."""
+    execution = ExecutionResult(return_code=1)
     try:
         requested_encoding = (
             None if request.policy.encoding == "auto" else request.policy.encoding
         )
         lines, encoding = read_lines(request.source, requested_encoding)
+        execution.encoding = encoding
         lines, audit = _run_transformations(
             lines,
             request.policy.transformations,
             full_source=request.policy.full_source,
         )
+        execution.audit = audit
 
         # PhysicalDocument is the single shared post-transformation representation.
-        # Do not call normalize_line here: its legacy semantic view intentionally
-        # removes leading ideographic spaces, which are formatting evidence for #34.
         physical_document = build_physical_document(lines)
         analysis = analyze_document(physical_document)
         formatting_model = build_formatting_model(physical_document, analysis)
@@ -90,47 +132,37 @@ def execute(
             analysis=analysis,
             formatting_model=formatting_model,
         )
+        execution.book_summary = _book_summary(result.book)
         report = validate_book(result.book, result.warnings)
+        execution.validation = report
+        execution.warnings = _warning_messages(audit, report.warnings)
         if report.errors:
-            for error in report.errors:
-                print(f"ERROR: {error}", file=sys.stderr)
-            return 2
-
-        print(f"Encoding: {encoding}")
-        print(f"Book: {result.book.title}")
-        print(f"Author: {result.book.author}")
-        print(f"Volumes: {len(result.book.volumes)}")
-        print(f"Chapters: {result.book.chapter_count}")
-        print(f"Paragraphs: {result.book.paragraph_count}")
-        transformation_warning_count = sum(len(stage.warnings) for stage in audit)
-        print(f"Warnings: {len(result.warnings) + transformation_warning_count}")
-        _print_transform_audit(audit)
-        for warning in result.warnings:
-            where = f" at line {warning.line}" if warning.line else ""
-            print(f"WARNING: {warning.message}{where}", file=sys.stderr)
+            execution.return_code = 2
+            execution.errors = list(report.errors)
+            return execution
 
         if keep_intermediate:
             intermediate_path = Path(
                 intermediate or Path(request.source).with_suffix("").name + ".intermediate"
             )
-            write_intermediate(result.book, intermediate_path, transformations=audit)
-            print(f"Intermediate: {intermediate_path}")
+            execution.intermediate_path = write_intermediate(
+                result.book, intermediate_path, transformations=audit
+            )
 
         render(result.book, request.destination)
-        epub_errors = validate_epub(request.destination)
-        if epub_errors:
-            for error in epub_errors:
-                print(f"ERROR: {error}", file=sys.stderr)
-            return 3
+        execution.epub_path = Path(request.destination)
+        execution.epub_validation_errors = validate_epub(request.destination)
+        if execution.epub_validation_errors:
+            execution.return_code = 3
+            execution.errors = list(execution.epub_validation_errors)
+            return execution
 
-        print(f"EPUB: {request.destination}")
-        return 0
+        execution.return_code = 0
+        return execution
     except TransformationError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
+        execution.errors = [str(exc)]
     except FileNotFoundError as exc:
-        print(f"ERROR: required executable or file not found: {exc}", file=sys.stderr)
-        return 1
+        execution.errors = [f"required executable or file not found: {exc}"]
     except (OSError, ValueError, UnicodeError) as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
+        execution.errors = [str(exc)]
+    return execution
