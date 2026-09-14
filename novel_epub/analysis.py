@@ -1,12 +1,14 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .physical import PhysicalDocument
+
 
 @dataclass(frozen=True)
 class AnalysisMetadata:
     physical_line_count: int
     nonblank_line_count: int
     blank_line_count: int
+
 
 @dataclass(frozen=True)
 class PhysicalBlockEvidence:
@@ -15,11 +17,13 @@ class PhysicalBlockEvidence:
     first_format: str
     last_format: str
 
+
 @dataclass(frozen=True)
 class BlankLineRunEvidence:
     length: int
     preceding_block: int | None
     following_block: int | None
+
 
 @dataclass(frozen=True)
 class FormattingPatternStatistics:
@@ -28,11 +32,13 @@ class FormattingPatternStatistics:
     block_start_count: int
     block_end_count: int
 
+
 @dataclass(frozen=True)
 class FormattingTransitionStatistics:
     from_pattern: str
     to_pattern: str
     count: int
+
 
 @dataclass(frozen=True)
 class DocumentAnalysis:
@@ -41,6 +47,7 @@ class DocumentAnalysis:
     blank_line_runs: tuple[BlankLineRunEvidence, ...]
     patterns: tuple[FormattingPatternStatistics, ...]
     transitions: tuple[FormattingTransitionStatistics, ...]
+    _document_identity: int = field(repr=False, compare=False)
 
 
 def analyze_document(document: PhysicalDocument) -> DocumentAnalysis:
@@ -87,4 +94,5 @@ def analyze_document(document: PhysicalDocument) -> DocumentAnalysis:
         blank_line_runs=blank_evidence,
         patterns=patterns,
         transitions=transition_stats,
+        _document_identity=id(document),
     )
