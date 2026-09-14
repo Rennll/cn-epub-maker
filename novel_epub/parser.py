@@ -153,6 +153,9 @@ def parse_document(
             preamble_paragraph_lines.append(stripped)
             if paragraph_mode == "line": flush_preamble_paragraph()
             continue
+        # PhysicalDocument retains the original leading whitespace as evidence;
+        # paragraph text is a parser-local semantic view, so leading/trailing
+        # whitespace is intentionally stripped before building Paragraph objects.
         paragraph_lines.append(stripped)
         if stripped.startswith("第") and re.search(r"[章集篇回]", stripped):
             warnings.append(WarningItem("suspicious_chapter_heading", line_no, f"possible chapter heading not matched: {stripped[:80]}"))
