@@ -33,6 +33,8 @@ def _stub_build_dependencies(monkeypatch, captured, source_lines=None):
 
     def fake_parse_lines(lines, **kwargs):
         captured["lines"] = lines
+        captured["physical_document"] = kwargs.get("physical_document")
+        captured["analysis"] = kwargs.get("analysis")
         return SimpleNamespace(
             book=SimpleNamespace(
                 title=kwargs["title"],
@@ -74,7 +76,7 @@ def test_build_full_source_disables_content_transformations(tmp_path, monkeypatc
     assert captured["lines"] == ["简体,中文"]
 
 
-def test_build_preserves_newlines_and_normalizes_before_parser(tmp_path, monkeypatch):
+def test_build_preserves_newlines_and_physical_whitespace_before_parser(tmp_path, monkeypatch):
     captured = {}
     _stub_build_dependencies(
         monkeypatch,
@@ -86,6 +88,8 @@ def test_build_preserves_newlines_and_normalizes_before_parser(tmp_path, monkeyp
         from novel_epub.parser import parse_lines
 
         captured["lines"] = lines
+        captured["physical_document"] = kwargs["physical_document"]
+        captured["analysis"] = kwargs["analysis"]
         result = parse_lines(
             lines,
             title=kwargs["title"],
@@ -99,7 +103,10 @@ def test_build_preserves_newlines_and_normalizes_before_parser(tmp_path, monkeyp
 
     monkeypatch.setattr("novel_epub.execution.parse_lines", fake_parse_lines)
     assert build(_build_request(tmp_path, full_source=True)) == 0
-    assert captured["lines"] == ["第一行", "第二行", "", "第三行", "", "第四行"]
+    assert captured["lines"] == ["　第一行", "　第二行", "", "第三行", "", "第四行"]
+    assert captured["physical_document"] is not None
+    assert captured["analysis"] is not None
+    assert [line.text for line in captured["physical_document"].lines] == captured["lines"]
     assert captured["paragraphs"] == ["第一行\n第二行", "第三行", "第四行"]
 
 
@@ -127,7 +134,7 @@ def test_build_uses_runtime_detected_encoding_without_mutating_request(tmp_path,
     assert request.policy.encoding == "auto"
 
 
-def test_build_passes_only_relevant_data_to_parser(tmp_path, monkeypatch):
+def test_build_passes_physical_document_and_analysis_to_parser(tmp_path, monkeypatch):
     captured = {}
     _stub_build_dependencies(monkeypatch, captured)
     request = _build_request(tmp_path, paragraph_mode="line")
@@ -147,13 +154,14 @@ def test_build_passes_only_relevant_data_to_parser(tmp_path, monkeypatch):
 
     monkeypatch.setattr("novel_epub.execution.parse_lines", fake_parse_lines)
     assert build(request) == 0
-    assert captured["kwargs"] == {
-        "title": "書名",
-        "author": "作者",
-        "language": "zh-CN",
-        "cover": None,
-        "paragraph_mode": "line",
-    }
+    assert captured["kwargs"]["title"] == "書名"
+    assert captured["kwargs"]["author"] == "作者"
+    assert captured["kwargs"]["language"] == "zh-CN"
+    assert captured["kwargs"]["cover"] is None
+    assert captured["kwargs"]["paragraph_mode"] == "line"
+    assert captured["kwargs"]["physical_document"] is captured["physical_document"]
+    assert captured["kwargs"]["analysis"] is captured["analysis"]
+    assert captured["kwargs"]["analysis"].metadata.physical_line_count == len(captured["physical_document"].lines)
 
 
 def test_build_reports_transformation_error(tmp_path, monkeypatch, capsys):
