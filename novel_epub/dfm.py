@@ -42,14 +42,7 @@ def build_formatting_model(
     analysis: DocumentAnalysis,
 ) -> DocumentFormattingModel:
     """Build a formatting model without introducing semantic boundaries."""
-    if analysis.metadata.physical_line_count != len(document.lines):
-        raise ValueError("analysis must describe the same PhysicalDocument")
-
-    # Analysis is derived from the document, but line counts alone cannot
-    # prove object identity. Re-analyze and compare the complete evidence so
-    # an analysis from a different document cannot be silently paired with it.
-    expected = __import__("novel_epub.analysis", fromlist=["analyze_document"]).analyze_document(document)
-    if analysis != expected:
+    if analysis._document_identity != id(document):
         raise ValueError("analysis must describe the same PhysicalDocument")
 
     return DocumentFormattingModel(physical_document=document, analysis=analysis)
