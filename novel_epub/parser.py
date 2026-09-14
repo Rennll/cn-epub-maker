@@ -6,6 +6,7 @@ from typing import Literal
 
 from .analysis import DocumentAnalysis, analyze_document
 from .chinese_numerals import chinese_numeral_to_int
+from .dfm import DocumentFormattingModel, build_formatting_model
 from .models import Book, Chapter, Paragraph, ParagraphBoundary, Volume
 from .normalize import normalize_line
 from .physical import PhysicalDocument, build_physical_document
@@ -26,6 +27,7 @@ class ParseResult:
     book: Book
     warnings: list[WarningItem]
     analysis: DocumentAnalysis | None = None
+    formatting_model: DocumentFormattingModel | None = None
 
 def _parse_number(raw: str) -> int | None:
     value = raw.strip().replace(" ", "").replace("　", "")
@@ -47,14 +49,21 @@ def parse_document(
     cover: str | None = None, volume_pattern: str = DEFAULT_VOLUME_PATTERN,
     chapter_pattern: str = DEFAULT_CHAPTER_PATTERN,
     paragraph_mode: ParagraphMode = "wrapped", analysis: DocumentAnalysis | None = None,
+    formatting_model: DocumentFormattingModel | None = None,
 ) -> ParseResult:
     """Parse the shared physical document; semantic normalization is parser-local."""
     if paragraph_mode not in {"wrapped", "line"}:
         raise ValueError(f"unsupported paragraph mode: {paragraph_mode}")
-    if analysis is None:
-        analysis = analyze_document(document)
-    elif analysis.metadata.physical_line_count != len(document.lines):
-        raise ValueError("analysis does not describe the supplied physical document")
+    if formatting_model is None:
+        if analysis is None:
+            analysis = analyze_document(document)
+        formatting_model = build_formatting_model(document, analysis)
+    else:
+        if formatting_model.physical_document is not document:
+            raise ValueError("formatting_model must use the supplied PhysicalDocument")
+        if analysis is not None and formatting_model.analysis is not analysis:
+            raise ValueError("formatting_model must use the supplied DocumentAnalysis")
+        analysis = formatting_model.analysis
 
     lines = [line.text for line in document.lines]
     volume_re = re.compile(volume_pattern)
@@ -151,7 +160,7 @@ def parse_document(
 
     flush_current()
     if not book.chapter_count: warnings.append(WarningItem("no_chapters", 0, "no chapters were detected"))
-    return ParseResult(book=book, warnings=warnings, analysis=analysis)
+    return ParseResult(book=book, warnings=warnings, analysis=analysis, formatting_model=formatting_model)
 
 
 def parse_lines(
@@ -159,12 +168,12 @@ def parse_lines(
     cover: str | None = None, volume_pattern: str = DEFAULT_VOLUME_PATTERN,
     chapter_pattern: str = DEFAULT_CHAPTER_PATTERN,
     paragraph_mode: ParagraphMode = "wrapped", physical_document: PhysicalDocument | None = None,
-    analysis: DocumentAnalysis | None = None,
+    analysis: DocumentAnalysis | None = None, formatting_model: DocumentFormattingModel | None = None,
 ) -> ParseResult:
     """Compatibility wrapper around the shared physical-document parser."""
     document = physical_document or build_physical_document(lines)
     return parse_document(
         document, title=title, author=author, language=language, cover=cover,
         volume_pattern=volume_pattern, chapter_pattern=chapter_pattern,
-        paragraph_mode=paragraph_mode, analysis=analysis,
+        paragraph_mode=paragraph_mode, analysis=analysis, formatting_model=formatting_model,
     )
