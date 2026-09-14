@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import Path
 
 COMMON_ENCODINGS = ("utf-8-sig", "utf-8", "gb18030", "gbk", "big5")
@@ -33,6 +31,5 @@ def read_lines(path: str | Path, encoding: str | None = None) -> tuple[list[str]
 
 
 def normalize_line(line: str) -> str:
-    # Formatting indentation in common Chinese TXT exports is represented by
-    # ideographic spaces. Remove only those at the beginning; preserve content.
-    return line.lstrip("\u3000")
+    """Return a representation-normalized physical line without discarding whitespace evidence."""
+    return line

@@ -5,8 +5,8 @@ import pytest
 from novel_epub.normalize import detect_encoding, read_lines, normalize_line
 
 
-def test_normalize_removes_only_leading_ideographic_spaces():
-    assert normalize_line("　　正文　保留") == "正文　保留"
+def test_normalize_preserves_leading_whitespace_evidence():
+    assert normalize_line("　　正文　保留") == "　　正文　保留"
 
 
 def test_utf8_bom_is_detected(tmp_path: Path):

@@ -3,10 +3,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from .analysis import analyze_document
 from .configuration import ConversionRequest, TransformationPolicy
+from .dfm import build_formatting_model
 from .intermediate import write_intermediate
-from .normalize import normalize_line, read_lines
+from .normalize import read_lines
 from .parser import parse_lines
+from .physical import build_physical_document
 from .renderers.pandoc import render
 from .transforms import (
     JunkCleaner,
@@ -41,12 +44,14 @@ def _run_transformations(
 def _print_transform_audit(audit: list[TransformAudit]) -> None:
     for stage in audit:
         if stage.name == "opencc":
-            profile = stage.metadata.get("profile", "unknown")
-            print(f"Transformation: OpenCC ({profile})")
+            print(
+                f"Transformation: OpenCC ({stage.metadata.get('profile', 'unknown')})"
+            )
         elif stage.name == "punctuation":
             print("Transformation: Punctuation")
         elif stage.name == "junk_cleaner":
             print("Transformation: Junk Cleaner")
+
         for warning in stage.warnings:
             print(f"WARNING: {stage.name}: {warning}", file=sys.stderr)
 
@@ -58,14 +63,22 @@ def execute(
     intermediate: str | None = None,
 ) -> int:
     try:
-        requested_encoding = None if request.policy.encoding == "auto" else request.policy.encoding
+        requested_encoding = (
+            None if request.policy.encoding == "auto" else request.policy.encoding
+        )
         lines, encoding = read_lines(request.source, requested_encoding)
-        lines = [normalize_line(line) for line in lines]
         lines, audit = _run_transformations(
             lines,
             request.policy.transformations,
             full_source=request.policy.full_source,
         )
+
+        # PhysicalDocument is the single shared post-transformation representation.
+        # Do not call normalize_line here: its legacy semantic view intentionally
+        # removes leading ideographic spaces, which are formatting evidence for #34.
+        physical_document = build_physical_document(lines)
+        analysis = analyze_document(physical_document)
+        formatting_model = build_formatting_model(physical_document, analysis)
         result = parse_lines(
             lines,
             title=request.book_metadata.title,
@@ -73,6 +86,9 @@ def execute(
             language=request.book_metadata.language,
             cover=request.book_metadata.cover,
             paragraph_mode=request.policy.parser.paragraph_mode,
+            physical_document=physical_document,
+            analysis=analysis,
+            formatting_model=formatting_model,
         )
         report = validate_book(result.book, result.warnings)
         if report.errors:
@@ -106,6 +122,7 @@ def execute(
             for error in epub_errors:
                 print(f"ERROR: {error}", file=sys.stderr)
             return 3
+
         print(f"EPUB: {request.destination}")
         return 0
     except TransformationError as exc:
