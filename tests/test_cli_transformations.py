@@ -110,6 +110,39 @@ def test_build_preserves_newlines_and_physical_whitespace_before_parser(tmp_path
     assert captured["paragraphs"] == ["第一行\n第二行", "第三行", "第四行"]
 
 
+def test_full_source_build_passes_the_same_dfm_to_parser(tmp_path, monkeypatch):
+    captured = {}
+    _stub_build_dependencies(
+        monkeypatch,
+        captured,
+        source_lines=["　第一章", "正文", "", "　第二段"],
+    )
+
+    def fake_parse_lines(lines, **kwargs):
+        captured["physical_document"] = kwargs["physical_document"]
+        captured["analysis"] = kwargs["analysis"]
+        captured["formatting_model"] = kwargs["formatting_model"]
+        return SimpleNamespace(
+            book=SimpleNamespace(
+                title=kwargs["title"],
+                author=kwargs["author"],
+                volumes=[],
+                chapter_count=0,
+                paragraph_count=1,
+            ),
+            warnings=[],
+        )
+
+    monkeypatch.setattr("novel_epub.execution.parse_lines", fake_parse_lines)
+    assert build(_build_request(tmp_path, full_source=True)) == 0
+    assert captured["formatting_model"] is not None
+    assert captured["formatting_model"].physical_document is captured["physical_document"]
+    assert captured["formatting_model"].analysis is captured["analysis"]
+    assert [line.text for line in captured["physical_document"].lines] == [
+        "　第一章", "正文", "", "　第二段"
+    ]
+
+
 def test_build_passes_resolved_paragraph_mode(tmp_path, monkeypatch):
     captured = {}
     _stub_build_dependencies(monkeypatch, captured)
