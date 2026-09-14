@@ -6,7 +6,7 @@ from pathlib import Path
 from .analysis import analyze_document
 from .configuration import ConversionRequest, TransformationPolicy
 from .intermediate import write_intermediate
-from .normalize import normalize_line, read_lines
+from .normalize import read_lines
 from .parser import parse_lines
 from .physical import build_physical_document
 from .renderers.pandoc import render
@@ -36,8 +36,11 @@ def execute(request: ConversionRequest, *, keep_intermediate: bool = False, inte
     try:
         requested_encoding = None if request.policy.encoding == "auto" else request.policy.encoding
         lines, encoding = read_lines(request.source, requested_encoding)
-        lines = [normalize_line(line) for line in lines]
         lines, audit = _run_transformations(lines, request.policy.transformations, full_source=request.policy.full_source)
+
+        # PhysicalDocument is the single shared post-transformation representation.
+        # Do not call normalize_line here: its legacy semantic view intentionally
+        # removes leading ideographic spaces, which are formatting evidence for #34.
         physical_document = build_physical_document(lines)
         analysis = analyze_document(physical_document)
         result = parse_lines(
