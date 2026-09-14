@@ -5,18 +5,64 @@ import sys
 
 from .cli_adapter import namespace_to_inputs
 from .configuration_resolver import resolve_conversion_request
-from .execution import execute
+from .execution import ExecutionResult, execute
 from .transforms import OpenCCTransformer
 from .validator import run_epubcheck, validate_epub
 
 
+def _report_execution(result: ExecutionResult) -> None:
+    book_summary = getattr(result, "book_summary", {})
+    warnings = getattr(result, "warnings", [])
+    audit = getattr(result, "audit", [])
+    validation = getattr(result, "validation", None)
+    validation_warnings = getattr(validation, "warnings", []) if validation else []
+    errors = getattr(result, "errors", [])
+    intermediate_path = getattr(result, "intermediate_path", None)
+    epub_path = getattr(result, "epub_path", None)
+    return_code = getattr(result, "return_code", 1)
+    encoding = getattr(result, "encoding", "")
+
+    if book_summary:
+        print(f"Encoding: {encoding}")
+        print(f"Book: {book_summary['title']}")
+        print(f"Author: {book_summary['author']}")
+        print(f"Volumes: {book_summary['volumes']}")
+        print(f"Chapters: {book_summary['chapters']}")
+        print(f"Paragraphs: {book_summary['paragraphs']}")
+        print(f"Warnings: {len(warnings)}")
+
+    for stage in audit:
+        if stage.name == "opencc":
+            print(f"Transformation: OpenCC ({stage.metadata.get('profile', 'unknown')})")
+        elif stage.name == "punctuation":
+            print("Transformation: Punctuation")
+        elif stage.name == "junk_cleaner":
+            print("Transformation: Junk Cleaner")
+        for warning in stage.warnings:
+            print(f"WARNING: {stage.name}: {warning}", file=sys.stderr)
+
+    for warning in validation_warnings:
+        where = f" at line {warning.line}" if warning.line else ""
+        print(f"WARNING: {warning.message}{where}", file=sys.stderr)
+
+    for error in errors:
+        print(f"ERROR: {error}", file=sys.stderr)
+
+    if intermediate_path is not None:
+        print(f"Intermediate: {intermediate_path}")
+    if epub_path is not None and return_code == 0:
+        print(f"EPUB: {epub_path}")
+
+
 def build(request, *, keep_intermediate=False, intermediate=None):
-    """Execute a resolved conversion request."""
-    return execute(
+    """Execute a resolved conversion request and report its structured result."""
+    result = execute(
         request,
         keep_intermediate=keep_intermediate,
         intermediate=intermediate,
     )
+    _report_execution(result)
+    return result.return_code
 
 
 def validate(args: argparse.Namespace) -> int:
