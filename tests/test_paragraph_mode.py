@@ -4,8 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from novel_epub.analysis import analyze_document
+from novel_epub.dfm import build_formatting_model
 from novel_epub.normalize import read_lines
 from novel_epub.parser import parse_lines
+from novel_epub.physical import build_physical_document
 from novel_epub.renderers.pandoc import render
 
 
@@ -105,7 +108,22 @@ def test_txt_to_epub_pipeline_produces_paragraph_level_xhtml(tmp_path: Path):
     lines, encoding = read_lines(source, "utf-8")
     assert encoding == "utf-8"
 
-    result = parse_lines(lines, title="書", author="作者", paragraph_mode="line")
+    document = build_physical_document(lines)
+    analysis = analyze_document(document)
+    formatting_model = build_formatting_model(document, analysis)
+    result = parse_lines(
+        lines,
+        title="書",
+        author="作者",
+        paragraph_mode="line",
+        physical_document=document,
+        analysis=analysis,
+        formatting_model=formatting_model,
+    )
+    assert result.analysis is analysis
+    assert result.formatting_model is formatting_model
+    assert formatting_model.physical_document is document
+
     output = tmp_path / "book.epub"
     render(result.book, output)
 
