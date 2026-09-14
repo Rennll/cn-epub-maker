@@ -37,7 +37,9 @@ def _request(source: Path, destination: Path) -> ConversionRequest:
     )
 
 
-def test_execute_returns_structured_result_without_stdout_side_effects(tmp_path, monkeypatch, capsys):
+def test_execute_returns_structured_result_without_stdout_side_effects(
+    tmp_path, monkeypatch, capsys
+):
     source = tmp_path / "source.txt"
     destination = tmp_path / "book.epub"
     source.write_text("第1章\n\n正文\n", encoding="utf-8")
@@ -46,6 +48,7 @@ def test_execute_returns_structured_result_without_stdout_side_effects(tmp_path,
         "novel_epub.execution.render",
         lambda book, path: Path(path).write_bytes(b"epub"),
     )
+    monkeypatch.setattr("novel_epub.execution.validate_epub", lambda path: [])
 
     result = execute(_request(source, destination))
 
@@ -62,10 +65,10 @@ def test_execute_returns_structured_result_without_stdout_side_effects(tmp_path,
     assert result.epub_path == destination
     assert result.intermediate_path is None
     assert result.validation is not None
-    assert result.epub_validation_errors == [
-        "invalid EPUB archive: File is not a zip file"
-    ]
-    assert capsys.readouterr() == capsys.readouterr()
+    assert result.epub_validation_errors == []
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
 
 
 def test_execute_captures_errors_in_result_without_printing(tmp_path, capsys):
