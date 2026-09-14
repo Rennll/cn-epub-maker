@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .analysis import analyze_document
 from .configuration import ConversionRequest, TransformationPolicy
+from .dfm import build_formatting_model
 from .intermediate import write_intermediate
 from .normalize import read_lines
 from .parser import parse_lines
@@ -43,11 +44,13 @@ def execute(request: ConversionRequest, *, keep_intermediate: bool = False, inte
         # removes leading ideographic spaces, which are formatting evidence for #34.
         physical_document = build_physical_document(lines)
         analysis = analyze_document(physical_document)
+        formatting_model = build_formatting_model(physical_document, analysis)
         result = parse_lines(
             lines, title=request.book_metadata.title, author=request.book_metadata.author,
             language=request.book_metadata.language, cover=request.book_metadata.cover,
             paragraph_mode=request.policy.parser.paragraph_mode,
             physical_document=physical_document, analysis=analysis,
+            formatting_model=formatting_model,
         )
         report = validate_book(result.book, result.warnings)
         if report.errors:
