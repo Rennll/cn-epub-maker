@@ -5,18 +5,53 @@ import sys
 
 from .cli_adapter import namespace_to_inputs
 from .configuration_resolver import resolve_conversion_request
-from .execution import execute
+from .execution import ExecutionResult, execute
 from .transforms import OpenCCTransformer
 from .validator import run_epubcheck, validate_epub
 
 
+def _report_execution(result: ExecutionResult) -> None:
+    if result.book_summary:
+        print(f"Encoding: {result.encoding}")
+        print(f"Book: {result.book_summary['title']}")
+        print(f"Author: {result.book_summary['author']}")
+        print(f"Volumes: {result.book_summary['volumes']}")
+        print(f"Chapters: {result.book_summary['chapters']}")
+        print(f"Paragraphs: {result.book_summary['paragraphs']}")
+        print(f"Warnings: {len(result.warnings)}")
+
+    for stage in result.audit:
+        if stage.name == "opencc":
+            print(f"Transformation: OpenCC ({stage.metadata.get('profile', 'unknown')})")
+        elif stage.name == "punctuation":
+            print("Transformation: Punctuation")
+        elif stage.name == "junk_cleaner":
+            print("Transformation: Junk Cleaner")
+        for warning in stage.warnings:
+            print(f"WARNING: {stage.name}: {warning}", file=sys.stderr)
+
+    for warning in result.validation.warnings if result.validation else []:
+        where = f" at line {warning.line}" if warning.line else ""
+        print(f"WARNING: {warning.message}{where}", file=sys.stderr)
+
+    for error in result.errors:
+        print(f"ERROR: {error}", file=sys.stderr)
+
+    if result.intermediate_path is not None:
+        print(f"Intermediate: {result.intermediate_path}")
+    if result.epub_path is not None and result.return_code == 0:
+        print(f"EPUB: {result.epub_path}")
+
+
 def build(request, *, keep_intermediate=False, intermediate=None):
-    """Execute a resolved conversion request."""
-    return execute(
+    """Execute a resolved conversion request and report its structured result."""
+    result = execute(
         request,
         keep_intermediate=keep_intermediate,
         intermediate=intermediate,
     )
+    _report_execution(result)
+    return result.return_code
 
 
 def validate(args: argparse.Namespace) -> int:
