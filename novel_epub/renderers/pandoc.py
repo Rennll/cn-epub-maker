@@ -26,6 +26,29 @@ _NS_OPF = "http://www.idpf.org/2007/opf"
 _NS_DC = "http://purl.org/dc/elements/1.1/"
 
 
+class RenderingError(Exception):
+    """Fatal renderer failure after the book model has been validated."""
+
+
+def _run_pandoc(args: list[str]) -> None:
+    try:
+        subprocess.run(
+            args,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or "").strip()
+        suffix = f": {detail}" if detail else ""
+        raise RenderingError(
+            f"Pandoc rendering failed with exit code {exc.returncode}{suffix}"
+        ) from exc
+
+
 def _escape_markdown(text: str) -> str:
     return "  \n".join(_MARKDOWN_CHARS.sub(r"\\\1", line) for line in text.split("\n"))
 
@@ -112,14 +135,8 @@ def _pandoc_chapter(chapter: Chapter, destination: Path, language: str) -> None:
     source = destination.with_suffix(".md")
     fragment = destination.with_suffix(".html")
     source.write_text(_chapter_markdown(chapter), encoding="utf-8")
-    subprocess.run(
-        ["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)],
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
+    _run_pandoc(
+        ["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)]
     )
     body = fragment.read_text(encoding="utf-8").strip()
     body = _apply_paragraph_boundaries(body, chapter.paragraphs)
@@ -145,14 +162,8 @@ def _pandoc_preamble(book: Book, destination: Path) -> None:
     source = destination.with_suffix(".md")
     fragment = destination.with_suffix(".html")
     source.write_text(_preamble_markdown(book), encoding="utf-8")
-    subprocess.run(
-        ["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)],
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
+    _run_pandoc(
+        ["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)]
     )
     body = fragment.read_text(encoding="utf-8").strip()
     body = _apply_paragraph_boundaries(body, book.preamble)
