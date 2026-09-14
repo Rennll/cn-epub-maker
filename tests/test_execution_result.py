@@ -83,3 +83,45 @@ def test_execute_captures_errors_in_result_without_printing(tmp_path, capsys):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == ""
+
+
+def test_execute_builds_physical_document_from_transformed_lines(tmp_path, monkeypatch):
+    source = tmp_path / "source.txt"
+    destination = tmp_path / "book.epub"
+    source.write_text("  廣告\n  正文\n", encoding="utf-8")
+    request = _request(source, destination)
+    request.policy.transformations.junk_cleaner.rules = (
+        JunkCleanerConfig(rules=()).rules
+    )
+
+    captured = {}
+
+    def fake_parse_lines(lines, **kwargs):
+        captured["lines"] = lines
+        captured["physical_document"] = kwargs["physical_document"]
+        return type("ParseResult", (), {
+            "book": type("Book", (), {
+                "title": kwargs["title"],
+                "author": kwargs["author"],
+                "volumes": [],
+                "chapter_count": 0,
+                "paragraph_count": 1,
+            })(),
+            "warnings": [],
+        })()
+
+    monkeypatch.setattr("novel_epub.execution.parse_lines", fake_parse_lines)
+    monkeypatch.setattr(
+        "novel_epub.execution.validate_book",
+        lambda book, warnings: type("Report", (), {"errors": [], "warnings": []})(),
+    )
+    monkeypatch.setattr("novel_epub.execution.render", lambda book, path: None)
+    monkeypatch.setattr("novel_epub.execution.validate_epub", lambda path: [])
+
+    result = execute(request)
+
+    assert result.return_code == 0
+    assert captured["lines"] == ["  廣告", "  正文"]
+    assert [line.text for line in captured["physical_document"].lines] == [
+        "  廣告", "  正文"
+    ]
