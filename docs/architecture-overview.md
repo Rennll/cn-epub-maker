@@ -16,6 +16,12 @@ Normalize
 Transformations
  │
  ▼
+Document Analysis
+ │
+ ▼
+Document Formatting Model
+ │
+ ▼
 Parser
  │
  ▼
@@ -33,7 +39,7 @@ Validation
 
 The exact transformation set and presentation semantics may evolve. This overview defines the architectural roles and boundaries rather than a fixed implementation sequence for every version.
 
-The CLI is the orchestration layer around this pipeline. Conceptually it coordinates reading, normalization, transformation, parsing, model validation, optional Intermediate serialization, rendering, and EPUB validation; it does not own the semantics of those stages.
+The CLI is the orchestration layer around this pipeline. Conceptually it coordinates reading, normalization, transformation, document analysis, parsing, model validation, optional Intermediate serialization, rendering, and EPUB validation; it does not own the semantics of those stages.
 
 ## Architectural Evolution
 
@@ -79,12 +85,15 @@ V2.x refines the surrounding contracts without replacing the V1/V2 core. The mai
 
 V2.x is an evolution path, not a second pipeline. Version labels identify milestones or subject areas; they do not imply a new architecture for every version.
 
+V2.x also formalizes Document Analysis as an explicit stage between Transformations and Parser. The analytical behavior — observing physical line structure, blank-line runs, and leading-whitespace patterns — existed in V1 and V2 as internal parser logic. V2.x extracts it into a stage with an explicit contract and boundary: Document Analysis produces a Document Formatting Model that the Parser consumes as evidence, rather than performing this analysis ad hoc inside parsing. This contract is defined in `physical-document-and-formatting-contract.md`.
+
 Detailed contracts remain in the relevant design documents:
 
 - `v1-architecture-decisions.md` — V1-specific structural, parsing, Intermediate, EPUB, and non-goal decisions;
 - `v2-migration-and-design-decisions.md` — V2 transformation, migration, integration, and compatibility decisions;
 - `v2x-configuration-model.md` — V2.x application configuration and execution-boundary contract;
-- `v2x-typography-and-layout.md` — V2.x typography and layout semantics.
+- `v2x-typography-and-layout.md` — V2.x typography and layout semantics;
+- `physical-document-and-formatting-contract.md` — implementation-independent contract for physical document structure, Document Analysis, Document Formatting Model, and the evidence boundary between analysis and parsing. This is the canonical source for what Document Analysis may and must not classify.
 
 These documents should refine the architecture map rather than restate the complete pipeline or duplicate each other's responsibilities.
 
@@ -102,11 +111,25 @@ Transform source content without owning the structural book model.
 
 This stage contains content-oriented processing such as junk cleanup, script conversion, and punctuation conversion. Transformation behavior, ordering, configuration, and auditability are defined by the relevant transformation design documentation.
 
+### Document Analysis
+
+Observe the post-transformation Physical Document and produce formatting evidence without assigning semantic meaning.
+
+Document Analysis scans physical line structure, blank-line runs, leading-whitespace patterns, and formatting transitions. It summarizes this evidence into a Document Formatting Model for the Parser to consume. It must not perform semantic classification — it does not decide what is a chapter, heading, paragraph, or scene break. Its output must be deterministic for the same normalized, post-transformation input.
+
+The complete boundary contract is defined in `physical-document-and-formatting-contract.md`.
+
+### Document Formatting Model
+
+Represent the formatting evidence produced by Document Analysis for consumption by the Parser.
+
+The Document Formatting Model is an evidence artifact, not a decision layer. It provides physical block structure, blank-line run lengths, leading-whitespace pattern statistics, and formatting transitions. It must not contain pre-classified semantic structure. The Parser uses it as contextual evidence alongside the Physical Document; it does not replace direct access to the Physical Document.
+
 ### Parser
 
-Interpret normalized and transformed text as book structure.
+Interpret physical document evidence as book structure.
 
-The parser is responsible for identifying the structural hierarchy and paragraph-level source semantics needed by the book model. It should not perform presentation rendering or EPUB-specific formatting.
+The Parser consumes the post-transformation Physical Document and the Document Formatting Model produced by Document Analysis. It is responsible for identifying the structural hierarchy and paragraph-level source semantics needed by the book model. It should not perform presentation rendering, EPUB-specific formatting, or reconstruct document-level formatting statistics already represented by the Formatting Model.
 
 ### Intermediate
 
@@ -159,6 +182,8 @@ Application Execution
         ├── Input / Decode
         ├── Normalize
         ├── Transform
+        ├── Document Analysis
+        ├── Document Formatting Model
         ├── Parser
         ├── Validation
         ├── Intermediate
@@ -176,6 +201,7 @@ The main boundaries are:
 
 - **Input boundary:** Normalize isolates raw source irregularities from later stages.
 - **Content boundary:** Transformations modify content while remaining separate from structural interpretation.
+- **Analysis boundary:** Document Analysis observes physical structure and produces formatting evidence. It does not assign semantic document types. The Parser owns semantic inference.
 - **Structure boundary:** Parser and Intermediate establish and preserve the book model.
 - **Presentation boundary:** Renderer turns structure into publication-oriented output without redefining upstream semantics.
 - **Artifact boundary:** EPUB generation packages the rendered result.
