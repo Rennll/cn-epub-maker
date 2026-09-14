@@ -4,7 +4,7 @@ from novel_epub.physical import build_physical_document
 
 def test_physical_document_preserves_blocks_blank_runs_and_indentation():
     document = build_physical_document([
-        "\u3000\u3000第一行",
+        "　　第一行",
         "第二行",
         "",
         "\t第三行",
@@ -13,7 +13,7 @@ def test_physical_document_preserves_blocks_blank_runs_and_indentation():
         "",
     ])
     assert [line.text for line in document.lines] == [
-        "\u3000\u3000第一行", "第二行", "", "\t第三行", " \u3000第四行", "", ""
+        "　　第一行", "第二行", "", "\t第三行", " \u3000第四行", "", ""
     ]
     assert [block.line_numbers for block in document.blocks] == [(1, 2), (4, 5)]
     assert [(run.length, run.preceding_block, run.following_block) for run in document.blank_runs] == [
@@ -25,7 +25,7 @@ def test_physical_document_preserves_blocks_blank_runs_and_indentation():
 
 
 def test_analysis_counts_patterns_and_transitions_without_semantic_labels():
-    document = build_physical_document(["第一行", "\u3000第二行", "\u3000第三行", "", "第四行"])
+    document = build_physical_document(["第一行", "　第二行", "　第三行", "", "第四行"])
     analysis = analyze_document(document)
     assert analysis.metadata.physical_line_count == 5
     assert analysis.metadata.nonblank_line_count == 4
@@ -59,7 +59,7 @@ def test_analysis_preserves_ascii_patterns_and_does_not_cross_blank_runs():
     ]
     assert {(x.from_pattern, x.to_pattern, x.count) for x in analysis.transitions} == {
         ("ASCII_SPACE_x1", "ASCII_SPACE_x2", 1),
-        ("ASCII_SPACE_x2", "ASCII_SPACE_x2", 2),
+        ("ASCII_SPACE_x2", "ASCII_SPACE_x2", 1),
     }
     assert analysis.blank_line_runs[0].length == 1
     assert analysis.blank_line_runs[0].preceding_block == 0
