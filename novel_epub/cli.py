@@ -15,6 +15,7 @@ def _report_execution(result: ExecutionResult) -> None:
     warnings = getattr(result, "warnings", [])
     audit = getattr(result, "audit", [])
     validation = getattr(result, "validation", None)
+    validation_warnings = getattr(validation, "warnings", []) if validation else []
     errors = getattr(result, "errors", [])
     intermediate_path = getattr(result, "intermediate_path", None)
     epub_path = getattr(result, "epub_path", None)
@@ -40,7 +41,7 @@ def _report_execution(result: ExecutionResult) -> None:
         for warning in stage.warnings:
             print(f"WARNING: {stage.name}: {warning}", file=sys.stderr)
 
-    for warning in validation.warnings if validation else []:
+    for warning in validation_warnings:
         where = f" at line {warning.line}" if warning.line else ""
         print(f"WARNING: {warning.message}{where}", file=sys.stderr)
 
