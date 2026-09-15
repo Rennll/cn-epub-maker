@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import mimetypes
+import os
 import re
 import subprocess
 import uuid
@@ -207,8 +208,7 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="{_NS_EPUB}" lang="{language}" xml:lang="{language}">
 <head><meta charset="utf-8" /><title>{title}</title></head>
 <body>
-<nav epub:type="toc" id="toc"><h1>{title}</h1><ol>{''.join(groups)}</ol></nav>
-</body>
+<nav epub:type="toc" id="toc"><h1>{title}</h1><ol>{''.join(groups)}</ol></body>
 </html>
 '''
 
@@ -257,26 +257,34 @@ def _write_epub(book: Book, output: Path, chapter_files: list[tuple[Chapter, Pat
 <rootfiles><rootfile full-path="EPUB/content.opf" media-type="application/oebps-package+xml" /></rootfiles>
 </container>
 '''
-    with zipfile.ZipFile(output, "w") as zf:
-        zf.writestr("mimetype", "application/epub+zip", compress_type=zipfile.ZIP_STORED)
-        zf.writestr("META-INF/container.xml", container, compress_type=zipfile.ZIP_DEFLATED)
-        zf.writestr("EPUB/nav.xhtml", _nav_xhtml(book, chapter_paths), compress_type=zipfile.ZIP_DEFLATED)
-        zf.writestr("EPUB/styles/stylesheet.css", CSS, compress_type=zipfile.ZIP_DEFLATED)
-        if preamble_file:
-            zf.writestr("EPUB/text/preamble.xhtml", preamble_file.read_bytes(), compress_type=zipfile.ZIP_DEFLATED)
-        for chapter, source in chapter_files:
-            zf.writestr(f"EPUB/{chapter_paths[chapter.sequence]}", source.read_bytes(), compress_type=zipfile.ZIP_DEFLATED)
-        zf.writestr("EPUB/content.opf", _content_opf(book, chapter_paths, identifier, cover_name, bool(preamble_file)), compress_type=zipfile.ZIP_DEFLATED)
-        if book.cover:
-            cover = Path(book.cover)
-            zf.write(cover, f"EPUB/images/{cover.name}", compress_type=zipfile.ZIP_DEFLATED)
+    fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
+    try:
+        with os.fdopen(fd, "wb") as output_file:
+            with zipfile.ZipFile(output_file, "w") as zf:
+                zf.writestr("mimetype", "application/epub+zip", compress_type=zipfile.ZIP_STORED)
+                zf.writestr("META-INF/container.xml", container, compress_type=zipfile.ZIP_DEFLATED)
+                zf.writestr("EPUB/nav.xhtml", _nav_xhtml(book, chapter_paths), compress_type=zipfile.ZIP_DEFLATED)
+                zf.writestr("EPUB/styles/stylesheet.css", CSS, compress_type=zipfile.ZIP_DEFLATED)
+                if preamble_file:
+                    zf.writestr("EPUB/text/preamble.xhtml", preamble_file.read_bytes(), compress_type=zipfile.ZIP_DEFLATED)
+                for chapter, source in chapter_files:
+                    zf.writestr(f"EPUB/{chapter_paths[chapter.sequence]}", source.read_bytes(), compress_type=zipfile.ZIP_DEFLATED)
+                zf.writestr("EPUB/content.opf", _content_opf(book, chapter_paths, identifier, cover_name, bool(preamble_file)), compress_type=zipfile.ZIP_DEFLATED)
+                if book.cover:
+                    cover = Path(book.cover)
+                    zf.write(cover, f"EPUB/images/{cover.name}", compress_type=zipfile.ZIP_DEFLATED)
+    except BaseException:
+        try:
+            output.unlink()
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def render(book: Book, output: str | Path) -> Path:
     """Render chapters independently with Pandoc, then assemble a native EPUB."""
     _validate_book(book)
     output = Path(output)
-    output.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix="novel-epub-") as tmp:
         root = Path(tmp)
         chapter_dir = root / "chapters"
