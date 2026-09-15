@@ -1,3 +1,4 @@
+import re
 import shutil
 import subprocess
 import sys
@@ -44,6 +45,15 @@ def test_real_reader_acceptance_fixture_produces_structural_baseline(tmp_path: P
         assert "META-INF/container.xml" in names
         assert "EPUB/content.opf" in names
         assert "EPUB/nav.xhtml" in names
+
+        opf = archive.read("EPUB/content.opf").decode("utf-8")
+        modified_values = re.findall(
+            r'<meta\s+property="dcterms:modified">([^<]+)</meta>', opf
+        )
+        assert len(modified_values) == 1
+        assert re.fullmatch(
+            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", modified_values[0]
+        )
 
         chapter_files = sorted(
             name for name in names if name.startswith("EPUB/text/") and name.endswith(".xhtml")
