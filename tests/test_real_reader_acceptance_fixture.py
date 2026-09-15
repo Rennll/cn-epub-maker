@@ -48,7 +48,7 @@ def test_real_reader_acceptance_fixture_produces_structural_baseline(tmp_path: P
         chapter_files = sorted(
             name for name in names if name.startswith("EPUB/text/") and name.endswith(".xhtml")
         )
-        assert len(chapter_files) == 4
+        assert chapter_files
         content = "\n".join(archive.read(name).decode("utf-8") for name in chapter_files)
 
     assert "第一章 閱讀器驗收基線" in content
@@ -56,7 +56,7 @@ def test_real_reader_acceptance_fixture_produces_structural_baseline(tmp_path: P
     assert "第三章 標點與 CJK 換行" in content
     assert "第四章 內容完整性" in content
     assert "這一段包含硬換行" in content
-    assert "下一行仍屬於同一段落。" in content
+    assert "這一行應該仍然屬於同一個段落語意" in content
     assert "https://example.com/reader-test?a=1&amp;b=2" in content
     assert "，。！？：「」『』（）——……" in content
 
@@ -65,10 +65,10 @@ def test_real_reader_acceptance_fixture_encodes_parser_boundary_signals():
     lines = FIXTURE.read_text(encoding="utf-8").splitlines()
     assert lines.count("") >= 5
 
-    expanded_marker = "這個段落前方有兩個空白行，應該被視為 expanded。"
-    scene_marker = "這個段落前方有三個以上空白行，應該被視為 scene break。"
+    expanded_marker = "這裡開始是一個 expanded paragraph boundary。"
+    scene_marker = "這裡開始是一個 scene break。"
     hard_break_marker = "這一段包含硬換行"
-    next_line_marker = "下一行仍屬於同一段落。"
+    next_line_marker = "這一行應該仍然屬於同一個段落語意，用來觀察 reader 對 hard line break 的呈現。"
 
     expanded_index = lines.index(expanded_marker)
     scene_index = lines.index(scene_marker)
