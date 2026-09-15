@@ -196,7 +196,7 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
     if book.volumes:
         for volume in book.volumes:
             label = escape(f"{volume.label} {volume.title}".rstrip())
-            children = "".join(chapter_li(ch) for chapter in volume.chapters)
+            children = "".join(chapter_li(ch) for ch in volume.chapters)
             groups.append(f"<li><span>{label}</span><ol>{children}</ol></li>")
     if book.chapters:
         groups.extend(chapter_li(ch) for ch in book.chapters)
