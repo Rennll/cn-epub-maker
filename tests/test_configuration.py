@@ -35,6 +35,7 @@ def test_conversion_request_contains_request_data_but_not_execution_state():
             cover="cover.jpg",
         ),
         destination=Path("book.epub"),
+        destination_mode="explicit",
         policy=ConversionPolicy(
             encoding="auto",
             parser=ParserPolicy(paragraph_mode="wrapped"),
@@ -49,6 +50,7 @@ def test_conversion_request_contains_request_data_but_not_execution_state():
 
     assert request.source == Path("book.txt")
     assert request.destination == Path("book.epub")
+    assert request.destination_mode == "explicit"
     assert request.book_metadata.language == "zh-TW"
     assert request.book_metadata.cover == "cover.jpg"
     assert not hasattr(request, "book")
@@ -73,6 +75,7 @@ def test_configuration_is_immutable():
             title="書名", author="作者", language="zh-CN", cover=None
         ),
         destination=Path("book.epub"),
+        destination_mode="explicit",
         policy=policy,
     )
 
