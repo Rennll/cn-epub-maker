@@ -4,9 +4,9 @@
 
 Resolved.
 
-This document defines the application-level policy for automatically generated output filenames, explicitly supplied destinations, collision handling, and parent-directory behavior.
+This document is the canonical behavioral policy for output destination selection, automatically generated filenames, filename sanitization, collision handling, and parent-directory behavior.
 
-The policy is consumed by configuration resolution and runtime output handling. It does not make the renderer responsible for destination policy.
+The `deferred-decision-audit.md` records that DD-09 is resolved and points here for the detailed contract. `v2x-configuration-model.md` defines the application configuration/request architecture; it does not duplicate the filesystem behavior defined here. Runtime and CLI components implement this policy at their respective boundaries.
 
 ## 1. Destination modes
 
@@ -90,7 +90,7 @@ book (02).epub
 
 The same suffix scheme applies to any sanitized metadata-derived stem.
 
-Collision selection must happen immediately before output creation so that the selected path reflects the filesystem state at execution time. Output creation must still use a non-overwriting operation where practical; filename selection alone is not considered a sufficient overwrite guarantee in the presence of races.
+Collision selection must happen immediately before output creation so that the selected path reflects the filesystem state at execution time. The output creation step must preserve the same non-overwrite guarantee if another process creates the selected path between collision selection and creation; the exact filesystem API used to achieve that guarantee is an implementation detail.
 
 No `--force` or overwrite option is introduced by DD-09.
 
@@ -125,14 +125,17 @@ A warning is the default user-visible reporting mechanism for automatic filename
 - metadata-derived name changed by sanitization; and
 - candidate changed because of an existing-file collision.
 
-## 9. Scope boundary
+## 9. Document boundaries and scope
 
 DD-09 defines destination semantics. It does not define:
 
+- the Python shape of `ConversionRequest` or `ConversionPolicy`;
+- CLI/config-file syntax for expressing `destination`;
 - a user-facing overwrite/force option;
-- configuration-file syntax for destination;
 - EPUBCheck behavior;
 - reader-specific EPUB compatibility;
 - renderer-specific output naming behavior.
+
+The configuration architecture owns the request model; DD-09 owns the behavioral meaning of destination handling. The runtime/output implementation owns the concrete filesystem operations. These layers should reference this policy rather than independently redefining the rules.
 
 The implementation child **#33** should apply this policy without introducing additional product-level filename decisions.
