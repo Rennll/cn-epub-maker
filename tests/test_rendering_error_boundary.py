@@ -27,6 +27,7 @@ def _request(source: Path, destination: Path) -> ConversionRequest:
             cover=None,
         ),
         destination=destination,
+        destination_mode="explicit",
         policy=ConversionPolicy(
             encoding="utf-8",
             parser=ParserPolicy(paragraph_mode="wrapped"),
