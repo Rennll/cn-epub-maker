@@ -72,7 +72,8 @@ def validate(args: argparse.Namespace) -> int:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
 
-    epubcheck = run_epubcheck(args.epub)
+    require_epubcheck = getattr(args, "require_epubcheck", False)
+    epubcheck = run_epubcheck(args.epub, required=require_epubcheck)
     if not epubcheck.ok:
         for error in epubcheck.errors:
             print(f"ERROR: {error}", file=sys.stderr)
@@ -113,6 +114,11 @@ def main() -> int:
 
     validate_parser = sub.add_parser("validate", help="validate an EPUB archive")
     validate_parser.add_argument("epub")
+    validate_parser.add_argument(
+        "--require-epubcheck",
+        action="store_true",
+        help="fail if EPUBCheck is unavailable or reports validation errors",
+    )
     validate_parser.set_defaults(func=validate)
     args = parser.parse_args()
     if args.command == "build":

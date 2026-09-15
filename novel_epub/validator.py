@@ -156,10 +156,16 @@ def validate_epub(path: str | Path) -> list[str]:
     return errors
 
 
-def run_epubcheck(path: str | Path) -> EpubCheckResult:
+def run_epubcheck(path: str | Path, *, required: bool = False) -> EpubCheckResult:
     path = Path(path)
     command = shutil.which("epubcheck")
     if command is None:
+        if required:
+            return EpubCheckResult(
+                available=False,
+                ok=False,
+                errors=["EPUBCheck executable not found"],
+            )
         return EpubCheckResult(available=False, ok=True, errors=[])
 
     try:
