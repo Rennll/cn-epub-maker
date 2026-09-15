@@ -101,13 +101,16 @@ def resolve_conversion_request(
     destination_value = resolved.get("destination")
     if destination_value is None:
         destination = source.with_name(f"{title}_{author}.epub")
+        destination_mode = "automatic"
     else:
         destination = Path(destination_value)
+        destination_mode = "explicit"
 
     return ConversionRequest(
         source=source,
         book_metadata=metadata,
         destination=destination,
+        destination_mode=destination_mode,
         policy=policy,
     )
 

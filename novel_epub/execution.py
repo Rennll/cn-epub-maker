@@ -8,6 +8,7 @@ from .configuration import ConversionRequest, TransformationPolicy
 from .dfm import build_formatting_model
 from .intermediate import write_intermediate
 from .normalize import read_lines
+from .output_destination import plan_output_destination
 from .parser import parse_lines
 from .physical import build_physical_document
 from .renderers.pandoc import RenderingError, render
@@ -117,7 +118,6 @@ def execute(
         )
         execution.audit = audit
 
-        # PhysicalDocument is the single shared post-transformation representation.
         physical_document = build_physical_document(lines)
         analysis = analyze_document(physical_document)
         formatting_model = build_formatting_model(physical_document, analysis)
@@ -150,9 +150,17 @@ def execute(
                 result.book, intermediate_path, transformations=audit
             )
 
-        render(result.book, request.destination)
-        execution.epub_path = Path(request.destination)
-        execution.epub_validation_errors = validate_epub(request.destination)
+        destination = request.destination if request.destination_mode == "explicit" else None
+        plan = plan_output_destination(
+            source=request.source,
+            title=request.book_metadata.title,
+            author=request.book_metadata.author,
+            destination=destination,
+        )
+        execution.warnings.extend(plan.warnings)
+        render(result.book, plan.path)
+        execution.epub_path = plan.path
+        execution.epub_validation_errors = validate_epub(plan.path)
         if execution.epub_validation_errors:
             execution.return_code = 3
             execution.errors = list(execution.epub_validation_errors)
