@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ def test_resolver_applies_application_defaults():
 
     assert request.source == Path("book.txt")
     assert request.destination == Path("書名_作者.epub")
+    assert request.destination_mode == "automatic"
     assert request.book_metadata.title == "書名"
     assert request.book_metadata.author == "作者"
     assert request.book_metadata.language == "zh-CN"
@@ -33,6 +35,7 @@ def test_explicit_destination_overrides_derived_default():
         }
     )
     assert request.destination == Path("output.epub")
+    assert request.destination_mode == "explicit"
 
 
 def test_resolver_accepts_explicit_policy_values():
@@ -112,6 +115,15 @@ def test_resolver_rejects_invalid_application_policy_values():
 
     with pytest.raises(ValueError, match="paragraph_mode"):
         resolve_conversion_request({**base, "paragraph_mode": "smart"})
+
+
+def test_conversion_request_rejects_invalid_destination_mode():
+    request = resolve_conversion_request(
+        {"source": "book.txt", "title": "書名", "author": "作者"}
+    )
+
+    with pytest.raises(ValueError, match="destination_mode"):
+        replace(request, destination_mode="invalid")
 
 
 def test_full_source_disables_effective_content_transformations():
