@@ -54,8 +54,8 @@ class ConversionRequest:
     source: Path
     book_metadata: BookMetadata
     destination: Path
+    policy: ConversionPolicy
     destination_mode: DestinationMode = "explicit"
-    policy: ConversionPolicy = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
         if self.destination_mode not in {"automatic", "explicit"}:
