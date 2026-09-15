@@ -19,7 +19,7 @@ The audit currently covers DD-01 through DD-14. DD-15 has been moved to `future-
 | DD-05 | Paragraph mode vs. source-format profile | Resolved | Parser architecture |
 | DD-06 | Normalize vs. Transformer responsibility | Resolved | Configuration Model + stage boundaries |
 | DD-07 | Real-device typography completion criteria | Open | EPUB rendering behavior |
-| DD-08 | EPUBCheck role | Open | Release/CI policy |
+| DD-08 | EPUBCheck role | Resolved | Release/CI policy |
 | DD-09 | Output filename sanitization and overwrite policy | Resolved | Destination/CLI policy |
 | DD-10 | Encoding auto-detection guarantee and positioning | Resolved | Input policy + runtime behavior |
 | DD-11 | Automatic chapter renumbering | Frozen | Structural preservation |
@@ -228,27 +228,23 @@ The project has a documented acceptance matrix and can distinguish implementatio
 
 ## DD-08 — EPUBCheck Role
 
-**Status: Open**
+**Status: Resolved**
 
-### Question
+### Decision
 
-What role should EPUBCheck play in the conversion and release workflow?
+EPUBCheck is an external conformance validation layer. Normal `build` runs built-in EPUB validation only and does not require or invoke EPUBCheck. `validate` runs EPUBCheck when available and treats missing EPUBCheck as a warning by default. `validate --require-epubcheck` makes the external validator mandatory. CI and release use the strict policy, so missing EPUBCheck or EPUBCheck failures fail the gate.
 
-### Current distinction
+### Canonical
 
-Built-in structural validation and EPUBCheck serve different levels of validation.
+`dd-08-epubcheck-validation-policy.md`
 
-### Decision needed
+### Evidence
 
-Determine which checks are:
+The policy is implemented through the validator's explicit required/optional mode and the CLI's `--require-epubcheck` option, with regression tests for missing and failing EPUBCheck states.
 
-- required for normal conversion;
-- recommended during development;
-- required for release/CI.
+### Reopen when
 
-### Resolve when
-
-The project's validation and release policy explicitly defines the role of EPUBCheck.
+The project changes the boundary between local validation and release/CI conformance requirements, or adopts a different external conformance tool.
 
 ---
 
