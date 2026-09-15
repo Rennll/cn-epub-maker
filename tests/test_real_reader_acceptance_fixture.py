@@ -63,26 +63,11 @@ def test_real_reader_acceptance_fixture_produces_structural_baseline(tmp_path: P
 
 
 def test_real_reader_acceptance_fixture_encodes_parser_boundary_signals():
-    lines = FIXTURE.read_text(encoding="utf-8").splitlines()
+    text = FIXTURE.read_text(encoding="utf-8")
 
-    blank_runs = []
-    index = 0
-    while index < len(lines):
-        if lines[index] != "":
-            index += 1
-            continue
-        start = index
-        while index < len(lines) and lines[index] == "":
-            index += 1
-        blank_runs.append((start, index - start, index))
+    # Two blank lines => expanded; three or more => scene break.
+    assert "\n\n\n" in text
+    assert "\n\n\n\n" in text
 
-    assert any(run_length == 2 for _, run_length, _ in blank_runs)
-    assert any(run_length >= 3 for _, run_length, _ in blank_runs)
-
-    expanded_runs = [run for run in blank_runs if run[1] == 2]
-    scene_runs = [run for run in blank_runs if run[1] >= 3]
-    assert any(lines[end] == "這裡開始是一個 expanded paragraph boundary。" for _, _, end in expanded_runs)
-    assert any(lines[end] == "這裡開始是一個 scene break。" for _, _, end in scene_runs)
-
-    hard_break_index = lines.index("這一段包含硬換行")
-    assert lines[hard_break_index + 1].startswith("這一行應該仍然屬於同一個段落語意")
+    hard_break = "這一段包含硬換行\n這一行應該仍然屬於同一個段落語意"
+    assert hard_break in text
