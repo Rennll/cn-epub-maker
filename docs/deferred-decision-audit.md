@@ -287,17 +287,18 @@ CLI/API behavior and the destination contract are explicit and consistent.
 
 `encoding=auto` is resolved at the input/runtime boundary, after `ConversionRequest` resolution and before transformations, parsing, analysis, rendering, or validation. The resolver does not perform detection.
 
-The supported auto-detection candidate order is fixed and deterministic:
+Detection first checks for the UTF-8 BOM. If the byte stream starts with the UTF-8 BOM, the selected encoding is `utf-8-sig`. This is a dedicated BOM check, not a general candidate-order entry, because Python's `utf-8-sig` codec also successfully decodes ordinary UTF-8 without a BOM.
 
-1. `utf-8-sig`
-2. `utf-8`
-3. `gb18030`
-4. `gbk`
-5. `big5`
+For non-BOM input, the supported auto-detection candidate order is fixed and deterministic:
 
-The first candidate that successfully decodes the complete byte stream is selected. UTF-8 with BOM is therefore handled before plain UTF-8 so the BOM is consumed rather than retained as content.
+1. `utf-8`
+2. `gb18030`
+3. `gbk`
+4. `big5`
 
-This is a practical candidate-based guarantee, not a general-purpose encoding detector. In particular, some legacy Chinese encodings are technically decodable by more than one codec. The implementation does not use semantic or language heuristics to decide whether the decoded text is linguistically correct. The documented priority order is the tie-breaker.
+The first non-BOM candidate that successfully decodes the complete byte stream is selected.
+
+This is a practical candidate-based guarantee, not a general-purpose encoding detector. In particular, some legacy Chinese encodings are technically decodable by more than one codec. The implementation does not use semantic or language heuristics to decide whether the decoded text is linguistically correct. The documented priority order is the tie-breaker for non-BOM ambiguity.
 
 If no supported candidate decodes the source, execution stops immediately with an explicit encoding-detection failure. Downstream transformation, parsing, analysis, rendering, and EPUB validation do not run. Explicitly requested encodings are decoded directly and do not silently fall back to auto-detection.
 
@@ -305,7 +306,7 @@ The requested value remains `ConversionRequest.policy.encoding` (for example, `"
 
 ### Supported scope
 
-The supported automatic candidates cover common UTF-8 and Chinese legacy TXT inputs: UTF-8, UTF-8 with BOM, GB18030/GBK-family data, and Big5. The policy does not claim reliable identification of every historical, malformed, mixed, or ambiguous Chinese encoding.
+The supported automatic inputs cover common UTF-8 and Chinese legacy TXT inputs: UTF-8, UTF-8 with BOM, GB18030/GBK-family data, and Big5. The policy does not claim reliable identification of every historical, malformed, mixed, or ambiguous Chinese encoding.
 
 ### Canonical
 
