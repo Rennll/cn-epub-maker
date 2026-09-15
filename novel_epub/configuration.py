@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from .transforms import JunkRule
+
+
+DestinationMode = Literal["automatic", "explicit"]
 
 
 @dataclass(frozen=True)
@@ -50,4 +54,11 @@ class ConversionRequest:
     source: Path
     book_metadata: BookMetadata
     destination: Path
+    destination_mode: DestinationMode
     policy: ConversionPolicy
+
+    def __post_init__(self) -> None:
+        if self.destination_mode not in {"automatic", "explicit"}:
+            raise ValueError(
+                f"invalid destination_mode: {self.destination_mode}"
+            )
