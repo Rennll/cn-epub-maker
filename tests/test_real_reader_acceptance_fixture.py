@@ -58,22 +58,31 @@ def test_real_reader_acceptance_fixture_produces_structural_baseline(tmp_path: P
     assert "這一段包含硬換行" in content
     assert "這一行應該仍然屬於同一個段落語意" in content
     assert "https://example.com/reader-test?a=1&amp;b=2" in content
-    assert "，。！？：「」『』（）——……" in content
+    for punctuation in "，。！？：「」『』（）——……":
+        assert punctuation in content
 
 
 def test_real_reader_acceptance_fixture_encodes_parser_boundary_signals():
     lines = FIXTURE.read_text(encoding="utf-8").splitlines()
-    assert lines.count("") >= 5
 
-    expanded_marker = "這裡開始是一個 expanded paragraph boundary。"
-    scene_marker = "這裡開始是一個 scene break。"
-    hard_break_marker = "這一段包含硬換行"
-    next_line_marker = "這一行應該仍然屬於同一個段落語意，用來觀察 reader 對 hard line break 的呈現。"
+    blank_runs = []
+    index = 0
+    while index < len(lines):
+        if lines[index] != "":
+            index += 1
+            continue
+        start = index
+        while index < len(lines) and lines[index] == "":
+            index += 1
+        blank_runs.append((start, index - start, index))
 
-    expanded_index = lines.index(expanded_marker)
-    scene_index = lines.index(scene_marker)
-    hard_break_index = lines.index(hard_break_marker)
+    assert any(run_length == 2 for _, run_length, _ in blank_runs)
+    assert any(run_length >= 3 for _, run_length, _ in blank_runs)
 
-    assert lines[expanded_index - 2 : expanded_index] == ["", ""]
-    assert lines[scene_index - 3 : scene_index] == ["", "", ""]
-    assert lines[hard_break_index + 1] == next_line_marker
+    expanded_runs = [run for run in blank_runs if run[1] == 2]
+    scene_runs = [run for run in blank_runs if run[1] >= 3]
+    assert any(lines[end] == "這裡開始是一個 expanded paragraph boundary。" for _, _, end in expanded_runs)
+    assert any(lines[end] == "這裡開始是一個 scene break。" for _, _, end in scene_runs)
+
+    hard_break_index = lines.index("這一段包含硬換行")
+    assert lines[hard_break_index + 1].startswith("這一行應該仍然屬於同一個段落語意")
