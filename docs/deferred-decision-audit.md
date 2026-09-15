@@ -20,7 +20,7 @@ The audit currently covers DD-01 through DD-14. DD-15 has been moved to `future-
 | DD-06 | Normalize vs. Transformer responsibility | Resolved | Configuration Model + stage boundaries |
 | DD-07 | Real-device typography completion criteria | Open | EPUB rendering behavior |
 | DD-08 | EPUBCheck role | Open | Release/CI policy |
-| DD-09 | Output filename sanitization and overwrite policy | Open | Destination/CLI policy |
+| DD-09 | Output filename sanitization and overwrite policy | Resolved | Destination/CLI policy |
 | DD-10 | Encoding auto-detection guarantee and positioning | Resolved | Input policy + runtime behavior |
 | DD-11 | Automatic chapter renumbering | Frozen | Structural preservation |
 | DD-12 | Generic semantic chapter inference | Frozen | Parser conservatism |
@@ -254,28 +254,35 @@ The project's validation and release policy explicitly defines the role of EPUBC
 
 ## DD-09 — Output Filename Sanitization and Overwrite Policy
 
-**Status: Open**
+**Status: Resolved**
 
-### Question
+### Decision
 
-How should destination paths, generated filenames, collisions, and overwrites be handled?
+Automatic destinations are derived from `<title>_<author>.epub` and placed beside the source. The derived filename is sanitized before use: path separators and platform-invalid filename characters with safe full-width equivalents are replaced, unsafe control characters are removed, and leading/trailing whitespace and `.` are removed. Empty or otherwise unusable names fall back deterministically to `book.epub`.
 
-### Decision needed
+Automatic destinations never overwrite an existing EPUB. Collisions use deterministic numeric suffixes such as `book (01).epub`, `book (02).epub`, and selection occurs at execution time immediately before output creation.
 
-- filename derivation;
-- filesystem character sanitization;
-- path traversal handling;
-- overwrite behavior;
-- parent-directory creation;
-- collision reporting.
+Explicit destinations are a separate mode. They are not metadata-sanitized or silently renamed; invalid/unusable paths and existing destinations fail rather than being redirected or overwritten. Missing parent directories are not implicitly created.
 
-### Architectural boundary
+Automatic sanitization or collision changes must be exposed through runtime reporting, while the actual selected output path is exposed through `ExecutionResult.epub_path`. These runtime facts do not mutate `ConversionRequest`.
 
-Destination and overwrite behavior are application policy and should not be implicit renderer side effects.
+### Canonical
 
-### Resolve when
+`dd-09-output-destination-policy.md`
 
-CLI/API behavior and the destination contract are explicit and consistent.
+### Related
+
+`v2x-configuration-model.md`
+
+`novel_epub/configuration_resolver.py`
+
+### Evidence
+
+The DD-09 policy document defines automatic versus explicit destination semantics, sanitization, fallback naming, collision handling, parent-directory behavior, and reporting requirements.
+
+### Reopen when
+
+A future requirement introduces an explicit overwrite/force policy, a different destination derivation contract, or a supported platform whose filename rules cannot be represented by the current policy.
 
 ---
 
