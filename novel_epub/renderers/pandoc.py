@@ -6,6 +6,7 @@ import re
 import subprocess
 import uuid
 import zipfile
+from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -33,21 +34,11 @@ class RenderingError(Exception):
 
 def _run_pandoc(args: list[str]) -> None:
     try:
-        subprocess.run(
-            args,
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
+        subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     except subprocess.CalledProcessError as exc:
         detail = (exc.stderr or "").strip()
         suffix = f": {detail}" if detail else ""
-        raise RenderingError(
-            f"Pandoc rendering failed with exit code {exc.returncode}{suffix}"
-        ) from exc
+        raise RenderingError(f"Pandoc rendering failed with exit code {exc.returncode}{suffix}") from exc
 
 
 def _escape_markdown(text: str) -> str:
@@ -73,7 +64,6 @@ def _preamble_markdown(book: Book) -> str:
 
 
 def _markdown(book: Book) -> str:
-    """Render the model as a debug-friendly whole-book Markdown document."""
     lines: list[str] = []
     for paragraph in book.preamble:
         lines.extend([_escape_markdown(paragraph.text), ""])
@@ -120,7 +110,6 @@ def _paragraph_class(boundary: ParagraphBoundary) -> str:
 
 def _apply_paragraph_boundaries(body: str, paragraphs: list[Paragraph]) -> str:
     index = 0
-
     def replace(match: re.Match[str]) -> str:
         nonlocal index
         if index >= len(paragraphs):
@@ -128,7 +117,6 @@ def _apply_paragraph_boundaries(body: str, paragraphs: list[Paragraph]) -> str:
         boundary = paragraphs[index].boundary
         index += 1
         return f"<p{_paragraph_class(boundary)}>"
-
     return _P_OPEN.sub(replace, body)
 
 
@@ -136,60 +124,37 @@ def _pandoc_chapter(chapter: Chapter, destination: Path, language: str) -> None:
     source = destination.with_suffix(".md")
     fragment = destination.with_suffix(".html")
     source.write_text(_chapter_markdown(chapter), encoding="utf-8")
-    _run_pandoc(
-        ["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)]
-    )
-    body = fragment.read_text(encoding="utf-8").strip()
-    body = _apply_paragraph_boundaries(body, chapter.paragraphs)
-    chapter_title = escape(f"{chapter.label} {chapter.title}".rstrip())
+    _run_pandoc(["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)])
+    body = _apply_paragraph_boundaries(fragment.read_text(encoding="utf-8").strip(), chapter.paragraphs)
     language = escape(language)
-    xhtml = (
-        '<?xml version="1.0" encoding="utf-8"?>\n'
-        '<!DOCTYPE html>\n'
+    chapter_title = escape(f"{chapter.label} {chapter.title}".rstrip())
+    destination.write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE html>\n'
         f'<html xmlns="http://www.w3.org/1999/xhtml" lang="{language}" xml:lang="{language}">\n'
-        "<head>\n"
-        '<meta charset="utf-8" />\n'
-        f"<title>{chapter_title}</title>\n"
-        '<link rel="stylesheet" type="text/css" href="../styles/stylesheet.css" />\n'
-        "</head>\n"
-        "<body>\n"
-        f"{body}\n"
-        "</body>\n</html>\n"
-    )
-    destination.write_text(xhtml, encoding="utf-8")
+        '<head>\n<meta charset="utf-8" />\n'
+        f'<title>{chapter_title}</title>\n<link rel="stylesheet" type="text/css" href="../styles/stylesheet.css" />\n'
+        '</head>\n<body>\n' + body + '\n</body>\n</html>\n', encoding="utf-8")
 
 
 def _pandoc_preamble(book: Book, destination: Path) -> None:
     source = destination.with_suffix(".md")
     fragment = destination.with_suffix(".html")
     source.write_text(_preamble_markdown(book), encoding="utf-8")
-    _run_pandoc(
-        ["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)]
-    )
-    body = fragment.read_text(encoding="utf-8").strip()
-    body = _apply_paragraph_boundaries(body, book.preamble)
+    _run_pandoc(["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)])
+    body = _apply_paragraph_boundaries(fragment.read_text(encoding="utf-8").strip(), book.preamble)
     language = escape(book.language)
-    xhtml = (
-        '<?xml version="1.0" encoding="utf-8"?>\n'
-        '<!DOCTYPE html>\n'
+    destination.write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE html>\n'
         f'<html xmlns="http://www.w3.org/1999/xhtml" lang="{language}" xml:lang="{language}">\n'
-        "<head>\n"
-        '<meta charset="utf-8" />\n'
-        f"<title>{escape(book.title)}</title>\n"
-        '<link rel="stylesheet" type="text/css" href="../styles/stylesheet.css" />\n'
-        "</head>\n"
-        "<body>\n"
-        f"{body}\n"
-        "</body>\n</html>\n"
-    )
-    destination.write_text(xhtml, encoding="utf-8")
+        '<head>\n<meta charset="utf-8" />\n'
+        f'<title>{escape(book.title)}</title>\n<link rel="stylesheet" type="text/css" href="../styles/stylesheet.css" />\n'
+        '</head>\n<body>\n' + body + '\n</body>\n</html>\n', encoding="utf-8")
 
 
 def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
     def chapter_li(chapter: Chapter) -> str:
         label = escape(f"{chapter.label} {chapter.title}".rstrip())
         return f'<li><a href="{chapter_paths[chapter.sequence]}">{label}</a></li>'
-
     groups: list[str] = []
     if book.preamble:
         groups.append('<li><a href="text/preamble.xhtml">前言</a></li>')
@@ -200,7 +165,6 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
             groups.append(f"<li><span>{label}</span><ol>{children}</ol></li>")
     if book.chapters:
         groups.extend(chapter_li(ch) for ch in book.chapters)
-
     title = escape(book.title)
     language = escape(book.language)
     return f'''<?xml version="1.0" encoding="utf-8"?>
@@ -233,7 +197,7 @@ def _content_opf(book: Book, chapter_paths: dict[int, str], identifier: str, cov
         media_type = mimetypes.guess_type(cover_name)[0]
         manifest.append(f'<item id="cover-image" href="images/{escape(Path(cover_name).name)}" media-type="{media_type}" properties="cover-image" />')
         cover_meta = '<meta name="cover" content="cover-image" />'
-
+    modified = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     return f'''<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="{_NS_OPF}" version="3.0" unique-identifier="pub-id" xml:lang="{escape(book.language)}">
 <metadata xmlns:dc="{_NS_DC}">
@@ -241,6 +205,7 @@ def _content_opf(book: Book, chapter_paths: dict[int, str], identifier: str, cov
 <dc:title>{escape(book.title)}</dc:title>
 <dc:creator>{escape(book.author)}</dc:creator>
 <dc:language>{escape(book.language)}</dc:language>
+<meta property="dcterms:modified">{modified}</meta>
 {cover_meta}
 </metadata>
 <manifest>{''.join(manifest)}</manifest>

@@ -32,6 +32,20 @@ jobs:
           chmod +x /usr/local/bin/epubcheck
           epubcheck --version
       - run: python -m pytest -q
+      - name: Build real-reader acceptance EPUB
+        run: |
+          python -m novel_epub.cli build tests/fixtures/real_reader_acceptance.txt \
+            --title "Real Reader Acceptance Baseline" \
+            --author "測試作者" \
+            --lang "zh-TW" \
+            --output /tmp/real-reader-acceptance.epub
+          python -m novel_epub.cli validate --require-epubcheck /tmp/real-reader-acceptance.epub
+      - name: Upload real-reader acceptance EPUB
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-reader-acceptance-epub
+          path: /tmp/real-reader-acceptance.epub
+          if-no-files-found: error
       - name: Verify strict EPUBCheck CLI path
         run: |
           python - <<'PY'
