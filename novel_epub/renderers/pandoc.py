@@ -196,7 +196,7 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
     if book.volumes:
         for volume in book.volumes:
             label = escape(f"{volume.label} {volume.title}".rstrip())
-            children = "".join(chapter_li(ch) for ch in volume.chapters)
+            children = "".join(chapter_li(ch) for chapter in volume.chapters)
             groups.append(f"<li><span>{label}</span><ol>{children}</ol></li>")
     if book.chapters:
         groups.extend(chapter_li(ch) for ch in book.chapters)
@@ -208,7 +208,8 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="{_NS_EPUB}" lang="{language}" xml:lang="{language}">
 <head><meta charset="utf-8" /><title>{title}</title></head>
 <body>
-<nav epub:type="toc" id="toc"><h1>{title}</h1><ol>{''.join(groups)}</ol></body>
+<nav epub:type="toc" id="toc"><h1>{title}</h1><ol>{''.join(groups)}</ol></nav>
+</body>
 </html>
 '''
 
