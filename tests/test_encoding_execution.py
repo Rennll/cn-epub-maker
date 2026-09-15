@@ -21,6 +21,7 @@ def _auto_request(source: Path, destination: Path) -> ConversionRequest:
             title="Test Book", author="Test Author", language="zh-CN", cover=None
         ),
         destination=destination,
+        destination_mode="explicit",
         policy=ConversionPolicy(
             encoding="auto",
             parser=ParserPolicy(paragraph_mode="wrapped"),
@@ -37,8 +38,6 @@ def _auto_request(source: Path, destination: Path) -> ConversionRequest:
 def test_execute_records_auto_detected_encoding_without_mutating_request(tmp_path, monkeypatch):
     source = tmp_path / "source.txt"
     destination = tmp_path / "book.epub"
-    # Must contain at least one parseable chapter so validate_book does not
-    # report "book contains no chapters" and cause return_code == 2.
     source.write_text("第一章 開始\n正文段落\n", encoding="utf-8")
     request = _auto_request(source, destination)
 
