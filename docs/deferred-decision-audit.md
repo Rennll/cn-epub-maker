@@ -21,7 +21,7 @@ The audit currently covers DD-01 through DD-14. DD-15 has been moved to `future-
 | DD-07 | Real-device typography completion criteria | Open | EPUB rendering behavior |
 | DD-08 | EPUBCheck role | Open | Release/CI policy |
 | DD-09 | Output filename sanitization and overwrite policy | Open | Destination/CLI policy |
-| DD-10 | Encoding auto-detection guarantee and positioning | Partially resolved | Input policy + runtime behavior |
+| DD-10 | Encoding auto-detection guarantee and positioning | Resolved | Input policy + runtime behavior |
 | DD-11 | Automatic chapter renumbering | Frozen | Structural preservation |
 | DD-12 | Generic semantic chapter inference | Frozen | Parser conservatism |
 | DD-13 | Punctuation/sentence-length paragraph splitting | Frozen | Paragraph semantics |
@@ -281,19 +281,32 @@ CLI/API behavior and the destination contract are explicit and consistent.
 
 ## DD-10 — Encoding Auto-Detection Guarantee and Positioning
 
-**Status: Partially resolved**
+**Status: Resolved**
 
-### Question
+### Decision
 
-What guarantee should automatic encoding detection provide, and where does it belong in the conversion boundary?
+`encoding=auto` is resolved at the input/runtime boundary, after `ConversionRequest` resolution and before transformations, parsing, analysis, rendering, or validation. The resolver does not perform detection.
 
-### Current decision
+Detection first checks for the UTF-8 BOM. If the byte stream starts with the UTF-8 BOM, the selected encoding is `utf-8-sig`. This is a dedicated BOM check, not a general candidate-order entry, because Python's `utf-8-sig` codec also successfully decodes ordinary UTF-8 without a BOM.
 
-Encoding detection remains input/runtime behavior rather than part of the serialized conversion request.
+For non-BOM input, the supported auto-detection candidate order is fixed and deterministic:
 
-### Remaining question
+1. `utf-8`
+2. `gb18030`
+3. `gbk`
+4. `big5`
 
-What confidence/failure guarantees should be exposed to users, and how should detection failure or ambiguity be reported?
+The first non-BOM candidate that successfully decodes the complete byte stream is selected.
+
+This is a practical candidate-based guarantee, not a general-purpose encoding detector. In particular, some legacy Chinese encodings are technically decodable by more than one codec. The implementation does not use semantic or language heuristics to decide whether the decoded text is linguistically correct. The documented priority order is the tie-breaker for non-BOM ambiguity.
+
+If no supported candidate decodes the source, execution stops immediately with an explicit encoding-detection failure. Downstream transformation, parsing, analysis, rendering, and EPUB validation do not run. Explicitly requested encodings are decoded directly and do not silently fall back to auto-detection.
+
+The requested value remains `ConversionRequest.policy.encoding` (for example, `"auto"`). The selected codec is runtime/provenance information exposed through `ExecutionResult.encoding` and is never written back into the request.
+
+### Supported scope
+
+The supported automatic inputs cover common UTF-8 and Chinese legacy TXT inputs: UTF-8, UTF-8 with BOM, GB18030/GBK-family data, and Big5. The policy does not claim reliable identification of every historical, malformed, mixed, or ambiguous Chinese encoding.
 
 ### Canonical
 
@@ -303,9 +316,15 @@ What confidence/failure guarantees should be exposed to users, and how should de
 
 `v2x-configuration-model.md`
 
-### Resolve when
+`novel_epub/execution.py`
 
-Detection behavior, failure semantics, and user-visible guarantees are explicitly defined.
+### Evidence
+
+Runtime normalization tests cover UTF-8, UTF-8 BOM, GB18030, explicit Big5 decoding, deterministic multi-decode behavior, and total detection failure. Execution tests verify that detected encoding is exposed without mutating the request and that detection failure prevents downstream processing.
+
+### Reopen when
+
+Real-world inputs demonstrate that the fixed candidate set or ordering is insufficient, at which point any semantic detector or additional candidate should be introduced as an explicit new decision rather than an implicit heuristic.
 
 ---
 
