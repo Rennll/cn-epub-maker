@@ -14,6 +14,7 @@ from .configuration import (
     TransformationPolicy,
 )
 from .junk_rule_configuration import parse_junk_rules
+from .transforms import JunkRule
 
 _DEFAULTS: dict[str, Any] = {
     "lang": "zh-CN",
@@ -40,14 +41,17 @@ def resolve_conversion_request(
     1. ``application_defaults``: application-owned fallback policy and defaults;
     2. ``config_file``: values explicitly supplied by a configuration adapter;
     3. ``cli``: values explicitly supplied by the CLI adapter;
-    4. ``values``: the base request values supplied by the current adapter.
+    4. ``values``: the legacy positional/base input for backwards compatibility.
 
     ``None`` means unspecified in an input layer and therefore does not override
     a lower-precedence value. The resolver owns precedence and application-level
     semantics; it does not read configuration files or execute conversion work.
 
-    ``values`` remains the positional/base input for backwards compatibility;
-    when it contains optional policy values, they have the highest precedence.
+    ``values`` is a separate legacy input, not a pre-merged copy of the other
+    named layers. Callers that use the named ``cli`` layer should pass only the
+    legacy/base values in ``values``; otherwise optional values, including
+    ``junk_rules``, can be supplied twice and will be processed twice according
+    to the ordered append semantics.
     """
     defaults = dict(_DEFAULTS)
     defaults.update(_specified(application_defaults or {}))
@@ -141,8 +145,14 @@ def _resolve_junk_rules(
     config_file: Mapping[str, Any] | None,
     cli: Mapping[str, Any] | None,
     values: Mapping[str, Any],
-) -> tuple:
-    """Canonicalize ordered JunkRule inputs from all configuration sources."""
+) -> tuple[JunkRule, ...]:
+    """Canonicalize ordered JunkRule inputs from each supplied source.
+
+    ``values`` is retained as a legacy/base source and is intentionally not
+    treated as a merged representation of ``cli``. If a caller supplies the
+    same rules through both inputs, both occurrences are preserved because
+    rule order is execution semantics and this resolver does not deduplicate.
+    """
     raw_rules = []
     for layer in (application_defaults, config_file, cli, values):
         if layer is not None and layer.get("junk_rules") is not None:
