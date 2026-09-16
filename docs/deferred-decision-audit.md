@@ -15,7 +15,7 @@ The audit currently covers DD-01 through DD-14. DD-15 has been moved to `future-
 | DD-01 | Configuration Model | Resolved | Application architecture |
 | DD-02 | JunkCleaner rule input | Resolved | Configuration Model |
 | DD-03 | JunkCleaner default rules | Resolved | Configuration Model + DD-02 |
-| DD-04 | Intermediate semantics | Partially resolved | Configuration Model + provenance model |
+| DD-04 | Intermediate semantics | Resolved | Book model + provenance model |
 | DD-05 | Paragraph mode vs. source-format profile | Resolved | Parser architecture |
 | DD-06 | Normalize vs. Transformer responsibility | Resolved | Configuration Model + stage boundaries |
 | DD-07 | Real-device typography completion criteria | Resolved | EPUB rendering behavior |
@@ -130,35 +130,31 @@ Strong cross-source evidence establishes a low-false-positive global rule set, o
 
 ## DD-04 — Intermediate Semantics
 
-**Status: Partially resolved**
+**Status: Resolved**
 
-### Question
+### Decision
 
-What semantic contract should the Intermediate representation provide?
+Intermediate is a serialization and inspection artifact around the canonical in-memory `Book` model. It is not a second semantic model, runtime state, or independently rebuildable application artifact.
 
-### Current decision
+The current conversion pipeline treats `Book` as the canonical semantic representation between parsing and rendering. Intermediate serialization may expose that structured result for inspection, debugging, provenance, and future tooling, but the application does not require an Intermediate reader to continue a conversion.
 
-Intermediate is the structured serialization boundary around `Book` plus transformation provenance. It is not runtime state, raw source text, or a second configuration model.
-
-### Remaining question
-
-Whether Intermediate should become a stable, independently rebuildable artifact with a stronger semantic and compatibility contract.
+Intermediate therefore does not currently promise arbitrary `Intermediate → Book` reconstruction, cross-version compatibility, migration, or a stable interchange-format contract.
 
 ### Canonical
 
-`architecture-overview.md`
+`dd-04-intermediate-semantics.md`
 
 ### Related
 
-`future-directions.md`
+`architecture-overview.md`
 
 ### Evidence
 
-Current Intermediate serialization and provenance/audit model.
+Current Intermediate serialization, `Book` model usage, and optional `--keep-intermediate` artifact generation.
 
-### Resolve when
+### Reopen when
 
-The required serialized fields, provenance semantics, and compatibility expectations are sufficiently defined for the intended scope.
+The project needs to rebuild a `Book` without the original source text, consume Intermediate from a separate process or tool, resume EPUB generation from an Intermediate artifact, or provide long-lived Intermediate files with compatibility guarantees. Such a requirement should be treated as a new architecture feature rather than inferred from the current serialization format.
 
 ---
 
