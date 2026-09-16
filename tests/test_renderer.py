@@ -177,3 +177,27 @@ def test_render_preserves_literal_html_like_paragraph_text(tmp_path: Path):
         chapter = zf.read("EPUB/text/ch000001.xhtml").decode("utf-8")
         assert '<span class="fiction">' not in chapter
         assert "&lt;span class=“fiction”&gt;&amp;內容&lt;/span&gt;" in chapter
+
+
+def test_render_preserves_markdown_special_character_literals(tmp_path: Path):
+    if shutil.which("pandoc") is None:
+        pytest.skip("Pandoc is not installed in this test environment")
+
+    book = Book(title="測試書", author="作者", chapters=[
+        Chapter(sequence=1, number="1", label="第1章", title="特殊字元", paragraphs=[
+            Paragraph("H^2^O  a $b$ c\n標題文字\n===\nTerm\n: Definition")
+        ])
+    ])
+    output = tmp_path / "book.epub"
+    render(book, output)
+
+    with zipfile.ZipFile(output) as zf:
+        chapter = zf.read("EPUB/text/ch000001.xhtml").decode("utf-8")
+        assert "<sup>2</sup>" not in chapter
+        assert "<math" not in chapter
+        assert "<h1 id=\"標題文字\">" not in chapter
+        assert "<dl>" not in chapter
+        assert "H^2^O  a $b$ c" in chapter
+        assert "標題文字" in chapter
+        assert "===\nTerm" not in chapter
+        assert ": Definition" in chapter
