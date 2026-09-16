@@ -140,7 +140,14 @@ def test_epub_cover_is_manifested_only_when_present(tmp_path):
     output = tmp_path / "book.epub"
     book = _book_with_preamble()
     cover = tmp_path / "cover.png"
-    cover.write_bytes(b"not-a-real-png-but-a-valid-test-fixture")
+    # Minimal valid PNG fixture: signature + IHDR + IEND.
+    cover.write_bytes(
+        bytes.fromhex(
+            "89504e470d0a1a0a"
+            "0000000d49484452000000010000000108060000001f15c489"
+            "0000000049454e44ae426082"
+        )
+    )
     book.cover = str(cover)
     render(book, output)
     with _read_epub(output) as (zf, opf, _nav):
