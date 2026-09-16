@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from novel_epub.configuration_resolver import resolve_conversion_request
+from novel_epub.transforms import JunkRule
 
 
 def test_resolver_applies_application_defaults():
@@ -22,6 +23,7 @@ def test_resolver_applies_application_defaults():
     assert request.policy.transformations.opencc.enabled is True
     assert request.policy.transformations.opencc.profile == "s2twp"
     assert request.policy.transformations.punctuation_enabled is True
+    assert request.policy.transformations.junk_cleaner.rules == ()
     assert request.policy.full_source is False
 
 
@@ -106,6 +108,86 @@ def test_unspecified_cli_values_do_not_override_config():
     assert request.policy.parser.paragraph_mode == "line"
 
 
+def test_resolver_canonicalizes_junk_rules_from_base_input():
+    request = resolve_conversion_request(
+        {
+            "source": "book.txt",
+            "title": "書名",
+            "author": "作者",
+            "junk_rules": [
+                {"target": "line", "matcher": "exact", "pattern": "first"},
+                "block:contains:second",
+            ],
+        }
+    )
+
+    assert request.policy.transformations.junk_cleaner.rules == (
+        JunkRule(target="line", matcher="exact", pattern="first"),
+        JunkRule(target="block", matcher="contains", pattern="second"),
+    )
+
+
+def test_resolver_appends_config_and_cli_junk_rules_in_order():
+    request = resolve_conversion_request(
+        {"source": "book.txt", "title": "書名", "author": "作者"},
+        config_file={
+            "junk_rules": [
+                {"target": "line", "matcher": "exact", "pattern": "config"}
+            ]
+        },
+        cli={"junk_rules": ["block:contains:cli"]},
+    )
+
+    assert request.policy.transformations.junk_cleaner.rules == (
+        JunkRule(target="line", matcher="exact", pattern="config"),
+        JunkRule(target="block", matcher="contains", pattern="cli"),
+    )
+
+
+def test_resolver_rejects_invalid_junk_rule_before_execution():
+    with pytest.raises(ValueError, match="junk rule"):
+        resolve_conversion_request(
+            {
+                "source": "book.txt",
+                "title": "書名",
+                "author": "作者",
+                "junk_rules": ["line:regex:[unclosed"],
+            }
+        )
+
+
+def test_resolver_rejects_invalid_junk_rule_even_in_full_source_mode():
+    with pytest.raises(ValueError, match="junk rule"):
+        resolve_conversion_request(
+            {
+                "source": "book.txt",
+                "title": "書名",
+                "author": "作者",
+                "full_source": True,
+                "junk_rules": ["line:regex:[unclosed"],
+            }
+        )
+
+
+def test_full_source_disables_effective_content_transformations():
+    request = resolve_conversion_request(
+        {
+            "source": "book.txt",
+            "title": "書名",
+            "author": "作者",
+            "full_source": True,
+            "opencc": True,
+            "punctuation": True,
+            "junk_rules": ["line:exact:ignored"],
+        }
+    )
+
+    assert request.policy.full_source is True
+    assert request.policy.transformations.opencc.enabled is False
+    assert request.policy.transformations.punctuation_enabled is False
+    assert request.policy.transformations.junk_cleaner.rules == ()
+
+
 def test_resolver_rejects_missing_required_fields():
     with pytest.raises(ValueError, match="source"):
         resolve_conversion_request({"title": "書名", "author": "作者"})
@@ -134,24 +216,6 @@ def test_conversion_request_rejects_invalid_destination_mode():
 
     with pytest.raises(ValueError, match="destination_mode"):
         replace(request, destination_mode="invalid")
-
-
-def test_full_source_disables_effective_content_transformations():
-    request = resolve_conversion_request(
-        {
-            "source": "book.txt",
-            "title": "書名",
-            "author": "作者",
-            "full_source": True,
-            "opencc": True,
-            "punctuation": True,
-        }
-    )
-
-    assert request.policy.full_source is True
-    assert request.policy.transformations.opencc.enabled is False
-    assert request.policy.transformations.punctuation_enabled is False
-    assert request.policy.transformations.junk_cleaner.rules == ()
 
 
 def test_resolver_does_not_read_source_or_execute_transformations(monkeypatch):
