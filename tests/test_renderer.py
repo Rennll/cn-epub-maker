@@ -185,7 +185,7 @@ def test_render_preserves_markdown_special_character_literals(tmp_path: Path):
 
     book = Book(title="測試書", author="作者", chapters=[
         Chapter(sequence=1, number="1", label="第1章", title="特殊字元", paragraphs=[
-            Paragraph("H^2^O  a $b$ c\n標題文字\n===\nTerm\n: Definition")
+            Paragraph("H^2^O  a $b$ c\n他說: 你好\n標題文字\n===\nTerm\n: Definition")
         ])
     ])
     output = tmp_path / "book.epub"
@@ -198,6 +198,7 @@ def test_render_preserves_markdown_special_character_literals(tmp_path: Path):
         assert "<h1 id=\"標題文字\">" not in chapter
         assert "<dl>" not in chapter
         assert "H^2^O a $b$ c" in chapter
+        assert "他說: 你好" in chapter
         assert "標題文字" in chapter
         assert "===\nTerm" not in chapter
         assert "===<br />" in chapter
