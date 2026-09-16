@@ -58,7 +58,7 @@ def test_real_reader_acceptance_fixture_produces_structural_baseline(tmp_path: P
         chapter_files = sorted(
             name for name in names if name.startswith("EPUB/text/") and name.endswith(".xhtml")
         )
-        assert chapter_files
+        assert len(chapter_files) == 4
         content = "\n".join(archive.read(name).decode("utf-8") for name in chapter_files)
 
     assert "第一章 閱讀器驗收基線" in content
