@@ -25,6 +25,16 @@ def test_resolver_applies_application_defaults():
     assert request.policy.full_source is False
 
 
+def test_explicit_application_defaults_override_built_in_defaults():
+    request = resolve_conversion_request(
+        {"source": "book.txt", "title": "書名", "author": "作者"},
+        application_defaults={"encoding": "big5", "paragraph_mode": "line"},
+    )
+
+    assert request.policy.encoding == "big5"
+    assert request.policy.parser.paragraph_mode == "line"
+
+
 def test_explicit_destination_overrides_derived_default():
     request = resolve_conversion_request(
         {
@@ -67,7 +77,7 @@ def test_resolver_accepts_explicit_policy_values():
 def test_resolver_uses_cli_values_over_config_values():
     request = resolve_conversion_request(
         {"source": "book.txt", "title": "書名", "author": "作者"},
-        config={
+        config_file={
             "encoding": "big5",
             "paragraph_mode": "line",
             "opencc": False,
@@ -89,7 +99,7 @@ def test_resolver_uses_cli_values_over_config_values():
 def test_unspecified_cli_values_do_not_override_config():
     request = resolve_conversion_request(
         {"source": "book.txt", "title": "書名", "author": "作者"},
-        config={"encoding": "big5", "paragraph_mode": "line"},
+        config_file={"encoding": "big5", "paragraph_mode": "line"},
         cli={"encoding": None, "paragraph_mode": None},
     )
     assert request.policy.encoding == "big5"
