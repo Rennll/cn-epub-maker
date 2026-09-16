@@ -137,7 +137,8 @@ def test_epub_order_and_metadata_follow_book_semantics(tmp_path):
         chapter_items = {
             item.get("id"): item.get("href")
             for item in manifest.findall(f"{{{OPF_NS}}}item")
-            if item.get("media-type") == "application/xhtml+xml" and item.get("id") != "preamble"
+            if item.get("media-type") == "application/xhtml+xml"
+            and item.get("id") not in {"nav", "preamble"}
         }
         spine_chapters = [
             item.get("idref")
