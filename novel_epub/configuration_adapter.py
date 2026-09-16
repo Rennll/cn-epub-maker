@@ -37,7 +37,7 @@ def load_config_file(path: str | Path) -> Mapping[str, Any]:
 
     if not isinstance(value, dict):
         raise ConfigurationFileError(
-            "top-level JSON value must be an object"
+            f"top-level JSON value must be an object: {config_path}"
         )
 
     return value
