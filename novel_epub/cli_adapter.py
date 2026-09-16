@@ -24,4 +24,5 @@ def namespace_to_inputs(args: Namespace) -> dict[str, Any]:
         "punctuation": args.punctuation,
         "full_source": args.full_source,
         "paragraph_mode": args.paragraph_mode,
+        "junk_rules": args.junk_rules,
     }
