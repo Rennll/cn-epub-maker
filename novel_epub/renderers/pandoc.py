@@ -42,7 +42,8 @@ def _run_pandoc(args: list[str]) -> None:
 
 
 def _escape_markdown(text: str) -> str:
-    return "  \n".join(_MARKDOWN_CHARS.sub(r"\\\1", line) for line in text.split("\n"))
+    escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return "  \n".join(_MARKDOWN_CHARS.sub(r"\\\1", line) for line in escaped.split("\n"))
 
 
 def _chapter_heading(chapter: Chapter, level: int = 1) -> str:
