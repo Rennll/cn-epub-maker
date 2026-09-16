@@ -282,7 +282,7 @@ novel-epub build novel.txt \
   --lang zh-TW
 ```
 
-預設語言為 `zh-CN`。
+預設語言為 `zh-CN`。工具的內容處理 pipeline（OpenCC s2twp、標點轉換）以繁體中文為導向，若輸出目標為繁體，建議明確指定 `--lang zh-TW`。
 
 ## Intermediate
 
