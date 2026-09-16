@@ -21,7 +21,7 @@ p.paragraph-scene-break { margin-top: 2.5em; }
 h1 { text-align: center; break-before: page; page-break-before: always; }
 """
 
-_MARKDOWN_CHARS = re.compile(r"([\\`*{}\[\]()#+.!_>|~-])")
+_MARKDOWN_CHARS = re.compile(r"([\\`*{}\[\]()#+.!_>|~\-=\^$:\"])")
 _P_OPEN = re.compile(r"<p(\s[^>]*)?>")
 _NS_EPUB = "http://www.idpf.org/2007/ops"
 _NS_OPF = "http://www.idpf.org/2007/opf"
