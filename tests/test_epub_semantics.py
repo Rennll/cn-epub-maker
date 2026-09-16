@@ -147,9 +147,9 @@ def test_epub_order_and_metadata_follow_book_semantics(tmp_path):
         ]
         assert spine_chapters == ["ch000001", "ch000002", "ch000003"]
         assert chapter_items == {
-            "ch000001": "text/ch000010.xhtml",
-            "ch000002": "text/ch000020.xhtml",
-            "ch000003": "text/ch000030.xhtml",
+            "ch000001": "text/ch000001.xhtml",
+            "ch000002": "text/ch000002.xhtml",
+            "ch000003": "text/ch000003.xhtml",
         }
         assert all(href.removeprefix("../") in zf.namelist() for href in chapter_items.values())
 
