@@ -4,6 +4,8 @@
 
 This document is the canonical architecture and behavior contract for public `JunkRule` configuration in V2.x. It resolves DD-02 and defines the boundary between configuration input, rule validation, configuration resolution, and JunkCleaner execution.
 
+Last updated: 2026-09-16 (initial)
+
 The contract is intentionally narrower than a general configuration-file specification. It defines the rule model and semantics required for CLI and structured configuration support.
 
 ## Architectural Decision
@@ -105,6 +107,8 @@ Invalid rules are configuration errors. They must not be silently skipped during
 
 The configuration layer may compile a regex for validation. This compilation is validation work; the compiled regex is not stored in `ConversionRequest` and does not become runtime state.
 
+At execution time, JunkCleaner compiles each canonical regex pattern as needed for matching. Execution may later introduce an explicit compiled-pattern cache as an optimization, but such a cache is runtime state and is not part of the configuration or request contract.
+
 Execution may retain defensive invariant checks, but a known-invalid rule must not normally reach execution.
 
 ## Invalid Rule versus No Match
@@ -145,7 +149,23 @@ This is intentionally different from scalar configuration values, where a higher
 
 If application defaults eventually provide built-in JunkRules, they participate as the lowest-order rule collection. Default-rule policy itself remains DD-03 and is not resolved by this document.
 
-An unspecified source contributes no rules. An explicitly empty rule collection is distinct from an unspecified collection where the surrounding configuration format needs to preserve that distinction.
+An unspecified source contributes no rules. An explicitly empty rule collection is distinct from an unspecified collection.
+
+For JSON, the distinction is represented directly:
+
+```json
+{}
+```
+
+means `junk_rules` is unspecified, while:
+
+```json
+{
+  "junk_rules": []
+}
+```
+
+means the source explicitly supplies an empty rule collection. Under append semantics both contribute zero rules to the merged ordered collection, but the distinction remains observable to configuration handling and diagnostics and must not be collapsed implicitly.
 
 ## Ordering
 
@@ -223,7 +243,8 @@ JunkCleaner owns transformation execution:
 
 - applying valid rules in order;
 - counting matches/removals;
-- producing transformation results and audit data.
+- producing transformation results and audit data;
+- compiling regex patterns as needed for execution.
 
 It does not interpret CLI shorthand or structured configuration syntax.
 
@@ -245,9 +266,9 @@ If future reproducibility requirements require preserving rule source/provenance
 
 ## Full Source Mode
 
-`full_source = true` retains its existing configuration semantics. Effective JunkCleaner rules are empty in the resolved request, regardless of configured rules.
+`full_source = true` retains its existing configuration semantics. The rule configuration layer validates all supplied rules first. An invalid rule remains a configuration error even when Full Source Mode will suppress all effective JunkCleaner execution. After successful validation, Full Source Mode resolves the effective JunkCleaner rule collection to empty.
 
-The rule configuration layer may validate supplied rules before this cross-field resolution is applied. Configuration validity and Full Source Mode suppression are separate concerns.
+Configuration validity and Full Source Mode suppression are separate concerns.
 
 ## Non-Goals
 
@@ -266,6 +287,8 @@ This decision does not define:
 Those concerns require separate decisions if introduced.
 
 ## Acceptance Criteria
+
+The following criteria apply to the DD-02 implementation milestone; they are not claims that this documentation PR alone satisfies them.
 
 DD-02 is considered implemented when:
 
