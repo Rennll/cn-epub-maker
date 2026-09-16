@@ -111,6 +111,14 @@ def main() -> int:
         choices=("wrapped", "line"),
         help="paragraph boundary semantics: blank-line wrapped paragraphs or one source line per paragraph",
     )
+    build_parser.add_argument(
+        "--junk-rule",
+        dest="junk_rules",
+        action="append",
+        default=None,
+        metavar="TARGET:MATCHER:PATTERN",
+        help="add a JunkCleaner rule; may be repeated",
+    )
 
     validate_parser = sub.add_parser("validate", help="validate an EPUB archive")
     validate_parser.add_argument("epub")
