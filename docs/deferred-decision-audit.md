@@ -14,7 +14,7 @@ The audit currently covers DD-01 through DD-14. DD-15 has been moved to `future-
 | --- | --- | --- | --- |
 | DD-01 | Configuration Model | Resolved | Application architecture |
 | DD-02 | JunkCleaner rule input | Resolved | Configuration Model |
-| DD-03 | JunkCleaner default rules | Open, ready to decide | Configuration Model + DD-02 |
+| DD-03 | JunkCleaner default rules | Resolved | Configuration Model + DD-02 |
 | DD-04 | Intermediate semantics | Partially resolved | Configuration Model + provenance model |
 | DD-05 | Paragraph mode vs. source-format profile | Resolved | Parser architecture |
 | DD-06 | Normalize vs. Transformer responsibility | Resolved | Configuration Model + stage boundaries |
@@ -102,27 +102,29 @@ A future requirement changes the canonical rule model, input forms, ordering sem
 
 ## DD-03 — JunkCleaner Default Rules
 
-**Status: Open, ready to decide**
+**Status: Resolved**
 
-### Question
+### Decision
 
-Should JunkCleaner provide built-in default rules, and if so, which rules are safe enough to enable by default?
+`JunkCleaner` has no built-in global default rules. The application-level `junk_rules` collection remains empty by default, preserving the existing no-rule runtime behavior.
 
-### Decision principles
+No source-independent rule set was established with sufficiently strong evidence of non-content identification and sufficiently low risk of deleting legitimate正文 across the supported TXT population. Repository fixtures contain legitimate URLs, mixed CJK/Latin text, chapter/volume headings, and other material that broad semantic junk rules could incorrectly remove. External corpus review showed real source-specific contamination such as watermarks, fixed footers, and domain-bearing junk, but those patterns are not safe to promote to global defaults without source-specific scoping or stronger cross-source evidence.
 
-Default rules must have strong evidence that they identify non-content material. Rules with plausible 正文 false positives should not be enabled globally.
+The following are explicitly not global defaults: generic URL matching, generic `廣告`/`版權`/`作者`/`網站` keyword rules, generic contact/QQ matching, ISBN/publisher metadata matching, and currently observed source-specific domain/footer patterns.
 
-### Decision needed
+DD-02 remains authoritative for application-default/config-file/CLI precedence, append ordering, validation, explicit empty collections, and Full Source Mode semantics. Source-specific rule profiles and detection/candidate-generation workflows remain outside DD-03.
 
-- default set;
-- whether defaults can be disabled;
-- whether user rules replace or extend defaults;
-- whether source-specific defaults require a future source profile;
-- provenance of default rules.
+### Canonical
 
-### Resolve when
+`docs/dd-03-junkcleaner-default-rules.md`
 
-The default set, precedence, safety rationale, and regression coverage are documented.
+### Evidence
+
+The decision preserves the existing empty application default and is supported by repository fixtures plus external TXT corpus review. The evidence did not establish a sufficiently safe cross-source global rule set.
+
+### Reopen when
+
+Strong cross-source evidence establishes a low-false-positive global rule set, or the architecture explicitly introduces a source-profile mechanism that can safely scope rules to known source ecosystems.
 
 ---
 
