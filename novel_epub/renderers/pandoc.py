@@ -47,7 +47,8 @@ def _escape_markdown(text: str) -> str:
 
 
 def _chapter_heading(chapter: Chapter, level: int = 1) -> str:
-    return f"{'#' * level} {chapter.label} {chapter.title}".rstrip()
+    text = f"{chapter.label} {chapter.title}".rstrip()
+    return f"{'#' * level} {_escape_markdown(text)}"
 
 
 def _chapter_markdown(chapter: Chapter) -> str:
@@ -70,7 +71,8 @@ def _markdown(book: Book) -> str:
         lines.extend([_escape_markdown(paragraph.text), ""])
     if book.volumes:
         for volume in book.volumes:
-            lines.extend([f"# {volume.label} {volume.title}".rstrip(), ""])
+            volume_text = f"{volume.label} {volume.title}".rstrip()
+            lines.extend([f"# {_escape_markdown(volume_text)}", ""])
             for chapter in volume.chapters:
                 lines.extend([_chapter_heading(chapter, 2), ""])
                 for paragraph in chapter.paragraphs:
