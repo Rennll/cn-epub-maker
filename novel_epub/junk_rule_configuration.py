@@ -27,8 +27,12 @@ def parse_junk_rule(value: Mapping[str, object] | str) -> JunkRule:
     else:
         raise JunkRuleConfigurationError("junk rule must be a mapping or string")
 
+    if target is None:
+        raise JunkRuleConfigurationError("junk rule is missing required field: target")
     if target not in _VALID_TARGETS:
         raise JunkRuleConfigurationError(f"invalid junk rule target: {target!r}")
+    if matcher is None:
+        raise JunkRuleConfigurationError("junk rule is missing required field: matcher")
     if matcher not in _VALID_MATCHERS:
         raise JunkRuleConfigurationError(f"invalid junk rule matcher: {matcher!r}")
     if not isinstance(pattern, str):
@@ -45,15 +49,17 @@ def parse_junk_rule(value: Mapping[str, object] | str) -> JunkRule:
     return JunkRule(target=target, matcher=matcher, pattern=pattern)
 
 
-def parse_junk_rules(values: Sequence[Mapping[str, object] | str]) -> tuple[JunkRule, ...]:
+def parse_junk_rules(
+    values: Sequence[Mapping[str, object] | str],
+) -> tuple[JunkRule, ...]:
     """Parse rules in input order and return canonical immutable rules."""
     return tuple(parse_junk_rule(value) for value in values)
 
 
-def _parse_shorthand(value: str) -> tuple[object, object, object]:
+def _parse_shorthand(value: str) -> tuple[str, str, str]:
     parts = value.split(":", 2)
     if len(parts) != 3:
         raise JunkRuleConfigurationError(
             "junk rule shorthand must be TARGET:MATCHER:PATTERN"
         )
-    return tuple(parts)  # type: ignore[return-value]
+    return parts[0], parts[1], parts[2]
