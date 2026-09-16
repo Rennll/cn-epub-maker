@@ -105,7 +105,8 @@ def test_epub_order_and_metadata_follow_book_semantics(tmp_path):
             for item in manifest.findall(f"{{{OPF_NS}}}item")
             if item.get("media-type") == "application/xhtml+xml" and item.get("id") not in {"nav", "preamble"}
         }
-        assert [item.get("idref") for item in spine.findall(f"{{{OPF_NS}}}itemref") if item.get("idref") != "preamble"] == ["ch000001", "ch000002", "ch000003"]
+        spine_chapters = [item.get("idref") for item in spine.findall(f"{{{OPF_NS}}}itemref") if item.get("idref") != "preamble"]
+        assert spine_chapters == ["ch000001", "ch000002", "ch000003"]
         assert chapter_items == {
             "ch000001": "text/ch000001.xhtml",
             "ch000002": "text/ch000002.xhtml",
@@ -114,7 +115,12 @@ def test_epub_order_and_metadata_follow_book_semantics(tmp_path):
         assert all(f"EPUB/{href}" in zf.namelist() for href in chapter_items.values())
 
         nav_links = [element.get("href") for element in nav.iter(f"{{{XHTML_NS}}}a") if element.get("href")]
-        assert nav_links == ["text/ch000010.xhtml", "text/ch000020.xhtml", "text/ch000030.xhtml"]
+        assert nav_links == [
+            "text/preamble.xhtml",
+            "text/ch000001.xhtml",
+            "text/ch000002.xhtml",
+            "text/ch000003.xhtml",
+        ]
         volume_lists = [element for element in nav.iter(f"{{{XHTML_NS}}}li") if "第一卷" in "".join(element.itertext())]
         assert volume_lists
 
