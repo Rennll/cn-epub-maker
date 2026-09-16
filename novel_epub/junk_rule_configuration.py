@@ -16,16 +16,20 @@ _VALID_TARGETS = {"line", "block"}
 _VALID_MATCHERS = {"exact", "contains", "regex"}
 
 
-def parse_junk_rule(value: Mapping[str, object] | str) -> JunkRule:
-    """Parse one structured or CLI-shorthand rule into a canonical JunkRule."""
-    if isinstance(value, str):
+def parse_junk_rule(value: Mapping[str, object] | str | JunkRule) -> JunkRule:
+    """Parse or validate one rule into the canonical JunkRule representation."""
+    if isinstance(value, JunkRule):
+        target = value.target
+        matcher = value.matcher
+        pattern = value.pattern
+    elif isinstance(value, str):
         target, matcher, pattern = _parse_shorthand(value)
     elif isinstance(value, Mapping):
         target = value.get("target")
         matcher = value.get("matcher")
         pattern = value.get("pattern")
     else:
-        raise JunkRuleConfigurationError("junk rule must be a mapping or string")
+        raise JunkRuleConfigurationError("junk rule must be a mapping, string, or JunkRule")
 
     if target is None:
         raise JunkRuleConfigurationError("junk rule is missing required field: target")
@@ -50,9 +54,9 @@ def parse_junk_rule(value: Mapping[str, object] | str) -> JunkRule:
 
 
 def parse_junk_rules(
-    values: Sequence[Mapping[str, object] | str],
+    values: Sequence[Mapping[str, object] | str | JunkRule],
 ) -> tuple[JunkRule, ...]:
-    """Parse rules in input order and return canonical immutable rules."""
+    """Parse or validate rules in input order into canonical immutable rules."""
     return tuple(parse_junk_rule(value) for value in values)
 
 
