@@ -144,7 +144,12 @@ def test_epub_order_and_metadata_follow_book_semantics(tmp_path):
             for item in spine.findall(f"{{{OPF_NS}}}itemref")
             if item.get("idref") != "preamble"
         ]
-        assert spine_chapters == ["ch000010", "ch000020", "ch000030"]
+        assert spine_chapters == ["ch000001", "ch000002", "ch000003"]
+        assert chapter_items == {
+            "ch000001": "text/ch000010.xhtml",
+            "ch000002": "text/ch000020.xhtml",
+            "ch000003": "text/ch000030.xhtml",
+        }
         assert all(href.removeprefix("../") in zf.namelist() for href in chapter_items.values())
 
         nav_links = [
@@ -153,9 +158,9 @@ def test_epub_order_and_metadata_follow_book_semantics(tmp_path):
             if element.get("href")
         ]
         assert nav_links == [
-            "text/chapter-000010.xhtml",
-            "text/chapter-000020.xhtml",
-            "text/chapter-000030.xhtml",
+            "text/ch000010.xhtml",
+            "text/ch000020.xhtml",
+            "text/ch000030.xhtml",
         ]
 
         volume_lists = [
@@ -169,7 +174,7 @@ def test_epub_order_and_metadata_follow_book_semantics(tmp_path):
         rootfile = container.find(f"{{{CONTAINER_NS}}}rootfiles/{{{CONTAINER_NS}}}rootfile")
         assert rootfile.get("full-path") == "EPUB/content.opf"
         assert "EPUB/nav.xhtml" in zf.namelist()
-        assert "EPUB/stylesheet.css" in zf.namelist()
+        assert "EPUB/styles/stylesheet.css" in zf.namelist()
 
         with zf.open("mimetype") as mimetype:
             assert mimetype.read() == b"application/epub+zip"
@@ -236,6 +241,6 @@ def test_epub_paragraph_boundaries_map_to_xhtml_paragraphs(tmp_path):
     render(book, output)
 
     with zipfile.ZipFile(output) as zf:
-        chapter = ET.fromstring(zf.read("EPUB/text/chapter-000001.xhtml"))
+        chapter = ET.fromstring(zf.read("EPUB/text/ch000001.xhtml"))
         classes = [p.get("class") for p in chapter.iter(f"{{{XHTML_NS}}}p")]
         assert classes == [None, "paragraph-expanded", "paragraph-scene-break"]
