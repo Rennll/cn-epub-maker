@@ -39,7 +39,7 @@ class Volume:
 class Book:
     title: str
     author: str
-    language: str = "zh-CN"
+    language: str = "zh-TW"
     cover: str | None = None
     preamble: list[Paragraph] = field(default_factory=list)
     volumes: list[Volume] = field(default_factory=list)
