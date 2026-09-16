@@ -282,7 +282,7 @@ novel-epub build novel.txt \
   --lang zh-TW
 ```
 
-預設語言為 `zh-CN`。工具的內容處理 pipeline（OpenCC s2twp、標點轉換）以繁體中文為導向，若輸出目標為繁體，建議明確指定 `--lang zh-TW`。
+預設語言為 `zh-TW`。工具的內容處理 pipeline（OpenCC `s2twp`、標點轉換）預設以繁體中文為輸出方向；如果需要其他 EPUB 語言標記，可以使用 `--lang` 指定。
 
 ## Intermediate
 
@@ -352,14 +352,29 @@ novel-epub build novel.txt \
   --encoding big5
 ```
 
-### 不想轉換簡體中文
+### 不想轉換簡繁體
 
-使用 `--no-opencc`。如果同時希望保留原始文字的內容 transformation 行為，也可以直接使用 `--full-source`；Full Source Mode 會停用 OpenCC、Punctuation Conversion 與其他內容 transformation，但仍執行 Normalize。
+如果希望保留來源文字，不執行 OpenCC，可以使用：
 
-### 不想轉換標點
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --no-opencc
+```
 
-使用 `--no-punctuation`。這不會停用 OpenCC。
+### Pandoc 已安裝但仍找不到
 
-## 授權
+請確認 `pandoc` 所在目錄有加入 `PATH`，並重新開啟終端機後再執行：
 
-MIT
+```bash
+which pandoc
+pandoc --version
+```
+
+Windows 可以使用：
+
+```powershell
+where.exe pandoc
+pandoc --version
+```
