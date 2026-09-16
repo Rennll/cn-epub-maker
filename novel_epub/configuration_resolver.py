@@ -17,7 +17,7 @@ from .junk_rule_configuration import parse_junk_rules
 from .transforms import JunkRule
 
 _DEFAULTS: dict[str, Any] = {
-    "lang": "zh-CN",
+    "lang": "zh-TW",
     "encoding": "auto",
     "paragraph_mode": "wrapped",
     "opencc": True,
