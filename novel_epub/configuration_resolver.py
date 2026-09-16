@@ -26,9 +26,10 @@ _DEFAULTS: dict[str, Any] = {
 
 
 def resolve_conversion_request(
-    cli: Mapping[str, Any],
+    values: Mapping[str, Any],
     *,
     config_file: Mapping[str, Any] | None = None,
+    cli: Mapping[str, Any] | None = None,
     application_defaults: Mapping[str, Any] | None = None,
 ) -> ConversionRequest:
     """Resolve explicit configuration layers into a complete request.
@@ -37,18 +38,23 @@ def resolve_conversion_request(
 
     1. ``application_defaults``: application-owned fallback policy and defaults;
     2. ``config_file``: values explicitly supplied by a configuration adapter;
-    3. ``cli``: values explicitly supplied by the CLI adapter.
+    3. ``cli``: values explicitly supplied by the CLI adapter;
+    4. ``values``: the base request values supplied by the current adapter.
 
     ``None`` means unspecified in an input layer and therefore does not override
     a lower-precedence value. The resolver owns precedence and application-level
     semantics; it does not read configuration files or execute conversion work.
+
+    ``values`` remains the positional/base input for backwards compatibility;
+    when it contains optional policy values, they have the highest precedence.
     """
     defaults = dict(_DEFAULTS)
     defaults.update(_specified(application_defaults or {}))
 
     resolved: dict[str, Any] = defaults
     resolved.update(_specified(config_file or {}))
-    resolved.update(_specified(cli))
+    resolved.update(_specified(cli or {}))
+    resolved.update(_specified(values))
 
     source = Path(_require(resolved, "source"))
     title = _require(resolved, "title")
