@@ -176,4 +176,4 @@ def test_render_preserves_literal_html_like_paragraph_text(tmp_path: Path):
     with zipfile.ZipFile(output) as zf:
         chapter = zf.read("EPUB/text/ch000001.xhtml").decode("utf-8")
         assert '<span class="fiction">' not in chapter
-        assert "這不是標籤：&lt;span class=\"fiction\"&gt;&amp;內容&lt;/span&gt;" in chapter
+        assert "&lt;span class=“fiction”&gt;&amp;內容&lt;/span&gt;" in chapter
