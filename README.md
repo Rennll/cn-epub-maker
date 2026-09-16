@@ -1,6 +1,6 @@
 # cn-epub-maker
 
-將中文小說 TXT 轉換成 EPUB 的 Python 工具。適合希望把整理過的中文小說文字轉成可閱讀 EPUB 的使用者，也提供 Intermediate JSON 供後續處理與除錯。
+將中文小說 TXT 轉換成 EPUB 的 Python 工具。適合把整理過的中文小說文字轉成可閱讀的 EPUB，也提供可選的 Intermediate JSON 供檢查與除錯。
 
 ## 安裝
 
@@ -8,9 +8,9 @@
 
 - Python 3.10 以上
 - Pandoc，且 `pandoc` 必須能在 `PATH` 中執行
-- EPUBCheck 為選用工具；若安裝並放在 `PATH` 中，`validate` 會額外執行 EPUB 標準驗證
+- EPUBCheck（選用）：安裝後 `validate` 會額外執行 EPUB 標準驗證
 
-建議在虛擬環境中安裝：
+建議使用虛擬環境：
 
 ```bash
 python3 -m venv .venv
@@ -18,19 +18,14 @@ source .venv/bin/activate
 python3 -m pip install -e .
 ```
 
-確認 Pandoc：
+確認安裝：
 
 ```bash
 pandoc --version
-```
-
-確認 CLI：
-
-```bash
 novel-epub --help
 ```
 
-如果不使用安裝後的 `novel-epub` 指令，也可以使用 Python module 方式：
+也可以使用 module 方式執行：
 
 ```bash
 python3 -m novel_epub.cli --help
@@ -38,13 +33,13 @@ python3 -m novel_epub.cli --help
 
 ## 基本使用
 
-最基本的 build 需要輸入 TXT、書名與作者：
+最基本的 build 需要 TXT、書名與作者：
 
 ```bash
 novel-epub build novel.txt --title "書名" --author "作者"
 ```
 
-預設輸出檔名為 `<書名>_<作者>.epub`。如果需要指定輸出位置：
+預設輸出檔名為 `<書名>_<作者>.epub`。指定輸出位置：
 
 ```bash
 novel-epub build novel.txt \
@@ -53,29 +48,24 @@ novel-epub build novel.txt \
   --output book.epub
 ```
 
-也可以使用 module 方式執行相同命令：
+## 常用選項
 
-```bash
-python3 -m novel_epub.cli build novel.txt \
-  --title "書名" \
-  --author "作者" \
-  --output book.epub
-```
-
-## 常用操作
-
-| 操作 | 參數 | 說明 |
+| 需求 | 參數 | 說明 |
 |---|---|---|
 | 指定輸出 | `--output` | 指定 EPUB 輸出檔案 |
-| 指定段落模式 | `--paragraph-mode` | [`wrapped`（預設）或 `line`](#段落模式) |
-| 停用 OpenCC | `--no-opencc` | 不進行簡體／繁體轉換 |
-| 停用標點轉換 | `--no-punctuation` | 不進行標點轉換 |
-| 保留 Intermediate | `--keep-intermediate` | [輸出中間 JSON 資料供檢查](#intermediate) |
-| 原始內容流程 | `--full-source` | [停用內容 transformation，但仍執行 Normalize](#full-source-mode) |
+| 指定來源編碼 | `--encoding` | 例如 `utf-8`、`gb18030`、`gbk`、`big5` |
+| 一行一段 | `--paragraph-mode line` | 適合「每個來源行就是一個段落」的 TXT |
+| 保留原本段落包裝 | `--paragraph-mode wrapped` | 預設；連續非空白行視為同一段落 |
+| 不做簡繁轉換 | `--no-opencc` | 停用預設的 OpenCC 轉換 |
+| 不做標點轉換 | `--no-punctuation` | 停用標點轉換 |
+| 加入封面 | `--cover` | 指定封面圖片 |
+| 指定 EPUB 語言 | `--lang` | 預設為 `zh-TW` |
+| 保留 Intermediate | `--keep-intermediate` | 將 build 過程的 JSON 資料寫到磁碟 |
+| 停用內容 transformation | `--full-source` | 保留來源內容，不做 OpenCC、標點與 junk cleaning |
 
-## 來源編碼
+### 來源編碼
 
-程式會自動嘗試常見中文編碼。若知道來源編碼，建議直接指定：
+程式會自動嘗試常見中文編碼。若知道來源編碼，建議直接指定，例如：
 
 ```bash
 novel-epub build novel.txt \
@@ -84,16 +74,31 @@ novel-epub build novel.txt \
   --encoding gb18030
 ```
 
-目前可指定的常見選項包括 `utf-8-sig`、`utf-8`、`gb18030`、`gbk`、`big5`。Normalize 會處理 UTF-8 BOM 與不同 newline 表示。
+目前常見選項包括 `utf-8-sig`、`utf-8`、`gb18030`、`gbk`、`big5`。Normalize 也會處理 UTF-8 BOM 與不同 newline 表示。
 
-## V2 文字處理
+### 段落模式
 
-一般 build 預設會依序執行：
+預設使用 `wrapped`：連續的非空白來源行視為同一個邏輯段落，空白行才結束段落。
+
+如果來源 TXT 是「一行就是一個段落」，使用：
+
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --paragraph-mode line
+```
+
+兩種模式都不會因空白行產生空的段落。段落模式也不會改變章節、卷與番外標題的辨識規則。
+
+## 文字處理
+
+一般 build 會依序處理來源文字：
 
 ```text
 Normalize
   ↓
-Junk Cleaner
+Junk Cleaning
   ↓
 OpenCC
   ↓
@@ -101,149 +106,36 @@ Punctuation Conversion
   ↓
 Parser
   ↓
-Intermediate
-  ↓
 EPUB
   ↓
 Validation
 ```
 
-OpenCC 預設啟用，可以用 `--no-opencc` 停用：
+OpenCC 預設將內容轉為繁體中文，可用 `--no-opencc` 停用。
 
-```bash
-novel-epub build novel.txt \
-  --title "書名" \
-  --author "作者" \
-  --no-opencc
-```
-
-Punctuation Conversion 預設啟用，可以用 `--no-punctuation` 停用：
-
-```bash
-novel-epub build novel.txt \
-  --title "書名" \
-  --author "作者" \
-  --no-punctuation
-```
+標點轉換預設啟用，可用 `--no-punctuation` 停用。
 
 ### Junk Cleaner
 
-Junk Cleaner 是文字處理 pipeline 中的固定階段，負責依照明確規則移除來源文字中的非正文內容。目前 CLI 建立的 Junk Cleaner 沒有套用預設規則，因此**不會主動刪除任何小說內容**。
+Junk Cleaner 只負責「移除可以明確判定為非正文的內容」，不負責一般文字替換。預設不會自行套用一組可能誤刪小說內容的規則。
 
-Junk Cleaner 的規則目前是程式內部的 `JunkRule`，每條規則包含三個欄位：
+規則使用 `JunkRule` 表示，核心欄位為：
 
-- `target`：匹配範圍，目前支援 `line` 與 `block`。
-- `matcher`：匹配方式，目前支援 `exact`、`contains` 與 `regex`。
-- `pattern`：要匹配的文字或正則表達式。
+- `target`：`line` 或 `block`
+- `matcher`：`exact`、`contains` 或 `regex`
+- `pattern`：匹配文字或正則表達式
 
-例如，規則可以表示為：
+例如：
 
-```python
-JunkRule(
-    target="line",
-    matcher="exact",
-    pattern="本章節完",
-)
+```text
+line:exact:本章節完
+line:contains:請收藏本書
+line:regex:^本章由.*整理$
 ```
 
-`target="line"` 表示逐行判斷。上面的規則只有在某一整行完全等於 `本章節完` 時才會移除該行。
+`line` 逐行判斷；`block` 則以空白行分隔的連續非空白行為單位，因此應更謹慎使用。
 
-`target="block"` 則以空白行分隔的連續非空白行作為一個區塊判斷。例如：
-
-```python
-JunkRule(
-    target="block",
-    matcher="contains",
-    pattern="本章由",
-)
-```
-
-如果某個連續文字區塊中包含 `本章由`，整個區塊會被移除。因此 `block` 規則要比 `line` 規則更加謹慎。
-
-三種 matcher 的行為如下：
-
-- `exact`：目標內容必須與 `pattern` 完全相等。
-- `contains`：目標內容只要包含 `pattern` 即視為命中。
-- `regex`：使用 Python 正則表達式進行匹配。
-
-例如，固定文字適合使用 `exact`：
-
-```python
-JunkRule(
-    target="line",
-    matcher="exact",
-    pattern="請收藏本書",
-)
-```
-
-文字可能出現在不同位置時，可以使用 `contains`：
-
-```python
-JunkRule(
-    target="line",
-    matcher="contains",
-    pattern="本小說由",
-)
-```
-
-需要處理固定結構、但部分文字會變動時，可以使用 `regex`：
-
-```python
-JunkRule(
-    target="line",
-    matcher="regex",
-    pattern=r"^本章由.*整理$",
-)
-```
-
-多條規則可以組合使用：
-
-```python
-rules = [
-    JunkRule(
-        target="line",
-        matcher="exact",
-        pattern="本章節完",
-    ),
-    JunkRule(
-        target="line",
-        matcher="contains",
-        pattern="請收藏本書",
-    ),
-    JunkRule(
-        target="line",
-        matcher="regex",
-        pattern=r"^本章由.*整理$",
-    ),
-]
-```
-
-目前這些規則並不是使用者可直接透過 CLI 指定的設定檔；它們是 `JunkCleaner` 的程式內部介面。這部分的使用者自訂規則與規則載入方式尚未定義，因此 README 目前不提供虛構的 `--junk-rules` 或 JSON/YAML 設定檔用法。
-
-撰寫規則時，應盡量使用最具體的匹配條件，只移除可以明確判定為非正文的內容。尤其是 `contains` 與 `regex`，如果條件過於寬鬆，可能誤刪正常小說內容。Junk Cleaner 的用途是 remove-only，不應拿來進行一般文字替換或正文改寫。
-
-## 段落模式
-
-`build` 提供 `--paragraph-mode`，用來指定 TXT 的段落邊界語義。預設為 `wrapped`，因此不指定此參數時，行為與既有傳統 TXT 解析相同：連續的非空白行視為同一個邏輯段落，空白行才結束段落。
-
-如果來源是中文網路小說常見的「一行就是一個段落」格式，可以指定 `line`：
-
-```bash
-novel-epub build novel.txt \
-  --title "侯夫人与杀猪刀" \
-  --author "作者" \
-  --paragraph-mode line
-```
-
-兩種模式的差異是：
-
-- `wrapped`：連續非空白行合併為一個段落；來源行中的換行可保留為該段落內的 hard line break。
-- `line`：每個非空白來源行各自成為一個段落。
-- 兩種模式都不會因空白行產生空的 `Paragraph`。
-- `--paragraph-mode` 是明確的輸入格式選擇，不會根據標點、句長、縮排等內容啟發式自動判斷。
-- 章節、卷與番外標題的辨識與段落模式獨立，不會因切換模式而改變既有 heading grammar。
-
-因此，只有在來源 TXT 確實採用「一行一段」格式時才需要使用 `--paragraph-mode line`；一般傳統 TXT 建議維持預設的 `wrapped`。
+JunkRule 的完整設定格式與規則語義見 [`docs/junk-rule-configuration.md`](docs/junk-rule-configuration.md)。目前 README 只描述規則模型，不把尚未整合完成的設定檔或 CLI 載入方式當成已可用功能。
 
 ## Full Source Mode
 
@@ -256,11 +148,7 @@ novel-epub build novel.txt \
   --full-source
 ```
 
-此模式仍會執行 Normalize，因此不是 byte-for-byte 的原始檔複製。其處理路徑是：
-
-```text
-TXT → Normalize → Parser → Intermediate → EPUB
-```
+此模式仍會執行 Normalize，因此不是 byte-for-byte 的原始檔複製；它的目的是保留來源文字內容，同時仍進行必要的輸入正規化。
 
 ## 封面與語言
 
@@ -282,11 +170,13 @@ novel-epub build novel.txt \
   --lang zh-TW
 ```
 
-預設語言為 `zh-TW`。工具的內容處理 pipeline（OpenCC `s2twp`、標點轉換）預設以繁體中文為輸出方向；如果需要其他 EPUB 語言標記，可以使用 `--lang` 指定。
+預設 EPUB 語言為 `zh-TW`。
 
 ## Intermediate
 
-Intermediate 是 build 過程中的結構化書籍資料。只有使用 `--keep-intermediate` 時，程式才會把它寫到磁碟，方便檢查 Parser 結果與 transformation audit。
+Intermediate 是可選的 build 輸出，主要用來檢查 Parser 結果與 transformation audit，不是一般使用者必須操作的格式。
+
+啟用：
 
 ```bash
 novel-epub build novel.txt \
@@ -295,7 +185,7 @@ novel-epub build novel.txt \
   --keep-intermediate
 ```
 
-如果沒有指定 `--intermediate`，例如輸入檔為 `novel.txt`，預設會在目前目錄建立 `novel.intermediate/`。也可以指定 Intermediate 根目錄：
+預設會建立 `<輸入檔名>.intermediate/`；也可以指定位置：
 
 ```bash
 novel-epub build novel.txt \
@@ -305,7 +195,7 @@ novel-epub build novel.txt \
   --intermediate book.intermediate
 ```
 
-Intermediate 實際輸出結構如下：
+輸出大致如下：
 
 ```text
 novel.intermediate/
@@ -317,7 +207,7 @@ novel.intermediate/
     └── ...
 ```
 
-`book.json` 保存書籍 metadata、卷章索引，以及這次 build 的 transformation audit。各章內容則寫在 `chapters/` 下的 JSON 檔案中；如果書籍有 preamble，則另外保存為 `preamble.json`。
+Intermediate 是序列化的 build 結果，方便人為檢查與除錯；目前沒有承諾可以由 Intermediate 完整反向重建執行時的 `Book`。
 
 ## 驗證 EPUB
 
@@ -327,23 +217,23 @@ novel.intermediate/
 novel-epub validate book.epub
 ```
 
-若系統中存在 EPUBCheck，`validate` 也會執行外部標準驗證；沒有安裝 EPUBCheck 時，內建驗證仍可使用，但會提示外部驗證被略過。
+若系統中存在 EPUBCheck，`validate` 會再執行外部 EPUB 標準驗證；沒有安裝時，內建驗證仍可使用。
 
 ## 常見問題
 
 ### 找不到 Pandoc
 
-如果出現找不到 `pandoc` 的錯誤，請先確認：
+先確認：
 
 ```bash
 pandoc --version
 ```
 
-如果指令不存在，請先安裝 Pandoc，並確認它位於 `PATH`。
+如果指令不存在，請安裝 Pandoc，並確認它位於 `PATH`。
 
 ### 中文顯示錯誤
 
-如果 TXT 是 Big5、GBK 或 GB18030 等編碼，請明確指定來源編碼，例如：
+如果 TXT 使用 Big5、GBK 或 GB18030，請明確指定來源編碼：
 
 ```bash
 novel-epub build novel.txt \
@@ -352,9 +242,9 @@ novel-epub build novel.txt \
   --encoding big5
 ```
 
-### 不想轉換簡繁體
+### 不想轉換簡繁
 
-如果希望保留來源文字，不執行 OpenCC，可以使用：
+使用：
 
 ```bash
 novel-epub build novel.txt \
@@ -363,18 +253,26 @@ novel-epub build novel.txt \
   --no-opencc
 ```
 
-### Pandoc 已安裝但仍找不到
+### 不想轉換標點
 
-請確認 `pandoc` 所在目錄有加入 `PATH`，並重新開啟終端機後再執行：
+使用：
 
 ```bash
-which pandoc
-pandoc --version
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --no-punctuation
 ```
 
-Windows 可以使用：
+### 想保留來源文字，不做內容轉換
 
-```powershell
-where.exe pandoc
-pandoc --version
-```
+使用 `--full-source`。注意它仍會進行 Normalize，所以不是 byte-for-byte 複製。
+
+## 架構與詳細文件
+
+一般使用不需要理解內部架構。需要了解行為規格或進行開發時，可從以下文件開始：
+
+- [`docs/architecture-overview.md`](docs/architecture-overview.md) — 整體架構
+- [`docs/physical-document-and-formatting-contract.md`](docs/physical-document-and-formatting-contract.md) — TXT 來源與格式語義
+- [`docs/junk-rule-configuration.md`](docs/junk-rule-configuration.md) — JunkRule 設定契約
+- [`docs/real-reader-acceptance-matrix.md`](docs/real-reader-acceptance-matrix.md) — EPUB 閱讀器驗收情境
