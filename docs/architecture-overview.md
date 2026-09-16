@@ -133,9 +133,9 @@ The Parser consumes the post-transformation Physical Document and the Document F
 
 ### Intermediate
 
-Provide the structured representation exchanged between parsing, serialization, and later processing stages.
+Provide an optional serialized representation of the canonical `Book` result for inspection, debugging, provenance, and future tooling.
 
-Intermediate preserves the information required to reconstruct the book while allowing the implementation to serialize, inspect, and process the structured result independently of the original source text. Its semantic contract and any future rebuildability are documented separately.
+Intermediate is a serialization and inspection artifact around `Book`, not a second semantic model or independently rebuildable application artifact. The application does not require an Intermediate reader to continue a conversion, and the current format does not promise arbitrary `Intermediate → Book` reconstruction, schema migration, or cross-version compatibility. The detailed contract is defined in `dd-04-intermediate-semantics.md`.
 
 ### Renderer
 
@@ -202,7 +202,7 @@ The main boundaries are:
 - **Input boundary:** Normalize isolates raw source irregularities from later stages.
 - **Content boundary:** Transformations modify content while remaining separate from structural interpretation.
 - **Analysis boundary:** Document Analysis observes physical structure and produces formatting evidence. It does not assign semantic document types. The Parser owns semantic inference.
-- **Structure boundary:** Parser and Intermediate establish and preserve the book model.
+- **Structure boundary:** Parser and `Book` establish and preserve the canonical semantic book model; Intermediate may serialize that model for inspection.
 - **Presentation boundary:** Renderer turns structure into publication-oriented output without redefining upstream semantics.
 - **Artifact boundary:** EPUB generation packages the rendered result.
 - **Verification boundary:** Validation checks the final artifact independently of how it was produced.
