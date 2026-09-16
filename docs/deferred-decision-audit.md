@@ -13,7 +13,7 @@ The audit currently covers DD-01 through DD-14. DD-15 has been moved to `future-
 | ID | Decision | Status | Primary dependency |
 | --- | --- | --- | --- |
 | DD-01 | Configuration Model | Resolved | Application architecture |
-| DD-02 | JunkCleaner rule input | Open, ready to decide | Configuration Model |
+| DD-02 | JunkCleaner rule input | Resolved | Configuration Model |
 | DD-03 | JunkCleaner default rules | Open, ready to decide | Configuration Model + DD-02 |
 | DD-04 | Intermediate semantics | Partially resolved | Configuration Model + provenance model |
 | DD-05 | Paragraph mode vs. source-format profile | Resolved | Parser architecture |
@@ -63,42 +63,46 @@ The current request/policy boundary can no longer represent the required configu
 
 ## DD-02 — JunkCleaner Rule Input
 
-**Status: Open**
+**Status: Resolved**
 
-### Question
+### Decision
 
-How should users define and provide `JunkRule` entries?
+JunkCleaner rules use a canonical structured `JunkRule` model and support a repeatable CLI shorthand. Structured configuration and CLI shorthand are parsed, normalized, validated, and canonicalized by a dedicated configuration rule layer before entering the resolved `ConversionRequest`.
 
-### Current position
+Configuration-file rules and CLI rules are merged by append, preserving declared order. Invalid rule configuration, including invalid regular expressions, is rejected before execution. A valid rule that matches zero input is not an error.
 
-The typed `JunkRule` schema belongs under `JunkCleanerConfig.rules`. The remaining decision concerns the public loading/input mechanism.
+The canonical rule model remains:
 
-### Decision needed
+```text
+JunkRule
+├── target: "line" | "block"
+├── matcher: "exact" | "contains" | "regex"
+└── pattern: string
+```
 
-- external configuration representation;
-- CLI shorthand, if any;
-- ordering guarantees;
-- malformed-rule behavior;
-- invalid-regex behavior;
-- representation of rule provenance in transformation audit.
+The structured configuration representation is JSON. CLI shorthand uses `TARGET:MATCHER:PATTERN`, with only the first two separators treated as syntax separators.
 
 ### Canonical
 
-`novel_epub/transforms.py`
+`docs/junk-rule-configuration.md`
 
 ### Related
 
 `v2x-configuration-model.md`
 
-### Resolve when
+### Evidence
 
-The public rule schema and loading path are documented, implemented, and covered by tests.
+The decision was established through the DD-02 architecture review and is now specified by the canonical rule configuration contract. Implementation and tests are tracked separately and do not reopen the architectural decision.
+
+### Reopen when
+
+A future requirement changes the canonical rule model, input forms, ordering semantics, validation contract, or configuration-source merge semantics.
 
 ---
 
 ## DD-03 — JunkCleaner Default Rules
 
-**Status: Open**
+**Status: Open, ready to decide**
 
 ### Question
 
