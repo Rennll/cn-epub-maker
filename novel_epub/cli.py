@@ -4,7 +4,7 @@ import argparse
 import sys
 
 from .cli_adapter import namespace_to_inputs
-from .configuration_adapter import load_config_file
+from .configuration_adapter import ConfigurationFileError, load_config_file
 from .configuration_resolver import resolve_conversion_request
 from .execution import ExecutionResult, execute
 from .transforms import OpenCCTransformer
@@ -133,7 +133,11 @@ def main() -> int:
     args = parser.parse_args()
     if args.command == "build":
         cli_inputs = namespace_to_inputs(args)
-        config_file = load_config_file(args.config) if args.config else None
+        try:
+            config_file = load_config_file(args.config) if args.config else None
+        except ConfigurationFileError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
         request = resolve_conversion_request({}, config_file=config_file, cli=cli_inputs)
         return build(
             request,
