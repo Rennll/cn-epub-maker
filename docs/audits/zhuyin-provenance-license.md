@@ -2,12 +2,12 @@
 
 ## Scope and baseline
 
-This audit records the provenance and licensing status of the two legacy Zhuyin assets currently present in the repository:
+This audit records the provenance and licensing status of the two legacy Zhuyin assets that were present in the repository:
 
 - `fonts/ToneOZ-Zhuyin-Kai-Traditional.ttf`
 - `fonts/phonic_table_Z.txt`
 
-The repository state used as the disposition baseline is commit `87877ca9d262ad2ac2fb4b7cdc6b79c4e1fa874a` (2026-09-05). The legacy HanWang Zhuyin font workaround has already been removed at that baseline.
+The repository state used as the disposition baseline is commit `87877ca9d262ad2ac2fb4b7cdc6b79c4e1fa874a` (2026-09-05). The legacy HanWang Zhuyin font workaround had already been removed at that baseline.
 
 This document is a provenance/maintenance record, not a formal legal opinion.
 
@@ -40,7 +40,7 @@ For the ToneOZ TTF specifically, the repository must be treated as containing a 
 
 ### Disposition
 
-**Retain for now.**
+**Retained.**
 
 Rationale:
 
@@ -55,9 +55,9 @@ Future implementation should independently verify the current upstream notices a
 
 ### Role in this repository
 
-`fonts/phonic_table_Z.txt` is a pronunciation/polyphone data table associated with the old Zhuyin IVS implementation. It is not part of the V2.1 processing pipeline.
+`fonts/phonic_table_Z.txt` was a pronunciation/polyphone data table associated with the old Zhuyin IVS implementation. It was not part of the V2.1 processing pipeline.
 
-The repository's March 2026 commit states that the table was imported from the ToneOZ project and contains thousands of polyphonic entries. Upstream investigation shows that the file is not merely a copy of one Ministry of Education table. It is a project-generated compilation from multiple source tables.
+The repository's March 2026 commit states that the table was imported from the ToneOZ project and contains thousands of polyphonic entries. Upstream investigation shows that the file was not merely a copy of one Ministry of Education table. It was a project-generated compilation from multiple source tables.
 
 ### Upstream construction and provenance
 
@@ -76,7 +76,7 @@ The upstream `phonetic/source/LICENSE.txt` explicitly records these different so
 
 ### Licensing conclusion
 
-There is **no clean single-license conclusion for the final `phonic_table_Z.txt`** based on the provenance currently established.
+There is **no clean single-license conclusion for the final `phonic_table_Z.txt`** based on the provenance established above.
 
 In particular:
 
@@ -85,20 +85,20 @@ In particular:
 - It must not be labeled MIT, Apache 2.0, or another permissive software license merely because the surrounding source code uses such a license.
 - The fact that ToneOZ distributed the file does not by itself establish a clear, independent file-level license for redistribution by this repository.
 
-The important distinction is that the provenance is traceable, but the final compiled data file does not have a single clearly documented redistribution license that is suitable to assume for a software repository without further upstream confirmation.
+The provenance is traceable, but the final compiled data file does not have a single clearly documented redistribution license suitable to assume for a software repository without further upstream confirmation.
 
 ### Disposition
 
-**Remove from this repository for V2.1.**
+**Removed.**
 
-Rationale:
+The file is no longer present in the repository. Rationale:
 
 1. V2.1 does not use the file.
 2. The old `add_zhuyin_ivs.py` path that consumed it is not part of the desired V2 architecture.
 3. The file is a mixed-source derived data compilation with no single clean file-level redistribution grant established by this audit.
 4. Removing an unused ambiguous-provenance data file reduces maintenance and licensing uncertainty without preventing a future Zhuyin implementation.
 
-This is a conservative repository-maintenance decision, not a finding that the file is necessarily unlawful to redistribute.
+This was a conservative repository-maintenance decision, not a finding that the file was necessarily unlawful to redistribute.
 
 ## 3. Relationship to the old Zhuyin implementation
 
@@ -108,12 +108,12 @@ That implementation should not be preserved merely because the two assets above 
 
 In particular, retaining the ToneOZ font does not imply retaining the old script or the old data table.
 
-## 4. Recommended V2.1 disposition summary
+## 4. V2.1 disposition summary
 
-| Asset | V2.1 use | Decision |
-| --- | --- | --- |
-| `fonts/ToneOZ-Zhuyin-Kai-Traditional.ttf` | None | **Retain**, as a future-use asset with accurate provenance/license documentation |
-| `fonts/phonic_table_Z.txt` | None | **Remove**, because it is an unused mixed-source derivative data file with unresolved single-license status |
-| `add_zhuyin_ivs.py` | None | **Remove**, because it belongs to the legacy EPUB post-processing architecture |
+| Asset | V2.1 use | Decision | Status |
+| --- | --- | --- | --- |
+| `fonts/ToneOZ-Zhuyin-Kai-Traditional.ttf` | None | Retain, as a future-use asset with accurate provenance/license documentation | Retained |
+| `fonts/phonic_table_Z.txt` | None | Remove: unused mixed-source derivative data file with unresolved single-license status | Removed |
+| `add_zhuyin_ivs.py` | None | Remove: belongs to the legacy EPUB post-processing architecture | Removed |
 
 Future Zhuyin work should not treat any of these legacy implementation details as an architectural contract. A later implementation can independently select pronunciation data, resolver logic, IVS encoding, and rendering integration.
