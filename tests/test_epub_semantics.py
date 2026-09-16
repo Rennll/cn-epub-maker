@@ -187,3 +187,43 @@ def test_epub_paragraph_boundaries_map_to_xhtml_paragraphs(tmp_path):
         chapter = ET.fromstring(zf.read("EPUB/text/ch000001.xhtml"))
         classes = [p.get("class") for p in chapter.iter(f"{{{XHTML_NS}}}p")]
         assert classes == [None, "paragraph-expanded", "paragraph-scene-break"]
+
+
+def test_epub_heading_text_is_literal(tmp_path):
+    _require_pandoc()
+    output = tmp_path / "book.epub"
+    book = Book(
+        title="標題語義測試",
+        author="測試作者",
+        language="zh-TW",
+        volumes=[
+            Volume(
+                sequence=1,
+                number="1",
+                label="卷*一",
+                title="卷_[二] $三$ ^四^ =五= <六> & 七",
+                chapters=[
+                    Chapter(
+                        sequence=1,
+                        number=1,
+                        label="章*一",
+                        title="章_[二] $三$ ^四^ =五= <六> & 七",
+                        paragraphs=[Paragraph(text="內容")],
+                    )
+                ],
+            )
+        ],
+    )
+    render(book, output)
+    with zipfile.ZipFile(output) as zf:
+        chapter = ET.fromstring(zf.read("EPUB/text/ch000001.xhtml"))
+        heading = chapter.find(f"{{{XHTML_NS}}}body/{{{XHTML_NS}}}h1")
+        assert heading is not None
+        assert "".join(heading.itertext()) == "章*一 章_[二] $三$ ^四^ =五= <六> & 七"
+        assert chapter.find(f".//{{{XHTML_NS}}}em") is None
+        assert chapter.find(f".//{{{XHTML_NS}}}sup") is None
+        assert chapter.find(f".//{{{XHTML_NS}}}sub") is None
+
+        nav = ET.fromstring(zf.read("EPUB/nav.xhtml"))
+        nav_text = " ".join(element for element in nav.itertext())
+        assert "卷*一 卷_[二] $三$ ^四^ =五= <六> & 七" in nav_text
