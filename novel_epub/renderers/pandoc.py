@@ -125,7 +125,7 @@ def _pandoc_chapter(chapter: Chapter, destination: Path, language: str) -> None:
     source = destination.with_suffix(".md")
     fragment = destination.with_suffix(".html")
     source.write_text(_chapter_markdown(chapter), encoding="utf-8")
-    _run_pandoc(["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)])
+    _run_pandoc(["pandoc", str(source), "--from=markdown-smart", "--to=html5", "--output", str(fragment)])
     body = _apply_paragraph_boundaries(fragment.read_text(encoding="utf-8").strip(), chapter.paragraphs)
     language = escape(language)
     chapter_title = escape(f"{chapter.label} {chapter.title}".rstrip())
@@ -141,7 +141,7 @@ def _pandoc_preamble(book: Book, destination: Path) -> None:
     source = destination.with_suffix(".md")
     fragment = destination.with_suffix(".html")
     source.write_text(_preamble_markdown(book), encoding="utf-8")
-    _run_pandoc(["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)])
+    _run_pandoc(["pandoc", str(source), "--from=markdown-smart", "--to=html5", "--output", str(fragment)])
     body = _apply_paragraph_boundaries(fragment.read_text(encoding="utf-8").strip(), book.preamble)
     language = escape(book.language)
     destination.write_text(
@@ -218,52 +218,40 @@ def _content_opf(book: Book, chapter_paths: dict[int, str], identifier: str, cov
 def _write_epub(book: Book, output: Path, chapter_files: list[tuple[Chapter, Path]], preamble_file: Path | None = None) -> None:
     identifier = str(uuid.uuid4())
     chapter_paths = {chapter.sequence: f"text/ch{index:06d}.xhtml" for index, (chapter, _source) in enumerate(chapter_files, start=1)}
-    cover_name = Path(book.cover).name if book.cover else None
-    container = '''<?xml version="1.0" encoding="UTF-8"?>
-<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
-<rootfiles><rootfile full-path="EPUB/content.opf" media-type="application/oebps-package+xml" /></rootfiles>
-</container>
-'''
-    fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
-    try:
-        with os.fdopen(fd, "wb") as output_file:
-            with zipfile.ZipFile(output_file, "w") as zf:
-                zf.writestr("mimetype", "application/epub+zip", compress_type=zipfile.ZIP_STORED)
-                zf.writestr("META-INF/container.xml", container, compress_type=zipfile.ZIP_DEFLATED)
-                zf.writestr("EPUB/nav.xhtml", _nav_xhtml(book, chapter_paths), compress_type=zipfile.ZIP_DEFLATED)
-                zf.writestr("EPUB/styles/stylesheet.css", CSS, compress_type=zipfile.ZIP_DEFLATED)
-                if preamble_file:
-                    zf.writestr("EPUB/text/preamble.xhtml", preamble_file.read_bytes(), compress_type=zipfile.ZIP_DEFLATED)
-                for chapter, source in chapter_files:
-                    zf.writestr(f"EPUB/{chapter_paths[chapter.sequence]}", source.read_bytes(), compress_type=zipfile.ZIP_DEFLATED)
-                zf.writestr("EPUB/content.opf", _content_opf(book, chapter_paths, identifier, cover_name, bool(preamble_file)), compress_type=zipfile.ZIP_DEFLATED)
-                if book.cover:
-                    cover = Path(book.cover)
-                    zf.write(cover, f"EPUB/images/{cover.name}", compress_type=zipfile.ZIP_DEFLATED)
-    except BaseException:
-        try:
-            output.unlink()
-        except FileNotFoundError:
-            pass
-        raise
+    preamble_manifest = '<item id="preamble" href="text/preamble.xhtml" media-type="application/xhtml+xml" />' if preamble_file else ''
+    with zipfile.ZipFile(output, "w") as zf:
+        zf.writestr("mimetype", "application/epub+zip", compress_type=zipfile.ZIP_STORED)
+        zf.writestr("META-INF/container.xml", '<?xml version="1.0" encoding="UTF-8"?>\n<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="EPUB/content.opf" media-type="application/oebps-package+xml" /></rootfiles></container>')
+        zf.writestr("EPUB/nav.xhtml", _nav_xhtml(book, chapter_paths))
+        zf.writestr("EPUB/styles/stylesheet.css", CSS)
+        if preamble_file:
+            zf.write(preamble_file, "EPUB/text/preamble.xhtml")
+        for chapter, source in chapter_files:
+            zf.write(source, f"EPUB/text/ch{chapter_paths[chapter.sequence].split('ch')[-1]}")
+        zf.writestr("EPUB/content.opf", _content_opf(book, chapter_paths, identifier, book.cover, bool(preamble_file)))
+        if book.cover:
+            zf.write(book.cover, f"EPUB/images/{Path(book.cover).name}")
 
 
-def render(book: Book, output: str | Path) -> Path:
-    """Render chapters independently with Pandoc, then assemble a native EPUB."""
+def render(book: Book, output: Path) -> None:
     _validate_book(book)
-    output = Path(output)
-    with TemporaryDirectory(prefix="novel-epub-") as tmp:
-        root = Path(tmp)
-        chapter_dir = root / "chapters"
-        chapter_dir.mkdir()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix="cn-epub-render-") as temp:
+        temp_dir = Path(temp)
         chapter_files: list[tuple[Chapter, Path]] = []
-        for _volume, chapter in _iter_chapters(book):
-            destination = chapter_dir / f"ch{chapter.sequence:06d}.xhtml"
+        for index, (_volume, chapter) in enumerate(_iter_chapters(book), start=1):
+            destination = temp_dir / f"ch{index:06d}.xhtml"
             _pandoc_chapter(chapter, destination, book.language)
             chapter_files.append((chapter, destination))
         preamble_file = None
         if book.preamble:
-            preamble_file = root / "preamble.xhtml"
+            preamble_file = temp_dir / "preamble.xhtml"
             _pandoc_preamble(book, preamble_file)
-        _write_epub(book, output, chapter_files, preamble_file)
-    return output
+        staging = output.with_suffix(output.suffix + ".tmp")
+        try:
+            _write_epub(book, staging, chapter_files, preamble_file)
+            os.replace(staging, output)
+        except OSError:
+            if staging.exists():
+                staging.unlink()
+            raise
