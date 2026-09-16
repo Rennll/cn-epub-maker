@@ -30,7 +30,7 @@ def test_markdown_preserves_volume_and_chapter_hierarchy():
     assert "## 第1章 黄山真君和九洲一号群" in md
     assert "# 第二卷 武道筑基" in md
     assert "## 第26章 我那与众不同的炼丹炉" in md
-    assert "a < b & c \\> d" in md
+    assert "a &lt; b &amp; c &gt; d" in md
 
 
 def test_render_requires_pandoc(tmp_path: Path):
@@ -82,7 +82,7 @@ def test_epub_renderer_contract_links_manifest_spine_and_content(tmp_path: Path)
         assert zf.read("mimetype") == b"application/epub+zip"
 
         container = ET.fromstring(zf.read("META-INF/container.xml"))
-        container_ns = "urn:oasis:names:tc:opendocument:xmlns:container"
+        container_ns = "urn:oasis:names:tc:opendocument:names:container"
         rootfile = container.find(f"{{{container_ns}}}rootfiles/{{{container_ns}}}rootfile")
         assert rootfile is not None
         assert rootfile.attrib["full-path"] == "EPUB/content.opf"
@@ -159,3 +159,21 @@ def test_epub_renderer_contract_rejects_duplicate_chapter_sequences(tmp_path: Pa
     ])
     with pytest.raises(ValueError, match="duplicate chapter sequence"):
         render(book, tmp_path / "book.epub")
+
+
+def test_render_preserves_literal_html_like_paragraph_text(tmp_path: Path):
+    if shutil.which("pandoc") is None:
+        pytest.skip("Pandoc is not installed in this test environment")
+
+    book = Book(title="測試書", author="作者", chapters=[
+        Chapter(sequence=1, number="1", label="第1章", title="文字", paragraphs=[
+            Paragraph('這不是標籤：<span class="fiction">&內容</span>')
+        ])
+    ])
+    output = tmp_path / "book.epub"
+    render(book, output)
+
+    with zipfile.ZipFile(output) as zf:
+        chapter = zf.read("EPUB/text/ch000001.xhtml").decode("utf-8")
+        assert '<span class="fiction">' not in chapter
+        assert "這不是標籤：&lt;span class=\"fiction\"&gt;&amp;內容&lt;/span&gt;" in chapter
