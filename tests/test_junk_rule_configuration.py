@@ -34,6 +34,12 @@ def test_parse_cli_shorthand_returns_same_canonical_rule():
     )
 
 
+def test_parse_existing_canonical_rule_is_idempotent():
+    rule = JunkRule(target="line", matcher="contains", pattern="本章廣告")
+
+    assert parse_junk_rule(rule) == rule
+
+
 def test_cli_shorthand_splits_only_first_two_separators():
     result = parse_junk_rule("line:regex:^https?://example.com:8080$")
 
