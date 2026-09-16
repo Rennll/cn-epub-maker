@@ -410,17 +410,3 @@ Global character-level rewriting can alter legitimate source content.
 ### Reopen when
 
 A future transformation policy explicitly defines the scope and semantics.
-
----
-
-## Follow-up Notes
-
-### Configuration resolver: `values` vs. `cli` precedence
-
-The resolver currently retains the positional `values` input for compatibility with existing callers. When both `values` and the named `cli` layer are supplied, `values` has higher precedence than `cli`.
-
-This is intentionally retained for compatibility rather than treated as a new configuration-layer decision. The behavior is potentially surprising because the documented three-layer configuration model is otherwise ordered as `application_defaults < config_file < cli`.
-
-### Follow-up condition
-
-If a future caller needs to provide both `values` and `cli`, revisit the API before adding more call sites. Consider clarifying the semantic role/name of `values` or removing the compatibility path, rather than silently changing its precedence.
