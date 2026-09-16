@@ -285,7 +285,9 @@ JunkCleanerConfig
 
 The existing `JunkRule` already represents configuration data with `target`, `matcher`, and `pattern`. A separate `JunkRuleConfig` type is not required unless a future responsibility requires the separation of public schema from the current rule representation.
 
-The central configuration model may carry `JunkCleanerConfig`, but it must not absorb JunkCleaner implementation semantics such as regex compilation, matching algorithms, block construction, or runtime state.
+The central configuration model may carry `JunkCleanerConfig`, but it must not absorb JunkCleaner implementation semantics such as matching algorithms, block construction, or runtime state. Rule syntax and regex validity are validated during configuration resolution according to the DD-02 contract; runtime matching remains owned by JunkCleaner.
+
+The application-level default is an empty rule collection. DD-03 resolves the absence of built-in global JunkCleaner defaults; source-specific rules, if introduced later, require an explicit source-scoped mechanism rather than being added to the global default set.
 
 ## Full Source Mode
 
@@ -337,7 +339,7 @@ The Resolver may:
 2. apply configuration-source precedence;
 3. map user-facing values into the application model;
 4. resolve cross-field semantics;
-5. validate application-level invariants;
+5. validate application-level invariants and canonical component configuration syntax;
 6. produce the resolved `ConversionRequest`.
 
 ### Resolver non-responsibilities
@@ -349,7 +351,6 @@ The Resolver must not:
 - detect actual encoding;
 - normalize text;
 - instantiate transformers;
-- compile JunkCleaner regexes;
 - execute transformations;
 - parse chapters;
 - construct `Book`;
@@ -366,17 +367,19 @@ Application-level defaults have one authority: the Configuration Model / Resolve
 
 The CLI parser should not become a second application-default authority through `argparse default=` values. Unspecified CLI values should remain distinguishable from explicit user values until resolution.
 
-The intended future precedence is:
+The canonical application-level precedence for configuration sources is:
 
 ```text
-explicit CLI
-    >
-explicit config file
-    >
-application default
+CLI
+  >
+config file
+  >
+application defaults
 ```
 
-Configuration files are not required by this document; the precedence model is defined in preparation for future support.
+Within `junk_rules`, DD-02 defines append semantics across these layers rather than scalar replacement. Application defaults therefore contribute the lowest-order rule collection, followed by config-file rules and then CLI rules. DD-03 resolves the application-default collection to empty.
+
+Configuration files are part of the canonical configuration model; their complete file syntax remains documented separately in `junk-rule-configuration.md` and related configuration contracts.
 
 Component-level convenience defaults may remain for standalone component use, but they must not override application policy resolved by the Resolver.
 
@@ -394,19 +397,18 @@ Runtime / Environment
 
 ### Configuration-level validation
 
-The Resolver validates application-level structure and policy, including required fields, basic types, supported policy values, and cross-field invariants.
+The Resolver validates application-level structure and policy, including required fields, basic types, supported policy values, cross-field invariants, and canonical JunkCleaner rule syntax. JunkCleaner regex syntax is validated before the resolved request is produced, so invalid rule configuration fails before execution, including in Full Source Mode.
 
 For example, `paragraph_mode` must be one of the application-supported values.
 
 ### Component-level validation
 
-Components validate their own semantic configuration.
+Components validate semantic behavior that remains specific to their implementation.
 
 Examples include:
 
 - supported OpenCC profiles;
-- JunkCleaner matcher semantics;
-- regex compilation;
+- JunkCleaner matching semantics;
 - component-specific constraints.
 
 The Resolver may understand the public component configuration schema, but it must not duplicate component implementation semantics.
@@ -542,13 +544,13 @@ This document does not define:
 - renderer layout configuration;
 - real-device typography tuning;
 - EPUBCheck as a release gate;
-- final JunkCleaner default rules;
+- source-specific JunkCleaner rule profiles;
 - automatic chapter renumbering;
 - generic semantic chapter inference;
 - global Arabic numeral conversion;
 - punctuation/sentence-length paragraph heuristics.
 
-These remain separate concerns or deferred decisions.
+The global JunkCleaner default decision is defined by DD-03 and the canonical `docs/dd-03-junkcleaner-default-rules.md`; this document only records its application-level configuration consequences.
 
 ## Acceptance Criteria
 
