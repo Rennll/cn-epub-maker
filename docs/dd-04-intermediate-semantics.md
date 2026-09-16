@@ -23,6 +23,8 @@ Intermediate may contain:
 
 The serialized representation should be internally consistent and should avoid presenting duplicate fields as independent sources of semantic truth. In particular, relationships between volume-owned chapters and the canonical chapter manifest must be explicit enough for inspection without requiring a reader to infer ownership from conflicting copies of chapter metadata.
 
+Within `volumes[].chapters[]`, array order is the canonical chapter order within that volume. No additional ordering field is required.
+
 The exact serialization shape remains an implementation concern unless a future requirement promotes Intermediate to a formal interchange format.
 
 ## Non-goals
