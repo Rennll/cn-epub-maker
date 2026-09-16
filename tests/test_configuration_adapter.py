@@ -50,8 +50,13 @@ def test_load_config_file_rejects_non_object_json(tmp_path):
     path = tmp_path / "config.json"
     path.write_text("[]", encoding="utf-8")
 
-    with pytest.raises(ConfigurationFileError, match="top-level JSON value must be an object"):
+    with pytest.raises(
+        ConfigurationFileError,
+        match="top-level JSON value must be an object",
+    ) as exc_info:
         load_config_file(path)
+
+    assert str(path) in str(exc_info.value)
 
 
 def test_load_config_file_does_not_resolve_or_validate_application_values(tmp_path):
