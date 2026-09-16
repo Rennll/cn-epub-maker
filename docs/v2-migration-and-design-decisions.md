@@ -8,6 +8,8 @@ V2 extends completed V1. It does not replace the V1 model, Intermediate boundary
 
 The overall V1 → V2 architecture is mapped in `architecture-overview.md`. This document focuses on V2-specific decisions and contracts.
 
+> **Current-contract note:** This document records V2 decisions, but later canonical contracts may supersede individual details. In particular, current normalization behavior is defined by `physical-document-and-formatting-contract.md`; historical V2 wording about unconditional leading U+3000 removal should not be treated as current behavior.
+
 ## Scope
 
 V2 adds isolated transformation and orchestration capabilities around the V1 structural core:
@@ -148,7 +150,7 @@ Punctuation Conversion is idempotent and runs after OpenCC and before Parser.
 
 ## Full Source Mode
 
-Full Source Mode disables content transformations while retaining Normalize. It is therefore source-content-preserving rather than byte-for-byte preservation: encoding interpretation, BOM handling, newline normalization, and the defined leading full-width-space normalization may still change representation.
+Full Source Mode disables content transformations while retaining Normalize. It is therefore source-content-preserving rather than byte-for-byte preservation: encoding interpretation, BOM handling, newline normalization, and the current normalization contract may still change representation. In particular, Full Source Mode follows the same current normalization semantics as ordinary builds; it does not imply unconditional removal of leading U+3000 IDEOGRAPHIC SPACE characters.
 
 In particular, Full Source Mode bypasses the transformation pipeline after Normalize rather than merely disabling a selected subset of transformers. No transformation audit entries are produced for skipped transformation stages.
 
