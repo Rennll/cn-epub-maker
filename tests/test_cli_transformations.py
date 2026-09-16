@@ -305,8 +305,10 @@ def test_build_writes_transformation_audit_to_intermediate(tmp_path, monkeypatch
 def test_main_uses_cli_adapter_and_resolver(monkeypatch):
     captured = {}
 
-    def fake_resolve(values):
+    def fake_resolve(values, *, config_file=None, cli=None, application_defaults=None):
         captured["values"] = values
+        captured["config_file"] = config_file
+        captured["cli"] = cli
         return object()
 
     def fake_build(request, *, keep_intermediate=False, intermediate=None):
@@ -339,13 +341,14 @@ def test_main_uses_cli_adapter_and_resolver(monkeypatch):
     )
 
     assert main() == 0
-    assert captured["values"]["source"] == "book.txt"
-    assert captured["values"]["destination"] is None
-    assert captured["values"]["opencc"] is False
-    assert captured["values"]["opencc_profile"] == "s2t"
-    assert captured["values"]["punctuation"] is False
-    assert captured["values"]["full_source"] is True
-    assert captured["values"]["paragraph_mode"] is None
+    assert captured["values"] == {}
+    assert captured["cli"]["source"] == "book.txt"
+    assert captured["cli"]["destination"] is None
+    assert captured["cli"]["opencc"] is False
+    assert captured["cli"]["opencc_profile"] == "s2t"
+    assert captured["cli"]["punctuation"] is False
+    assert captured["cli"]["full_source"] is True
+    assert captured["cli"]["paragraph_mode"] is None
     assert captured["keep_intermediate"] is True
     assert captured["intermediate"] == "cache"
 
