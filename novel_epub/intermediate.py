@@ -96,10 +96,7 @@ def write_intermediate(
                 "label": v.label,
                 "title": v.title,
                 "chapters": [
-                    {
-                        "sequence": c.sequence,
-                        "file": f"chapters/{chapter_files[id(c)]}",
-                    }
+                    {"file": f"chapters/{chapter_files[id(c)]}"}
                     for c in v.chapters
                 ],
             }
