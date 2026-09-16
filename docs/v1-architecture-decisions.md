@@ -6,6 +6,8 @@ V1 is complete and serves as the stable structural and EPUB baseline for the pro
 
 The overall system architecture is described in `architecture-overview.md`. This document records V1-specific architectural decisions and stable behavioral contracts rather than development history.
 
+> **Historical note:** This document records the V1 design baseline. Where a later canonical contract explicitly supersedes a V1 detail, the later contract is authoritative for current behavior. In particular, current normalization behavior is defined by `physical-document-and-formatting-contract.md`, and current Intermediate semantics are defined by `dd-04-intermediate-semantics.md`.
+
 ## Scope and Principles
 
 V1 is a minimal, text-preserving TXT-to-EPUB foundation. Its purpose is to provide predictable structural parsing, a stable Intermediate representation, EPUB generation, and validation without attempting to reproduce every behavior of the legacy implementation.
@@ -45,7 +47,7 @@ Book
 
 The normalization layer decodes supported TXT encodings and normalizes line endings before parsing. Automatic encoding detection tries `utf-8-sig`, `utf-8`, `gb18030`, `gbk`, and `big5` in that order after BOM handling. Explicitly supplied encodings are also supported.
 
-Newline forms `CRLF` and `CR` are normalized to `LF`. The line-level normalization removes only leading U+3000 IDEOGRAPHIC SPACE characters. It does not generally trim whitespace, collapse whitespace, or otherwise rewrite content.
+Newline forms `CRLF` and `CR` are normalized to `LF`. Current normalization does not unconditionally remove leading U+3000 IDEOGRAPHIC SPACE characters, and does not generally trim whitespace, collapse whitespace, or otherwise rewrite content. Leading U+3000 may remain available as formatting evidence for later analysis. The current normalization contract is defined by `physical-document-and-formatting-contract.md`.
 
 Normalization provides predictable parser input but does not infer document structure.
 
@@ -87,7 +89,7 @@ Consecutive non-empty lines form one paragraph; a blank line flushes the paragra
 
 ## Intermediate Representation
 
-Intermediate separates parsing from EPUB rendering and provides a stable serialization boundary. Its current on-disk layout is:
+Intermediate separates parsing from EPUB rendering and provides a serialization boundary. Its current on-disk layout is:
 
 ```text
 intermediate/
@@ -103,7 +105,7 @@ intermediate/
 
 This chapter-per-file layout is intentional: it keeps the serialization boundary manageable for works with thousands of chapters and allows downstream tooling to inspect or process chapters independently without constructing one giant JSON document.
 
-The V1 Intermediate representation preserves the information required to reconstruct the V1 book model. It is a serialization boundary, not merely a temporary cache format.
+The V1 Intermediate format was designed to preserve the information needed to represent the V1 book model. However, the current project contract does not provide an Intermediate reader or an `Intermediate → Book` reconstruction guarantee. `dd-04-intermediate-semantics.md` is authoritative for the current meaning of Intermediate: it is an inspectable serialization artifact around the canonical in-memory `Book`, not a separately rebuildable application model or stable interchange format.
 
 ## EPUB Generation Decisions
 
