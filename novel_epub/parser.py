@@ -45,7 +45,7 @@ def _boundary_for_blank_run(blank_count: int) -> ParagraphBoundary:
     return ParagraphBoundary.NORMAL
 
 def parse_document(
-    document: PhysicalDocument, *, title: str, author: str, language: str = "zh-CN",
+    document: PhysicalDocument, *, title: str, author: str, language: str = "zh-TW",
     cover: str | None = None, volume_pattern: str = DEFAULT_VOLUME_PATTERN,
     chapter_pattern: str = DEFAULT_CHAPTER_PATTERN,
     paragraph_mode: ParagraphMode = "wrapped", analysis: DocumentAnalysis | None = None,
@@ -167,7 +167,7 @@ def parse_document(
 
 
 def parse_lines(
-    lines: list[str], *, title: str, author: str, language: str = "zh-CN",
+    lines: list[str], *, title: str, author: str, language: str = "zh-TW",
     cover: str | None = None, volume_pattern: str = DEFAULT_VOLUME_PATTERN,
     chapter_pattern: str = DEFAULT_CHAPTER_PATTERN,
     paragraph_mode: ParagraphMode = "wrapped", physical_document: PhysicalDocument | None = None,

@@ -1,6 +1,15 @@
 from novel_epub.parser import parse_lines
 
 
+def test_default_book_language_is_zh_tw():
+    result = parse_lines(
+        ["第1章 開始", "正文"],
+        title="書",
+        author="作者",
+    )
+    assert result.book.language == "zh-TW"
+
+
 def test_two_volumes_and_original_numbers():
     result = parse_lines([
         "第一卷 九洲一号群",

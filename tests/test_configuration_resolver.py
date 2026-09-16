@@ -17,7 +17,7 @@ def test_resolver_applies_application_defaults():
     assert request.destination_mode == "automatic"
     assert request.book_metadata.title == "書名"
     assert request.book_metadata.author == "作者"
-    assert request.book_metadata.language == "zh-CN"
+    assert request.book_metadata.language == "zh-TW"
     assert request.policy.encoding == "auto"
     assert request.policy.parser.paragraph_mode == "wrapped"
     assert request.policy.transformations.opencc.enabled is True

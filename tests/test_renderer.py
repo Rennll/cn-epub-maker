@@ -95,7 +95,7 @@ def test_epub_renderer_contract_links_manifest_spine_and_content(tmp_path: Path)
         assert metadata is not None
         assert metadata.find("dc:title", opf_ns).text == "測試書"
         assert metadata.find("dc:creator", opf_ns).text == "作者"
-        assert metadata.find("dc:language", opf_ns).text == "zh-CN"
+        assert metadata.find("dc:language", opf_ns).text == "zh-TW"
 
         manifest = {item.attrib["id"]: item for item in opf.findall("opf:manifest/opf:item", opf_ns)}
         spine = [itemref.attrib["idref"] for itemref in opf.findall("opf:spine/opf:itemref", opf_ns)]
