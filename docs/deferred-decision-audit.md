@@ -18,7 +18,7 @@ The audit currently covers DD-01 through DD-14. DD-15 has been moved to `future-
 | DD-04 | Intermediate semantics | Partially resolved | Configuration Model + provenance model |
 | DD-05 | Paragraph mode vs. source-format profile | Resolved | Parser architecture |
 | DD-06 | Normalize vs. Transformer responsibility | Resolved | Configuration Model + stage boundaries |
-| DD-07 | Real-device typography completion criteria | Open | EPUB rendering behavior |
+| DD-07 | Real-device typography completion criteria | Resolved | EPUB rendering behavior |
 | DD-08 | EPUBCheck role | Resolved | Release/CI policy |
 | DD-09 | Output filename sanitization and overwrite policy | Resolved | Destination/CLI policy |
 | DD-10 | Encoding auto-detection guarantee and positioning | Resolved | Input policy + runtime behavior |
@@ -202,27 +202,37 @@ A new normalization behavior cannot be clearly classified as inherent input inte
 
 ## DD-07 — Real-Device Typography Completion Criteria
 
-**Status: Open**
+**Status: Resolved**
 
 ### Question
 
 What evidence is sufficient to declare EPUB typography and layout complete?
 
-### Decision needed
+### Decision
 
-Define a repeatable acceptance matrix covering representative readers and at least:
+A documented acceptance matrix and deterministic representative fixture are now in place. The generated baseline EPUB was validated structurally and with EPUBCheck, then tested as the same artifact in representative desktop and mobile/tablet reading environments.
 
-- paragraph and line spacing;
-- heading hierarchy;
-- margins and page geometry;
-- long chapters;
-- CJK rendering;
-- punctuation and line breaking;
-- metadata, cover, and navigation.
+The observed baseline was functionally acceptable across the matrix. Android ReadEra showed somewhat unusual layout for long continuous English/alphanumeric content, but no project-wide content, structure, overflow, or semantic defect was identified. Kindle Paperwhite 3 behavior after EPUB-to-AZW3 conversion was also normal for the tested cases. Both environments showed somewhat wider apparent right-side whitespace; this was treated as reader-dependent presentation variance rather than evidence of a generator defect.
 
-### Resolve when
+No renderer or CSS tuning was justified by the observed evidence. The acceptance baseline therefore establishes the current renderer/CSS behavior as acceptable while explicitly retaining reader-dependent presentation differences outside the generator contract.
 
-The project has a documented acceptance matrix and can distinguish implementation defects from reader-specific rendering differences.
+### Canonical
+
+`docs/real-reader-acceptance-matrix.md`
+
+`docs/v2x-typography-and-layout.md`
+
+`tests/fixtures/real_reader_acceptance.txt`
+
+`tests/test_real_reader_acceptance_fixture.py`
+
+### Evidence
+
+GitHub Actions generated and validated the representative EPUB artifact. The same artifact was manually inspected in Android ReadEra and on a Kindle Paperwhite 3 after EPUB-to-AZW3 conversion. The acceptance cases were reported as passing; the only noted variance was long continuous Latin/alphanumeric layout in ReadEra and wider apparent right-side whitespace in both environments.
+
+### Reopen when
+
+A reproducible generator defect, structural/content defect, or project-wide presentation problem is observed in the acceptance matrix, or a new target reader/environment becomes an explicit project requirement.
 
 ---
 
