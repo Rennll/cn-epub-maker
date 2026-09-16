@@ -122,7 +122,8 @@ def main() -> int:
     validate_parser.set_defaults(func=validate)
     args = parser.parse_args()
     if args.command == "build":
-        request = resolve_conversion_request(namespace_to_inputs(args))
+        cli_inputs = namespace_to_inputs(args)
+        request = resolve_conversion_request(cli_inputs)
         return build(
             request,
             keep_intermediate=args.keep_intermediate,
