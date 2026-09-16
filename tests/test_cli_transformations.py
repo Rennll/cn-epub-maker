@@ -348,3 +348,46 @@ def test_main_uses_cli_adapter_and_resolver(monkeypatch):
     assert captured["values"]["paragraph_mode"] is None
     assert captured["keep_intermediate"] is True
     assert captured["intermediate"] == "cache"
+
+
+def test_main_loads_config_file_and_passes_cli_as_named_layer(monkeypatch):
+    captured = {}
+    config = {"encoding": "big5", "paragraph_mode": "line", "title": "設定書名"}
+
+    def fake_load(path):
+        captured["config_path"] = path
+        return config
+
+    def fake_resolve(values, *, config_file=None, cli=None, application_defaults=None):
+        captured["values"] = values
+        captured["config_file"] = config_file
+        captured["cli"] = cli
+        return object()
+
+    monkeypatch.setattr("novel_epub.cli.load_config_file", fake_load)
+    monkeypatch.setattr("novel_epub.cli.resolve_conversion_request", fake_resolve)
+    monkeypatch.setattr("novel_epub.cli.build", lambda request, **kwargs: 0)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "novel-epub",
+            "build",
+            "book.txt",
+            "--title",
+            "CLI書名",
+            "--author",
+            "作者",
+            "--config",
+            "config.json",
+            "--encoding",
+            "utf-8",
+        ],
+    )
+
+    assert main() == 0
+    assert captured["config_path"] == "config.json"
+    assert captured["config_file"] == config
+    assert captured["values"] == {}
+    assert captured["cli"]["source"] == "book.txt"
+    assert captured["cli"]["title"] == "CLI書名"
+    assert captured["cli"]["encoding"] == "utf-8"
