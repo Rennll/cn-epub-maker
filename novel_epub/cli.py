@@ -4,6 +4,7 @@ import argparse
 import sys
 
 from .cli_adapter import namespace_to_inputs
+from .configuration_adapter import load_config_file
 from .configuration_resolver import resolve_conversion_request
 from .execution import ExecutionResult, execute
 from .transforms import OpenCCTransformer
@@ -94,6 +95,7 @@ def main() -> int:
     build_parser.add_argument("-o", "--output")
     build_parser.add_argument("-t", "--title", required=True)
     build_parser.add_argument("-a", "--author", required=True)
+    build_parser.add_argument("--config", help="load application configuration from a JSON file")
     build_parser.add_argument("--lang")
     build_parser.add_argument("--cover")
     build_parser.add_argument("--encoding")
@@ -131,7 +133,8 @@ def main() -> int:
     args = parser.parse_args()
     if args.command == "build":
         cli_inputs = namespace_to_inputs(args)
-        request = resolve_conversion_request(cli_inputs)
+        config_file = load_config_file(args.config) if args.config else None
+        request = resolve_conversion_request({}, config_file=config_file, cli=cli_inputs)
         return build(
             request,
             keep_intermediate=args.keep_intermediate,
