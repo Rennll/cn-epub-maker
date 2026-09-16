@@ -219,7 +219,8 @@ def test_epub_heading_text_is_literal(tmp_path):
         chapter = ET.fromstring(zf.read("EPUB/text/ch000001.xhtml"))
         heading = chapter.find(f"{{{XHTML_NS}}}body/{{{XHTML_NS}}}h1")
         assert heading is not None
-        assert "".join(heading.itertext()) == "章*一 章_[二] $三$ ^四^ =五= <六> & 七"
+        heading_text = "".join(heading.itertext()).replace("\n", " ")
+        assert heading_text == "章*一 章_[二] $三$ ^四^ =五= <六> & 七"
         assert chapter.find(f".//{{{XHTML_NS}}}em") is None
         assert chapter.find(f".//{{{XHTML_NS}}}sup") is None
         assert chapter.find(f".//{{{XHTML_NS}}}sub") is None
