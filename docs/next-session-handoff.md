@@ -2,7 +2,7 @@
 
 ## Current Context
 
-The V2.x architecture refactor is complete.
+The V2.x architecture refactor is complete, including DD-04 Intermediate semantics and the #31 Intermediate chapter-manifest cleanup.
 
 The project is now in the validation and release-correctness phase. Focus on verifying existing contracts in real EPUB output and resolving remaining operational decisions.
 
@@ -21,22 +21,11 @@ GitHub Issues are the authoritative work queue. Do not duplicate the issue backl
 9. When a blocker is closed, remove `status:blocked` from issues that are now unblocked and keep their dependency sections accurate.
 10. Update canonical documentation only when a stable contract or decision changes.
 
-## Current Priority Chain
+## Current Work Queue
 
-The current intended implementation order is:
+Do not maintain a static priority chain in this document. Issue state, priority, dependencies, and current requirements are authoritative in GitHub and must be inspected at the start of each session.
 
-```text
-#34  P0 architecture
- ↓
-#29  P0 runtime
- ├──→ #35  P1 encoding policy
- ├──→ #36  P1 output policy
- │     ↓
- │    #33  P2 filename implementation
- └──→ #32  P1 configuration resolver
-
-#34  also blocks #31 (P1 intermediate schema)
-```
+The current repository state includes completed architecture work such as #31. Do not treat closed issues or their historical dependency chains as active blockers.
 
 Parser-specific and validation work should not be artificially blocked unless the issue itself establishes a direct dependency.
 
@@ -48,6 +37,7 @@ When starting a new session:
 2. Check `docs/deferred-decision-audit.md` when an issue involves an unresolved design decision.
 3. Read the issue's dependency metadata before implementation.
 4. Preserve current architecture boundaries and non-goals unless new evidence or requirements justify reopening them.
+5. For EPUB-generation work, trace the current end-to-end path from `Book` through rendering, package assembly, and validation before proposing implementation changes.
 
 ## Handoff Notes
 
