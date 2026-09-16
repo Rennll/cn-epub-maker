@@ -53,15 +53,15 @@ novel-epub build novel.txt \
 | 需求 | 參數 | 說明 |
 |---|---|---|
 | 指定輸出 | `--output` | 指定 EPUB 輸出檔案 |
-| 指定來源編碼 | `--encoding` | 例如 `utf-8`、`gb18030`、`gbk`、`big5` |
-| 一行一段 | `--paragraph-mode line` | 適合「每個來源行就是一個段落」的 TXT |
-| 保留原本段落包裝 | `--paragraph-mode wrapped` | 預設；連續非空白行視為同一段落 |
-| 不做簡繁轉換 | `--no-opencc` | 停用預設的 OpenCC 轉換 |
-| 不做標點轉換 | `--no-punctuation` | 停用標點轉換 |
-| 加入封面 | `--cover` | 指定封面圖片 |
-| 指定 EPUB 語言 | `--lang` | 預設為 `zh-TW` |
-| 保留 Intermediate | `--keep-intermediate` | 將 build 過程的 JSON 資料寫到磁碟 |
-| 停用內容 transformation | `--full-source` | 保留來源內容，不做 OpenCC、標點與 junk cleaning |
+| 指定來源編碼 | [`--encoding`](#來源編碼) | 例如 `utf-8`、`gb18030`、`gbk`、`big5` |
+| 一行一段 | [`--paragraph-mode line`](#段落模式) | 適合「每個來源行就是一個段落」的 TXT |
+| 保留原本段落包裝 | [`--paragraph-mode wrapped`](#段落模式) | 預設；連續非空白行視為同一段落 |
+| 不做簡繁轉換 | [`--no-opencc`](#文字處理) | 停用預設的 OpenCC 轉換 |
+| 不做標點轉換 | [`--no-punctuation`](#文字處理) | 停用標點轉換 |
+| 加入封面 | [`--cover`](#封面與語言) | 指定封面圖片 |
+| 指定 EPUB 語言 | [`--lang`](#封面與語言) | 預設為 `zh-TW` |
+| 保留 Intermediate | [`--keep-intermediate`](#intermediate) | 將 build 過程的 JSON 資料寫到磁碟 |
+| 停用內容 transformation | [`--full-source`](#full-source-mode) | 保留來源內容，不做 OpenCC、標點與 junk cleaning |
 
 ### 來源編碼
 
@@ -125,17 +125,58 @@ Junk Cleaner 只負責「移除可以明確判定為非正文的內容」，不�
 - `matcher`：`exact`、`contains` 或 `regex`
 - `pattern`：匹配文字或正則表達式
 
-例如：
+可以直接透過 CLI 指定規則，`--junk-rule` 可以重複使用：
+
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --junk-rule 'line:exact:本章節完' \
+  --junk-rule 'line:contains:請收藏本書'
+```
+
+規則格式為 `TARGET:MATCHER:PATTERN`，例如：
 
 ```text
 line:exact:本章節完
 line:contains:請收藏本書
 line:regex:^本章由.*整理$
+block:exact:本文為贊助內容
 ```
+
+也可以放在 JSON config：
+
+```json
+{
+  "junk_rules": [
+    {
+      "target": "line",
+      "matcher": "exact",
+      "pattern": "本章節完"
+    },
+    {
+      "target": "line",
+      "matcher": "contains",
+      "pattern": "請收藏本書"
+    }
+  ]
+}
+```
+
+使用 `--config config.json` 載入設定：
+
+```bash
+novel-epub build novel.txt \
+  --title "書名" \
+  --author "作者" \
+  --config config.json
+```
+
+CLI 與 config 可以混用。config 中的規則會先保留原本順序，CLI 指定的規則再依指定順序追加。
 
 `line` 逐行判斷；`block` 則以空白行分隔的連續非空白行為單位，因此應更謹慎使用。
 
-JunkRule 的完整設定格式與規則語義見 [`docs/junk-rule-configuration.md`](docs/junk-rule-configuration.md)。目前 README 只描述規則模型，不把尚未整合完成的設定檔或 CLI 載入方式當成已可用功能。
+JunkRule 的完整設定格式與規則語義見 [`docs/junk-rule-configuration.md`](docs/junk-rule-configuration.md)。
 
 ## Full Source Mode
 
