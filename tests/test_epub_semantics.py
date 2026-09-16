@@ -228,3 +228,4 @@ def test_epub_heading_text_is_literal(tmp_path):
         nav = ET.fromstring(zf.read("EPUB/nav.xhtml"))
         nav_text = " ".join(element for element in nav.itertext())
         assert "卷*一 卷_[二] $三$ ^四^ =五= <六> & 七" in nav_text
+
