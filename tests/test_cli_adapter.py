@@ -20,6 +20,7 @@ def test_adapter_keeps_only_cli_configuration_fields():
         punctuation=True,
         full_source=False,
         paragraph_mode="line",
+        junk_rules=["line:contains:廣告"],
     )
 
     values = namespace_to_inputs(args)
@@ -37,6 +38,7 @@ def test_adapter_keeps_only_cli_configuration_fields():
         "punctuation": True,
         "full_source": False,
         "paragraph_mode": "line",
+        "junk_rules": ["line:contains:廣告"],
     }
     assert "keep_intermediate" not in values
     assert "intermediate" not in values
@@ -56,6 +58,7 @@ def test_adapter_preserves_unspecified_cli_values_as_none():
         punctuation=None,
         full_source=None,
         paragraph_mode=None,
+        junk_rules=None,
     )
 
     values = namespace_to_inputs(args)
@@ -68,6 +71,7 @@ def test_adapter_preserves_unspecified_cli_values_as_none():
     assert values["punctuation"] is None
     assert values["full_source"] is None
     assert values["paragraph_mode"] is None
+    assert values["junk_rules"] is None
 
 
 def test_adapter_does_not_depend_on_argparse_in_returned_data():
@@ -84,6 +88,7 @@ def test_adapter_does_not_depend_on_argparse_in_returned_data():
         punctuation=True,
         full_source=False,
         paragraph_mode="wrapped",
+        junk_rules=[],
     )
 
     values = namespace_to_inputs(args)
