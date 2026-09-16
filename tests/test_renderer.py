@@ -82,7 +82,7 @@ def test_epub_renderer_contract_links_manifest_spine_and_content(tmp_path: Path)
         assert zf.read("mimetype") == b"application/epub+zip"
 
         container = ET.fromstring(zf.read("META-INF/container.xml"))
-        container_ns = "urn:oasis:names:tc:opendocument:names:container"
+        container_ns = "urn:oasis:names:tc:opendocument:xmlns:container"
         rootfile = container.find(f"{{{container_ns}}}rootfiles/{{{container_ns}}}rootfile")
         assert rootfile is not None
         assert rootfile.attrib["full-path"] == "EPUB/content.opf"
