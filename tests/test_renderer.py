@@ -197,7 +197,8 @@ def test_render_preserves_markdown_special_character_literals(tmp_path: Path):
         assert "<math" not in chapter
         assert "<h1 id=\"標題文字\">" not in chapter
         assert "<dl>" not in chapter
-        assert "H^2^O  a $b$ c" in chapter
+        assert "H^2^O a $b$ c" in chapter
         assert "標題文字" in chapter
         assert "===\nTerm" not in chapter
+        assert "===<br />" in chapter
         assert ": Definition" in chapter
