@@ -45,7 +45,7 @@ def _boundary_for_blank_run(blank_count: int) -> ParagraphBoundary:
     return ParagraphBoundary.NORMAL
 
 def parse_document(
-    document: PhysicalDocument, *, title: str, author: str, language: str = "zh-CN",
+    document: PhysicalDocument, *, title: str, author: str, language: str = "zh-TW",
     cover: str | None = None, volume_pattern: str = DEFAULT_VOLUME_PATTERN,
     chapter_pattern: str = DEFAULT_CHAPTER_PATTERN,
     paragraph_mode: ParagraphMode = "wrapped", analysis: DocumentAnalysis | None = None,
@@ -153,9 +153,6 @@ def parse_document(
             preamble_paragraph_lines.append(stripped)
             if paragraph_mode == "line": flush_preamble_paragraph()
             continue
-        # PhysicalDocument retains the original leading whitespace as evidence;
-        # paragraph text is a parser-local semantic view, so leading/trailing
-        # whitespace is intentionally stripped before building Paragraph objects.
         paragraph_lines.append(stripped)
         if stripped.startswith("第") and re.search(r"[章集篇回]", stripped):
             warnings.append(WarningItem("suspicious_chapter_heading", line_no, f"possible chapter heading not matched: {stripped[:80]}"))
@@ -167,7 +164,7 @@ def parse_document(
 
 
 def parse_lines(
-    lines: list[str], *, title: str, author: str, language: str = "zh-CN",
+    lines: list[str], *, title: str, author: str, language: str = "zh-TW",
     cover: str | None = None, volume_pattern: str = DEFAULT_VOLUME_PATTERN,
     chapter_pattern: str = DEFAULT_CHAPTER_PATTERN,
     paragraph_mode: ParagraphMode = "wrapped", physical_document: PhysicalDocument | None = None,
