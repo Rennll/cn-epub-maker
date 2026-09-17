@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from novel_epub.inspection import inspect_source
 
 
@@ -56,3 +58,15 @@ def test_inspect_preserves_source(tmp_path):
     inspect_source(source, output, input_fn=lambda _: "s")
 
     assert source.read_text(encoding="utf-8") == original
+
+
+def test_inspect_does_not_overwrite_existing_output(tmp_path):
+    source = tmp_path / "book.txt"
+    output = tmp_path / "junk-config.json"
+    source.write_text("正文\n", encoding="utf-8")
+    output.write_text('{"junk_rules": []}\n', encoding="utf-8")
+
+    with pytest.raises(FileExistsError):
+        inspect_source(source, output, input_fn=lambda _: "s")
+
+    assert output.read_text(encoding="utf-8") == '{"junk_rules": []}\n'
