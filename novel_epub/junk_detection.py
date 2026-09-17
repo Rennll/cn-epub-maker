@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from .junk_rule_configuration import parse_junk_rule
 from .physical import PhysicalDocument
 from .transforms import JunkRule, _matches
 
@@ -62,12 +63,13 @@ def detect_document(document: PhysicalDocument) -> tuple[DetectionGroup, ...]:
 
 
 def preview_rule(document: PhysicalDocument, rule: JunkRule) -> RulePreview:
-    """Preview a JunkRule against the physical document without changing it."""
-    if rule.target == "line":
-        return _preview_lines(document, rule)
-    if rule.target == "block":
-        return _preview_blocks(document, rule)
-    raise ValueError(f"invalid junk rule target: {rule.target!r}")
+    """Validate and preview a JunkRule without changing the physical document."""
+    canonical = parse_junk_rule(rule)
+    if canonical.target == "line":
+        return _preview_lines(document, canonical)
+    if canonical.target == "block":
+        return _preview_blocks(document, canonical)
+    raise ValueError(f"invalid junk rule target: {canonical.target!r}")
 
 
 def _preview_lines(document: PhysicalDocument, rule: JunkRule) -> RulePreview:
