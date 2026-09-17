@@ -170,8 +170,8 @@ def _deterministic_pattern(text: str):
 def _pattern_to_regex(pattern: str) -> str:
     variable_regex = {
         "number": r"\d+",
-        "url": r"\[[^\]\n]*\]\(https?://[^\s)]+\)|https?://[^\s]+|www\.[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?",
-        "date": r"\d{4}(?:[-/]\d{1,2}[-/]\d{1,2}|年\d{1,2}月\d{1,2}日)",
+        "url": r"(?:\[[^\]\n]*\]\(https?://[^\s)]+\)|https?://[^\s]+|www\.[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?)",
+        "date": r"(?:\d{4}(?:[-/]\d{1,2}[-/]\d{1,2}|年\d{1,2}月\d{1,2}日))",
         "time": r"(?:\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分)",
         "id": r"(?=[A-Za-z0-9_-]*[A-Za-z])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{8,}",
     }
@@ -179,14 +179,19 @@ def _pattern_to_regex(pattern: str) -> str:
     parts, cursor = [], 0
     for match in placeholder.finditer(pattern):
         literal = pattern[cursor:match.start()]
-        if match.group(1) == "url" and literal.endswith(":"):
-            parts.append(re.escape(literal[:-1]) + r"[：:]")
-        else:
-            parts.append(re.escape(literal))
+        parts.append(re.escape(literal))
         parts.append(variable_regex[match.group(1)])
         cursor = match.end()
     parts.append(re.escape(pattern[cursor:]))
-    return "^" + "".join(parts) + "$"
+    primary = "^" + "".join(parts) + "$"
+
+    # Detection canonicalizes a full-width Chinese colon to ASCII for the
+    # human-readable pattern. Keep the suggested rule readable while making
+    # the executable regex match both source spellings.
+    if "：" not in pattern and ":" in pattern:
+        alternate = pattern.replace(":", "：", 1)
+        return primary + "|" + _pattern_to_regex(alternate)
+    return primary
 
 
 def _make_group(scope, pattern, occurrences, evidence, rule):
