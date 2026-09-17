@@ -25,6 +25,10 @@ def inspect_source(
     if output_path.exists():
         raise FileExistsError(f"inspection output already exists: {output_path}")
 
+    # Reserve the output before interactive review so a later write cannot
+    # unexpectedly collide with a file created while the user is deciding.
+    output_path.touch(exist_ok=False)
+
     lines, _ = read_lines(source, encoding)
     document = build_physical_document(lines)
     groups = detect_document(document)
@@ -33,17 +37,19 @@ def inspect_source(
     for index, group in enumerate(groups, 1):
         preview = preview_rule(document, group.suggested_rule)
         _print_group(index, group, preview)
-        decision = input_fn("[a] accept [e] edit [s] skip: ").strip().lower()
-        if decision == "a":
-            accepted.append(group.suggested_rule)
-        elif decision == "e":
-            accepted.append(_edit_rule(input_fn, document, group))
-        elif decision == "s":
-            continue
-        else:
-            raise ValueError("invalid inspection decision; expected a, e, or s")
+        while True:
+            decision = input_fn("[a] accept [e] edit [s] skip: ").strip().lower()
+            if decision == "a":
+                accepted.append(group.suggested_rule)
+                break
+            if decision == "e":
+                accepted.append(_edit_rule(input_fn, document, group))
+                break
+            if decision == "s":
+                break
+            print("ERROR: expected a, e, or s")
 
-    write_junk_config(output_path, accepted)
+    _write_junk_config_contents(output_path, accepted)
     return tuple(accepted)
 
 
@@ -52,6 +58,10 @@ def write_junk_config(path: str | Path, rules: list[JunkRule] | tuple[JunkRule, 
     output_path = Path(path)
     if output_path.exists():
         raise FileExistsError(f"inspection output already exists: {output_path}")
+    _write_junk_config_contents(output_path, rules)
+
+
+def _write_junk_config_contents(path: Path, rules: list[JunkRule] | tuple[JunkRule, ...]) -> None:
     payload = {
         "junk_rules": [
             {
@@ -62,7 +72,7 @@ def write_junk_config(path: str | Path, rules: list[JunkRule] | tuple[JunkRule, 
             for rule in rules
         ]
     }
-    output_path.write_text(
+    path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
