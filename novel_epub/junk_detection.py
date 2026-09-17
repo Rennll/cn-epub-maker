@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 
 from .physical import PhysicalDocument
-from .transforms import JunkRule
+from .transforms import JunkRule, _matches
 
 
 _NUMBER_RE = re.compile(r"\d+")
@@ -23,10 +23,60 @@ class DetectionGroup:
     suggested_rule: JunkRule
 
 
+@dataclass(frozen=True)
+class RulePreview:
+    """Read-only matching results for a canonical JunkRule."""
+
+    matched_count: int
+    affected_block_count: int
+    examples: tuple[str, ...]
+    locations: tuple[int, ...]
+
+
 def detect_document(document: PhysicalDocument) -> tuple[DetectionGroup, ...]:
     """Find deterministic repeated line and block candidates in a physical document."""
     groups = [*_detect_lines(document), *_detect_blocks(document)]
     return tuple(sorted(groups, key=_group_sort_key))
+
+
+def preview_rule(document: PhysicalDocument, rule: JunkRule) -> RulePreview:
+    """Preview a JunkRule against the physical document without changing it."""
+    if rule.target == "line":
+        return _preview_lines(document, rule)
+    if rule.target == "block":
+        return _preview_blocks(document, rule)
+    raise ValueError(f"invalid junk rule target: {rule.target!r}")
+
+
+def _preview_lines(document: PhysicalDocument, rule: JunkRule) -> RulePreview:
+    matches = [line for line in document.lines if _matches(line.text, rule.matcher, rule.pattern)]
+    block_by_line = {
+        line_number: block.index
+        for block in document.blocks
+        for line_number in block.line_numbers
+    }
+    affected_blocks = {block_by_line[line.number] for line in matches if line.number in block_by_line}
+    return RulePreview(
+        matched_count=len(matches),
+        affected_block_count=len(affected_blocks),
+        examples=tuple(line.text for line in matches[:5]),
+        locations=tuple(line.number for line in matches),
+    )
+
+
+def _preview_blocks(document: PhysicalDocument, rule: JunkRule) -> RulePreview:
+    lines_by_number = {line.number: line.text for line in document.lines}
+    blocks = [
+        (block.index, "\n".join(lines_by_number[number] for number in block.line_numbers))
+        for block in document.blocks
+    ]
+    matches = [(index, text) for index, text in blocks if _matches(text, rule.matcher, rule.pattern)]
+    return RulePreview(
+        matched_count=len(matches),
+        affected_block_count=len(matches),
+        examples=tuple(text for _, text in matches[:5]),
+        locations=tuple(index for index, _ in matches),
+    )
 
 
 def _detect_lines(document: PhysicalDocument) -> list[DetectionGroup]:
