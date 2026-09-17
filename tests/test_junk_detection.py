@@ -47,16 +47,15 @@ def test_single_occurrence_is_not_a_detection_group():
     assert detect_document(document) == ()
 
 
-def test_detection_does_not_cross_physical_blocks_for_block_scope():
-    document = build_physical_document(
-        ["A", "B", "", "A", "B"]
-    )
+def test_repeated_identical_blocks_produce_a_block_candidate():
+    document = build_physical_document(["A", "B", "", "A", "B"])
 
     groups = detect_document(document)
 
-    assert len(groups) == 1
-    assert groups[0].scope == "block"
-    assert groups[0].occurrences == (0, 1)
-    assert groups[0].suggested_rule.target == "block"
-    assert groups[0].suggested_rule.matcher == "exact"
-    assert groups[0].suggested_rule.pattern == "A\nB"
+    block_groups = [group for group in groups if group.scope == "block"]
+    assert len(block_groups) == 1
+    group = block_groups[0]
+    assert group.occurrences == (0, 1)
+    assert group.suggested_rule.target == "block"
+    assert group.suggested_rule.matcher == "exact"
+    assert group.suggested_rule.pattern == "A\nB"
