@@ -9,7 +9,7 @@ from typing import Callable
 from .junk_detection import DetectionGroup, RulePreview, detect_document, preview_rule
 from .junk_rule_configuration import JunkRuleConfigurationError, parse_junk_rule
 from .normalize import read_lines
-from .physical import build_physical_document
+from .physical import PhysicalDocument, build_physical_document
 from .transforms import JunkRule
 
 
@@ -33,7 +33,7 @@ def inspect_source(
         if decision == "a":
             accepted.append(group.suggested_rule)
         elif decision == "e":
-            accepted.append(_edit_rule(input_fn, group.suggested_rule))
+            accepted.append(_edit_rule(input_fn, document, group))
         elif decision == "s":
             continue
         else:
@@ -70,6 +70,12 @@ def _print_group(index: int, group: DetectionGroup, preview: RulePreview) -> Non
         f"{group.suggested_rule.target}:{group.suggested_rule.matcher}:"
         f"{group.suggested_rule.pattern}"
     )
+    _print_preview(preview)
+    if _preview_is_broader(group, preview):
+        print("  WARNING: preview is broader than the detected group; review before accepting.")
+
+
+def _print_preview(preview: RulePreview) -> None:
     print(
         "  preview: "
         f"{preview.matched_count} matches, "
@@ -77,8 +83,6 @@ def _print_group(index: int, group: DetectionGroup, preview: RulePreview) -> Non
     )
     if preview.examples:
         print(f"  examples: {preview.examples}")
-    if _preview_is_broader(group, preview):
-        print("  WARNING: preview is broader than the detected group; review before accepting.")
 
 
 def _preview_is_broader(group: DetectionGroup, preview: RulePreview) -> bool:
@@ -88,7 +92,12 @@ def _preview_is_broader(group: DetectionGroup, preview: RulePreview) -> bool:
     )
 
 
-def _edit_rule(input_fn: Callable[[str], str], original: JunkRule) -> JunkRule:
+def _edit_rule(
+    input_fn: Callable[[str], str],
+    document: PhysicalDocument,
+    group: DetectionGroup,
+) -> JunkRule:
+    original = group.suggested_rule
     while True:
         value = input_fn(
             "rule TARGET:MATCHER:PATTERN "
@@ -97,6 +106,13 @@ def _edit_rule(input_fn: Callable[[str], str], original: JunkRule) -> JunkRule:
         if not value:
             value = f"{original.target}:{original.matcher}:{original.pattern}"
         try:
-            return parse_junk_rule(value)
+            rule = parse_junk_rule(value)
+            preview = preview_rule(document, rule)
         except (JunkRuleConfigurationError, ValueError) as exc:
             print(f"ERROR: invalid JunkRule: {exc}")
+            continue
+        print("  edited rule preview:")
+        _print_preview(preview)
+        if _preview_is_broader(group, preview):
+            print("  WARNING: edited preview is broader than the detected group; review carefully.")
+        return rule
