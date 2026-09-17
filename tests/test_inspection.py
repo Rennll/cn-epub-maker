@@ -49,6 +49,17 @@ def test_inspect_edit_revalidates_and_writes_edited_rule(tmp_path):
     assert rules[0].pattern == "本章"
 
 
+def test_inspect_invalid_decision_allows_retry(tmp_path):
+    source = tmp_path / "book.txt"
+    output = tmp_path / "junk-config.json"
+    source.write_text("正文\n本章完\n其他\n本章完\n", encoding="utf-8")
+    answers = iter([" A ", "a"])
+
+    rules = inspect_source(source, output, input_fn=lambda _: next(answers))
+
+    assert len(rules) == 1
+
+
 def test_inspect_preserves_source(tmp_path):
     source = tmp_path / "book.txt"
     output = tmp_path / "junk-config.json"
