@@ -127,8 +127,13 @@ def _detect_blocks(document: PhysicalDocument) -> list[DetectionGroup]:
     return _make_groups("block", exact, patterned, pattern_values)
 
 
-def _make_groups(scope, exact, patterned, pattern_values):
-    groups = []
+def _make_groups(
+    scope: str,
+    exact: dict[str, list[int]],
+    patterned: dict[tuple[str, str], list[int]],
+    pattern_values: dict[tuple[str, str], list[str]],
+) -> list[DetectionGroup]:
+    groups: list[DetectionGroup] = []
     for text, occurrences in exact.items():
         if len(occurrences) >= 2:
             groups.append(_make_group(scope, text, occurrences, ("repetition",), JunkRule(scope, "exact", text)))
@@ -149,7 +154,9 @@ def _make_groups(scope, exact, patterned, pattern_values):
     return groups
 
 
-def _deterministic_pattern(text: str):
+def _deterministic_pattern(text: str) -> tuple[str, str, tuple[str, ...]] | None:
+    # Families are checked in a deliberate priority order; the first matching
+    # family owns the deterministic abstraction for the line/block.
     for family, expression, _ in _VARIABLES:
         matches = tuple(expression.finditer(text))
         if not matches:
@@ -194,9 +201,15 @@ def _pattern_to_regex(pattern: str) -> str:
     return primary
 
 
-def _make_group(scope, pattern, occurrences, evidence, rule):
+def _make_group(
+    scope: str,
+    pattern: str,
+    occurrences: list[int],
+    evidence: tuple[str, ...],
+    rule: JunkRule,
+) -> DetectionGroup:
     return DetectionGroup(scope, pattern, tuple(occurrences), evidence, rule)
 
 
-def _group_sort_key(group):
+def _group_sort_key(group: DetectionGroup) -> tuple[int, int, str]:
     return (group.occurrences[0], 0 if group.scope == "line" else 1, group.pattern)
