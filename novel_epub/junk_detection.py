@@ -10,27 +10,17 @@ from .physical import PhysicalDocument
 from .transforms import JunkRule, _matches
 
 
+_URL_PATTERN = re.compile(
+    r"\[[^\]\n]*\]\(https?://[^\s)]+\)"
+    r"|https?://[^\s]+"
+    r"|(?:www\.)[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?"
+)
+
 _VARIABLES: tuple[tuple[str, re.Pattern[str], str], ...] = (
-    (
-        "url",
-        re.compile(r"https?://[^\s]+|(?:www\.)[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?"),
-        "format",
-    ),
-    (
-        "date",
-        re.compile(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日"),
-        "format",
-    ),
-    (
-        "time",
-        re.compile(r"\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分"),
-        "format",
-    ),
-    (
-        "id",
-        re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9][A-Za-z0-9_-]{7,}(?![A-Za-z0-9])"),
-        "format",
-    ),
+    ("url", _URL_PATTERN, "format"),
+    ("date", re.compile(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日"), "format"),
+    ("time", re.compile(r"\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分"), "format"),
+    ("id", re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9][A-Za-z0-9_-]{7,}(?![A-Za-z0-9])"), "format"),
     ("number", re.compile(r"\d+"), "pattern"),
 )
 
@@ -74,40 +64,22 @@ def preview_rule(document: PhysicalDocument, rule: JunkRule) -> RulePreview:
 
 def _preview_lines(document: PhysicalDocument, rule: JunkRule) -> RulePreview:
     matches = [line for line in document.lines if _matches(line.text, rule.matcher, rule.pattern)]
-    block_by_line = {
-        line_number: block.index
-        for block in document.blocks
-        for line_number in block.line_numbers
-    }
+    block_by_line = {line_number: block.index for block in document.blocks for line_number in block.line_numbers}
     affected_blocks = {block_by_line[line.number] for line in matches if line.number in block_by_line}
-    return RulePreview(
-        matched_count=len(matches),
-        affected_block_count=len(affected_blocks),
-        examples=tuple(line.text for line in matches[:5]),
-        locations=tuple(line.number for line in matches),
-    )
+    return RulePreview(len(matches), len(affected_blocks), tuple(line.text for line in matches[:5]), tuple(line.number for line in matches))
 
 
 def _preview_blocks(document: PhysicalDocument, rule: JunkRule) -> RulePreview:
     lines_by_number = {line.number: line.text for line in document.lines}
-    blocks = [
-        (block.index, "\n".join(lines_by_number[number] for number in block.line_numbers))
-        for block in document.blocks
-    ]
+    blocks = [(block.index, "\n".join(lines_by_number[number] for number in block.line_numbers)) for block in document.blocks]
     matches = [(index, text) for index, text in blocks if _matches(text, rule.matcher, rule.pattern)]
-    return RulePreview(
-        matched_count=len(matches),
-        affected_block_count=len(matches),
-        examples=tuple(text for _, text in matches[:5]),
-        locations=tuple(index for index, _ in matches),
-    )
+    return RulePreview(len(matches), len(matches), tuple(text for _, text in matches[:5]), tuple(index for index, _ in matches))
 
 
 def _detect_lines(document: PhysicalDocument) -> list[DetectionGroup]:
     exact: dict[str, list[int]] = {}
     patterned: dict[tuple[str, str], list[int]] = {}
     pattern_values: dict[tuple[str, str], list[str]] = {}
-
     for line in document.lines:
         if line.blank:
             continue
@@ -118,7 +90,6 @@ def _detect_lines(document: PhysicalDocument) -> list[DetectionGroup]:
             key = (family, pattern)
             patterned.setdefault(key, []).append(line.number)
             pattern_values.setdefault(key, []).append(line.text)
-
     return _make_groups("line", exact, patterned, pattern_values)
 
 
@@ -127,7 +98,6 @@ def _detect_blocks(document: PhysicalDocument) -> list[DetectionGroup]:
     patterned: dict[tuple[str, str], list[int]] = {}
     pattern_values: dict[tuple[str, str], list[str]] = {}
     lines_by_number = {line.number: line.text for line in document.lines}
-
     for block in document.blocks:
         text = "\n".join(lines_by_number[number] for number in block.line_numbers)
         exact.setdefault(text, []).append(block.index)
@@ -137,58 +107,31 @@ def _detect_blocks(document: PhysicalDocument) -> list[DetectionGroup]:
             key = (family, pattern)
             patterned.setdefault(key, []).append(block.index)
             pattern_values.setdefault(key, []).append(text)
-
     return _make_groups("block", exact, patterned, pattern_values)
 
 
-def _make_groups(
-    scope: str,
-    exact: dict[str, list[int]],
-    patterned: dict[tuple[str, str], list[int]],
-    pattern_values: dict[tuple[str, str], list[str]],
-) -> list[DetectionGroup]:
-    groups: list[DetectionGroup] = []
+def _make_groups(scope, exact, patterned, pattern_values):
+    groups = []
     for text, occurrences in exact.items():
-        if len(occurrences) < 2:
-            continue
-        groups.append(
-            _make_group(
-                scope=scope,
-                pattern=text,
-                occurrences=occurrences,
-                evidence=("repetition",),
-                rule=JunkRule(scope, "exact", text),
-            )
-        )
-
+        if len(occurrences) >= 2:
+            groups.append(_make_group(scope, text, occurrences, ("repetition",), JunkRule(scope, "exact", text)))
     for (family, pattern), occurrences in patterned.items():
         values = pattern_values[(family, pattern)]
         if len(occurrences) < 2 or len(set(values)) < 2:
             continue
         evidence = ("repetition", "pattern", "format") if family != "number" else ("repetition", "pattern")
-        groups.append(
-            _make_group(
-                scope=scope,
-                pattern=pattern,
-                occurrences=occurrences,
-                evidence=evidence,
-                rule=JunkRule(scope, "regex", _pattern_to_regex(pattern)),
-            )
-        )
+        groups.append(_make_group(scope, pattern, occurrences, evidence, JunkRule(scope, "regex", _pattern_to_regex(pattern))))
     return groups
 
 
-def _deterministic_pattern(text: str) -> tuple[str, str, tuple[str, ...]] | None:
+def _deterministic_pattern(text: str):
     for family, expression, _ in _VARIABLES:
         matches = tuple(expression.finditer(text))
         if not matches:
             continue
-        pieces: list[str] = []
-        values: list[str] = []
-        cursor = 0
+        pieces, values, cursor = [], [], 0
         for match in matches:
-            pieces.append(text[cursor : match.start()])
-            pieces.append(f"<{family}>")
+            pieces.extend((text[cursor:match.start()], f"<{family}>"))
             values.append(match.group(0))
             cursor = match.end()
         pieces.append(text[cursor:])
@@ -199,38 +142,24 @@ def _deterministic_pattern(text: str) -> tuple[str, str, tuple[str, ...]] | None
 def _pattern_to_regex(pattern: str) -> str:
     variable_regex = {
         "number": r"\d+",
-        "url": r"https?://[^\s]+|www\.[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?",
+        "url": r"\[[^\]\n]*\]\(https?://[^\s)]+\)|https?://[^\s]+|www\.[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?",
         "date": r"\d{4}(?:[-/]\d{1,2}[-/]\d{1,2}|年\d{1,2}月\d{1,2}日)",
         "time": r"(?:\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分)",
         "id": r"[A-Za-z0-9][A-Za-z0-9_-]{7,}",
     }
     placeholder = re.compile(r"<(number|url|date|time|id)>")
-    parts: list[str] = []
-    cursor = 0
+    parts, cursor = [], 0
     for match in placeholder.finditer(pattern):
-        parts.append(re.escape(pattern[cursor : match.start()]))
+        parts.append(re.escape(pattern[cursor:match.start()]))
         parts.append(variable_regex[match.group(1)])
         cursor = match.end()
     parts.append(re.escape(pattern[cursor:]))
     return "^" + "".join(parts) + "$"
 
 
-def _make_group(
-    *,
-    scope: str,
-    pattern: str,
-    occurrences: list[int],
-    evidence: tuple[str, ...],
-    rule: JunkRule,
-) -> DetectionGroup:
-    return DetectionGroup(
-        scope=scope,
-        pattern=pattern,
-        occurrences=tuple(occurrences),
-        evidence=evidence,
-        suggested_rule=rule,
-    )
+def _make_group(scope, pattern, occurrences, evidence, rule):
+    return DetectionGroup(scope, pattern, tuple(occurrences), evidence, rule)
 
 
-def _group_sort_key(group: DetectionGroup) -> tuple[int, int, str]:
+def _group_sort_key(group):
     return (group.occurrences[0], 0 if group.scope == "line" else 1, group.pattern)
