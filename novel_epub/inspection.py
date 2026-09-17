@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Callable
 
-from .junk_detection import DetectionGroup, RulePreview, preview_rule
+from .junk_detection import DetectionGroup, RulePreview, detect_document, preview_rule
 from .junk_rule_configuration import JunkRuleConfigurationError, parse_junk_rule
 from .normalize import read_lines
 from .physical import build_physical_document
@@ -23,7 +23,7 @@ def inspect_source(
     """Inspect a source, interactively select rules, and write a new config."""
     lines, _ = read_lines(source, encoding)
     document = build_physical_document(lines)
-    groups = _detect_groups(document)
+    groups = detect_document(document)
 
     accepted: list[JunkRule] = []
     for index, group in enumerate(groups, 1):
@@ -33,9 +33,7 @@ def inspect_source(
         if decision == "a":
             accepted.append(group.suggested_rule)
         elif decision == "e":
-            edited = _edit_rule(input_fn, group.suggested_rule)
-            if edited is not None:
-                accepted.append(edited)
+            accepted.append(_edit_rule(input_fn, group.suggested_rule))
         elif decision == "s":
             continue
         else:
@@ -61,12 +59,6 @@ def write_junk_config(path: str | Path, rules: list[JunkRule] | tuple[JunkRule, 
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-
-
-def _detect_groups(document):
-    from .junk_detection import detect_document
-
-    return detect_document(document)
 
 
 def _print_group(index: int, group: DetectionGroup, preview: RulePreview) -> None:
@@ -96,7 +88,7 @@ def _preview_is_broader(group: DetectionGroup, preview: RulePreview) -> bool:
     )
 
 
-def _edit_rule(input_fn: Callable[[str], str], original: JunkRule) -> JunkRule | None:
+def _edit_rule(input_fn: Callable[[str], str], original: JunkRule) -> JunkRule:
     while True:
         value = input_fn(
             "rule TARGET:MATCHER:PATTERN "
@@ -105,8 +97,6 @@ def _edit_rule(input_fn: Callable[[str], str], original: JunkRule) -> JunkRule |
         if not value:
             value = f"{original.target}:{original.matcher}:{original.pattern}"
         try:
-            rule = parse_junk_rule(value)
+            return parse_junk_rule(value)
         except (JunkRuleConfigurationError, ValueError) as exc:
             print(f"ERROR: invalid JunkRule: {exc}")
-            continue
-        return rule
