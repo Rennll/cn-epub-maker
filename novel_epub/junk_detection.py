@@ -15,12 +15,11 @@ _URL_PATTERN = re.compile(
     r"|https?://[^\s]+"
     r"|(?:www\.)[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?"
 )
-
 _VARIABLES: tuple[tuple[str, re.Pattern[str], str], ...] = (
     ("url", _URL_PATTERN, "format"),
     ("date", re.compile(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日"), "format"),
     ("time", re.compile(r"\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分"), "format"),
-    ("id", re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9][A-Za-z0-9_-]{7,}(?![A-Za-z0-9])"), "format"),
+    ("id", re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9_-]*\d[A-Za-z0-9_-]{7,}(?![A-Za-z0-9])"), "format"),
     ("number", re.compile(r"\d+"), "pattern"),
 )
 
@@ -66,14 +65,27 @@ def _preview_lines(document: PhysicalDocument, rule: JunkRule) -> RulePreview:
     matches = [line for line in document.lines if _matches(line.text, rule.matcher, rule.pattern)]
     block_by_line = {line_number: block.index for block in document.blocks for line_number in block.line_numbers}
     affected_blocks = {block_by_line[line.number] for line in matches if line.number in block_by_line}
-    return RulePreview(len(matches), len(affected_blocks), tuple(line.text for line in matches[:5]), tuple(line.number for line in matches))
+    return RulePreview(
+        len(matches),
+        len(affected_blocks),
+        tuple(line.text for line in matches[:5]),
+        tuple(line.number for line in matches),
+    )
 
 
 def _preview_blocks(document: PhysicalDocument, rule: JunkRule) -> RulePreview:
     lines_by_number = {line.number: line.text for line in document.lines}
-    blocks = [(block.index, "\n".join(lines_by_number[number] for number in block.line_numbers)) for block in document.blocks]
+    blocks = [
+        (block.index, "\n".join(lines_by_number[number] for number in block.line_numbers))
+        for block in document.blocks
+    ]
     matches = [(index, text) for index, text in blocks if _matches(text, rule.matcher, rule.pattern)]
-    return RulePreview(len(matches), len(matches), tuple(text for _, text in matches[:5]), tuple(index for index, _ in matches))
+    return RulePreview(
+        len(matches),
+        len(matches),
+        tuple(text for _, text in matches[:5]),
+        tuple(index for index, _ in matches),
+    )
 
 
 def _detect_lines(document: PhysicalDocument) -> list[DetectionGroup]:
@@ -85,11 +97,12 @@ def _detect_lines(document: PhysicalDocument) -> list[DetectionGroup]:
             continue
         exact.setdefault(line.text, []).append(line.number)
         candidate = _deterministic_pattern(line.text)
-        if candidate is not None:
-            pattern, family, _ = candidate
-            key = (family, pattern)
-            patterned.setdefault(key, []).append(line.number)
-            pattern_values.setdefault(key, []).append(line.text)
+        if candidate is None:
+            continue
+        pattern, family, _ = candidate
+        key = (family, pattern)
+        patterned.setdefault(key, []).append(line.number)
+        pattern_values.setdefault(key, []).append(line.text)
     return _make_groups("line", exact, patterned, pattern_values)
 
 
@@ -102,11 +115,12 @@ def _detect_blocks(document: PhysicalDocument) -> list[DetectionGroup]:
         text = "\n".join(lines_by_number[number] for number in block.line_numbers)
         exact.setdefault(text, []).append(block.index)
         candidate = _deterministic_pattern(text)
-        if candidate is not None:
-            pattern, family, _ = candidate
-            key = (family, pattern)
-            patterned.setdefault(key, []).append(block.index)
-            pattern_values.setdefault(key, []).append(text)
+        if candidate is None:
+            continue
+        pattern, family, _ = candidate
+        key = (family, pattern)
+        patterned.setdefault(key, []).append(block.index)
+        pattern_values.setdefault(key, []).append(text)
     return _make_groups("block", exact, patterned, pattern_values)
 
 
@@ -120,7 +134,15 @@ def _make_groups(scope, exact, patterned, pattern_values):
         if len(occurrences) < 2 or len(set(values)) < 2:
             continue
         evidence = ("repetition", "pattern", "format") if family != "number" else ("repetition", "pattern")
-        groups.append(_make_group(scope, pattern, occurrences, evidence, JunkRule(scope, "regex", _pattern_to_regex(pattern))))
+        groups.append(
+            _make_group(
+                scope,
+                pattern,
+                occurrences,
+                evidence,
+                JunkRule(scope, "regex", _pattern_to_regex(pattern)),
+            )
+        )
     return groups
 
 
@@ -145,7 +167,7 @@ def _pattern_to_regex(pattern: str) -> str:
         "url": r"\[[^\]\n]*\]\(https?://[^\s)]+\)|https?://[^\s]+|www\.[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?",
         "date": r"\d{4}(?:[-/]\d{1,2}[-/]\d{1,2}|年\d{1,2}月\d{1,2}日)",
         "time": r"(?:\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分)",
-        "id": r"[A-Za-z0-9][A-Za-z0-9_-]{7,}",
+        "id": r"[A-Za-z0-9_-]*\d[A-Za-z0-9_-]{7,}",
     }
     placeholder = re.compile(r"<(number|url|date|time|id)>")
     parts, cursor = [], 0
