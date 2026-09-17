@@ -15,11 +15,14 @@ _URL_PATTERN = re.compile(
     r"|https?://[^\s]+"
     r"|(?:www\.)[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?"
 )
+_ID_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_-])(?=[A-Za-z0-9_-]*[A-Za-z])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{8,}(?![A-Za-z0-9_-])"
+)
 _VARIABLES: tuple[tuple[str, re.Pattern[str], str], ...] = (
     ("url", _URL_PATTERN, "format"),
     ("date", re.compile(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日"), "format"),
     ("time", re.compile(r"\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分"), "format"),
-    ("id", re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9_-]*\d[A-Za-z0-9_-]{7,}(?![A-Za-z0-9])"), "format"),
+    ("id", _ID_PATTERN, "format"),
     ("number", re.compile(r"\d+"), "pattern"),
 )
 
@@ -157,7 +160,10 @@ def _deterministic_pattern(text: str):
             values.append(match.group(0))
             cursor = match.end()
         pieces.append(text[cursor:])
-        return "".join(pieces), family, tuple(values)
+        pattern = "".join(pieces)
+        if family == "url":
+            pattern = pattern.replace("：<url>", ":<url>")
+        return pattern, family, tuple(values)
     return None
 
 
@@ -167,12 +173,16 @@ def _pattern_to_regex(pattern: str) -> str:
         "url": r"\[[^\]\n]*\]\(https?://[^\s)]+\)|https?://[^\s]+|www\.[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?",
         "date": r"\d{4}(?:[-/]\d{1,2}[-/]\d{1,2}|年\d{1,2}月\d{1,2}日)",
         "time": r"(?:\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分)",
-        "id": r"[A-Za-z0-9_-]*\d[A-Za-z0-9_-]{7,}",
+        "id": r"(?=[A-Za-z0-9_-]*[A-Za-z])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{8,}",
     }
     placeholder = re.compile(r"<(number|url|date|time|id)>")
     parts, cursor = [], 0
     for match in placeholder.finditer(pattern):
-        parts.append(re.escape(pattern[cursor:match.start()]))
+        literal = pattern[cursor:match.start()]
+        if match.group(1) == "url" and literal.endswith(":"):
+            parts.append(re.escape(literal[:-1]) + r"[：:]")
+        else:
+            parts.append(re.escape(literal))
         parts.append(variable_regex[match.group(1)])
         cursor = match.end()
     parts.append(re.escape(pattern[cursor:]))
