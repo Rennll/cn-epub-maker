@@ -21,6 +21,10 @@ def inspect_source(
     input_fn: Callable[[str], str] = input,
 ) -> tuple[JunkRule, ...]:
     """Inspect a source, interactively select rules, and write a new config."""
+    output_path = Path(output)
+    if output_path.exists():
+        raise FileExistsError(f"inspection output already exists: {output_path}")
+
     lines, _ = read_lines(source, encoding)
     document = build_physical_document(lines)
     groups = detect_document(document)
@@ -39,12 +43,15 @@ def inspect_source(
         else:
             raise ValueError("invalid inspection decision; expected a, e, or s")
 
-    write_junk_config(output, accepted)
+    write_junk_config(output_path, accepted)
     return tuple(accepted)
 
 
 def write_junk_config(path: str | Path, rules: list[JunkRule] | tuple[JunkRule, ...]) -> None:
     """Write only accepted canonical JunkRules to a new JSON configuration."""
+    output_path = Path(path)
+    if output_path.exists():
+        raise FileExistsError(f"inspection output already exists: {output_path}")
     payload = {
         "junk_rules": [
             {
@@ -55,7 +62,7 @@ def write_junk_config(path: str | Path, rules: list[JunkRule] | tuple[JunkRule, 
             for rule in rules
         ]
     }
-    Path(path).write_text(
+    output_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
