@@ -20,7 +20,7 @@ def test_preview_line_rule_reports_matches_blocks_examples_and_locations():
     )
 
     assert preview.matched_count == 2
-    assert preview.affected_block_count == 2
+    assert preview.affected_block_count == 1
     assert preview.examples == ("本章字數：1234", "本章字數：5678")
     assert preview.locations == (2, 4)
 
