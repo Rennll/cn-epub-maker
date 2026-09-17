@@ -9,7 +9,29 @@ from .physical import PhysicalDocument
 from .transforms import JunkRule, _matches
 
 
-_NUMBER_RE = re.compile(r"\d+")
+_VARIABLES: tuple[tuple[str, re.Pattern[str], str], ...] = (
+    (
+        "url",
+        re.compile(r"https?://[^\s]+|(?:www\.)[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?"),
+        "format",
+    ),
+    (
+        "date",
+        re.compile(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日"),
+        "format",
+    ),
+    (
+        "time",
+        re.compile(r"\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分"),
+        "format",
+    ),
+    (
+        "id",
+        re.compile(r"(?<![A-Za-z0-9])[A-Za-z0-9][A-Za-z0-9_-]{7,}(?![A-Za-z0-9])"),
+        "format",
+    ),
+    ("number", re.compile(r"\d+"), "pattern"),
+)
 
 
 @dataclass(frozen=True)
@@ -80,116 +102,112 @@ def _preview_blocks(document: PhysicalDocument, rule: JunkRule) -> RulePreview:
 
 
 def _detect_lines(document: PhysicalDocument) -> list[DetectionGroup]:
-    groups: list[DetectionGroup] = []
     exact: dict[str, list[int]] = {}
-    patterned: dict[str, list[int]] = {}
-    pattern_values: dict[str, list[str]] = {}
+    patterned: dict[tuple[str, str], list[int]] = {}
+    pattern_values: dict[tuple[str, str], list[str]] = {}
 
     for line in document.lines:
         if line.blank:
             continue
         exact.setdefault(line.text, []).append(line.number)
-        pattern = _number_pattern(line.text)
-        if pattern is not None:
-            patterned.setdefault(pattern[0], []).append(line.number)
-            pattern_values.setdefault(pattern[0], []).append(line.text)
+        candidate = _deterministic_pattern(line.text)
+        if candidate is not None:
+            pattern, family, _ = candidate
+            key = (family, pattern)
+            patterned.setdefault(key, []).append(line.number)
+            pattern_values.setdefault(key, []).append(line.text)
 
-    for text, occurrences in exact.items():
-        if len(occurrences) < 2:
-            continue
-        groups.append(
-            _make_group(
-                scope="line",
-                pattern=text,
-                occurrences=occurrences,
-                evidence=("repetition",),
-                rule=JunkRule("line", "exact", text),
-            )
-        )
-
-    for pattern, occurrences in patterned.items():
-        values = pattern_values[pattern]
-        if len(occurrences) < 2 or len(set(values)) < 2:
-            continue
-        groups.append(
-            _make_group(
-                scope="line",
-                pattern=pattern,
-                occurrences=occurrences,
-                evidence=("repetition", "pattern"),
-                rule=JunkRule("line", "regex", _pattern_to_regex(pattern)),
-            )
-        )
-
-    return groups
+    return _make_groups("line", exact, patterned, pattern_values)
 
 
 def _detect_blocks(document: PhysicalDocument) -> list[DetectionGroup]:
-    groups: list[DetectionGroup] = []
     exact: dict[str, list[int]] = {}
-    patterned: dict[str, list[int]] = {}
-    pattern_values: dict[str, list[str]] = {}
-
+    patterned: dict[tuple[str, str], list[int]] = {}
+    pattern_values: dict[tuple[str, str], list[str]] = {}
     lines_by_number = {line.number: line.text for line in document.lines}
+
     for block in document.blocks:
         text = "\n".join(lines_by_number[number] for number in block.line_numbers)
         exact.setdefault(text, []).append(block.index)
-        pattern = _number_pattern(text)
-        if pattern is not None:
-            patterned.setdefault(pattern[0], []).append(block.index)
-            pattern_values.setdefault(pattern[0], []).append(text)
+        candidate = _deterministic_pattern(text)
+        if candidate is not None:
+            pattern, family, _ = candidate
+            key = (family, pattern)
+            patterned.setdefault(key, []).append(block.index)
+            pattern_values.setdefault(key, []).append(text)
 
+    return _make_groups("block", exact, patterned, pattern_values)
+
+
+def _make_groups(
+    scope: str,
+    exact: dict[str, list[int]],
+    patterned: dict[tuple[str, str], list[int]],
+    pattern_values: dict[tuple[str, str], list[str]],
+) -> list[DetectionGroup]:
+    groups: list[DetectionGroup] = []
     for text, occurrences in exact.items():
         if len(occurrences) < 2:
             continue
         groups.append(
             _make_group(
-                scope="block",
+                scope=scope,
                 pattern=text,
                 occurrences=occurrences,
                 evidence=("repetition",),
-                rule=JunkRule("block", "exact", text),
+                rule=JunkRule(scope, "exact", text),
             )
         )
 
-    for pattern, occurrences in patterned.items():
-        values = pattern_values[pattern]
+    for (family, pattern), occurrences in patterned.items():
+        values = pattern_values[(family, pattern)]
         if len(occurrences) < 2 or len(set(values)) < 2:
             continue
+        evidence = ("repetition", "pattern", "format") if family != "number" else ("repetition", "pattern")
         groups.append(
             _make_group(
-                scope="block",
+                scope=scope,
                 pattern=pattern,
                 occurrences=occurrences,
-                evidence=("repetition", "pattern"),
-                rule=JunkRule("block", "regex", _pattern_to_regex(pattern)),
+                evidence=evidence,
+                rule=JunkRule(scope, "regex", _pattern_to_regex(pattern)),
             )
         )
-
     return groups
 
 
-def _number_pattern(text: str) -> tuple[str, tuple[str, ...]] | None:
-    matches = tuple(_NUMBER_RE.finditer(text))
-    if not matches:
-        return None
-    pieces: list[str] = []
-    cursor = 0
-    for match in matches:
-        pieces.append(text[cursor : match.start()])
-        pieces.append("<number>")
-        cursor = match.end()
-    pieces.append(text[cursor:])
-    pattern = "".join(pieces)
-    return pattern, tuple(match.group(0) for match in matches)
+def _deterministic_pattern(text: str) -> tuple[str, str, tuple[str, ...]] | None:
+    for family, expression, _ in _VARIABLES:
+        matches = tuple(expression.finditer(text))
+        if not matches:
+            continue
+        pieces: list[str] = []
+        values: list[str] = []
+        cursor = 0
+        for match in matches:
+            pieces.append(text[cursor : match.start()])
+            pieces.append(f"<{family}>")
+            values.append(match.group(0))
+            cursor = match.end()
+        pieces.append(text[cursor:])
+        return "".join(pieces), family, tuple(values)
+    return None
 
 
 def _pattern_to_regex(pattern: str) -> str:
+    variable_regex = {
+        "number": r"\d+",
+        "url": r"https?://[^\s]+|www\.[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?",
+        "date": r"\d{4}(?:[-/]\d{1,2}[-/]\d{1,2}|年\d{1,2}月\d{1,2}日)",
+        "time": r"(?:\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分)",
+        "id": r"[A-Za-z0-9][A-Za-z0-9_-]{7,}",
+    }
+    placeholder = re.compile(r"<(number|url|date|time|id)>")
     parts: list[str] = []
     cursor = 0
-    for match in re.finditer(r"<number>", pattern):
+    for match in placeholder.finditer(pattern):
         parts.append(re.escape(pattern[cursor : match.start()]))
-        parts.append(r"\d+")
+        parts.append(variable_regex[match.group(1)])
         cursor = match.end()
     parts.append(re.escape(pattern[cursor:]))
     return "^" + "".join(parts) + "$"
