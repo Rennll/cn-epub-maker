@@ -4,7 +4,7 @@ from html import escape
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from ..models import Book, Chapter, Paragraph
+from ..models import Book, Chapter, Paragraph, ParagraphBoundary
 from .epub import EpubPackageBuilder, _iter_chapters
 
 
@@ -58,10 +58,10 @@ class NativeRenderer:
     @staticmethod
     def _paragraph(paragraph: Paragraph) -> str:
         classes = {
-            "expanded": "paragraph-expanded",
-            "scene-break": "paragraph-scene-break",
+            ParagraphBoundary.EXPANDED: "paragraph-expanded",
+            ParagraphBoundary.SCENE_BREAK: "paragraph-scene-break",
         }
-        class_name = classes.get(paragraph.boundary.value)
+        class_name = classes.get(paragraph.boundary)
         class_attr = f' class="{class_name}"' if class_name else ""
         text = escape(paragraph.text).replace("\n", "<br />\n")
         return f"<p{class_attr}>{text}</p>\n"
