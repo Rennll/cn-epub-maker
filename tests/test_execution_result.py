@@ -13,6 +13,7 @@ from novel_epub.configuration import (
 )
 from novel_epub.execution import ExecutionResult, execute
 from novel_epub.transforms import JunkRule
+from novel_epub.validation.report import ValidationReport
 
 
 def _request(source: Path, destination: Path) -> ConversionRequest:
@@ -49,7 +50,7 @@ def test_execute_returns_structured_result_without_stdout_side_effects(
         "novel_epub.execution.render",
         lambda book, path: Path(path).write_bytes(b"epub"),
     )
-    monkeypatch.setattr("novel_epub.execution.validate_epub", lambda path: [])
+    monkeypatch.setattr("novel_epub.execution.validate_epub", lambda path: ValidationReport())
 
     result = execute(_request(source, destination))
 
