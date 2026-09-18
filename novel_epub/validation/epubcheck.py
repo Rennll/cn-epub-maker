@@ -13,10 +13,10 @@ class EpubCheckResult:
     errors: list[str]
 
 
-def run_epubcheck(path: str | Path, *, required: bool = False) -> EpubCheckResult:
+def run_epubcheck(path: str | Path, *, required: bool = False, which=shutil.which, runner=subprocess.run) -> EpubCheckResult:
     """Run the optional external EPUBCheck executable."""
     path = Path(path)
-    command = shutil.which("epubcheck")
+    command = which("epubcheck")
     if command is None:
         if required:
             return EpubCheckResult(
@@ -27,7 +27,7 @@ def run_epubcheck(path: str | Path, *, required: bool = False) -> EpubCheckResul
         return EpubCheckResult(available=False, ok=True, errors=[])
 
     try:
-        completed = subprocess.run(
+        completed = runner(
             [command, str(path)],
             capture_output=True,
             text=True,
@@ -41,9 +41,9 @@ def run_epubcheck(path: str | Path, *, required: bool = False) -> EpubCheckResul
 
     errors: list[str] = []
     if completed.stdout:
-        errors.append(f"EPUBCheck stdout: {completed.stdout}")
+        errors.append(completed.stdout)
     if completed.stderr:
-        errors.append(f"EPUBCheck stderr: {completed.stderr}")
+        errors.append(completed.stderr)
     if not errors:
         errors.append(f"EPUBCheck exited with status {completed.returncode}")
     return EpubCheckResult(available=True, ok=False, errors=errors)
