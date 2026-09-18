@@ -57,7 +57,7 @@ def test_valid_epub_structure_passes(tmp_path: Path):
             "EPUB/text/ch000001.xhtml": "<html xmlns=\"http://www.w3.org/1999/xhtml\"><body><h1>Chapter</h1></body></html>",
         },
     )
-    assert validate_epub(path) == []
+    assert validate_epub(path).errors == []
 
 
 def test_missing_opf_target_is_reported(tmp_path: Path):
@@ -72,7 +72,7 @@ def test_missing_opf_target_is_reported(tmp_path: Path):
         opf=opf,
         files={"EPUB/nav.xhtml": NAV},
     )
-    errors = validate_epub(path)
+    errors = validate_epub(path).errors
     assert any("manifest target missing" in error for error in errors)
 
 
@@ -107,6 +107,41 @@ def test_nav_target_must_exist(tmp_path: Path):
     )
     errors = validate_epub(path)
     assert any("nav target missing" in error for error in errors)
+
+
+def test_missing_container_is_reported(tmp_path: Path):
+    path = tmp_path / "book.epub"
+    with ZipFile(path, "w") as zf:
+        zf.writestr("mimetype", "application/epub+zip")
+    errors = validate_epub(path).errors
+    assert "missing required EPUB file: META-INF/container.xml" in errors
+
+
+def test_invalid_opf_xml_is_reported(tmp_path: Path):
+    path = _write_epub(
+        tmp_path,
+        container=CONTAINER,
+        opf="<package>",
+        files={},
+    )
+    errors = validate_epub(path).errors
+    assert any("invalid content.opf" in error for error in errors)
+
+
+def test_multiple_nav_items_are_reported(tmp_path: Path):
+    opf = _opf(
+        '<item id="nav1" href="nav1.xhtml" media-type="application/xhtml+xml" properties="nav" />'
+        '<item id="nav2" href="nav2.xhtml" media-type="application/xhtml+xml" properties="nav" />',
+        "",
+    )
+    path = _write_epub(
+        tmp_path,
+        container=CONTAINER,
+        opf=opf,
+        files={"EPUB/nav1.xhtml": NAV, "EPUB/nav2.xhtml": NAV},
+    )
+    errors = validate_epub(path).errors
+    assert "EPUB must contain exactly one nav manifest item" in errors
 
 
 def test_container_must_resolve_to_existing_opf(tmp_path: Path):
