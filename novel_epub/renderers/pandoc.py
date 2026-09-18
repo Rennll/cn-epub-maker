@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import mimetypes
+import os
 import re
 import subprocess
+import uuid
+import zipfile
+from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from ..models import Book, Chapter, Paragraph, ParagraphBoundary
-from .epub import EpubPackageBuilder
 
 CSS = """@charset "UTF-8";
 body { font-size: 1em; line-height: 1.7; margin: 1em; text-align: left; }
@@ -23,12 +26,6 @@ _P_OPEN = re.compile(r"<p(\s[^>]*)?>")
 _NS_EPUB = "http://www.idpf.org/2007/ops"
 _NS_OPF = "http://www.idpf.org/2007/opf"
 _NS_DC = "http://purl.org/dc/elements/1.1/"
-
-
-def _iter_chapters(book: Book):
-    for volume in book.volumes:
-        yield from ((volume, chapter) for chapter in volume.chapters)
-    yield from ((None, chapter) for chapter in book.chapters)
 
 
 class RenderingError(Exception):
@@ -86,6 +83,78 @@ def _markdown(book: Book) -> str:
             lines.extend([_escape_markdown(paragraph.text), ""])
     return "\n".join(lines).rstrip() + "\n"
 
+
+def _iter_chapters(book: Book):
+    for volume in book.volumes:
+        yield from ((volume, chapter) for chapter in volume.chapters)
+    yield from ((None, chapter) for chapter in book.chapters)
+
+
+def _validate_book(book: Book) -> None:
+    sequences = [chapter.sequence for _volume, chapter in _iter_chapters(book)]
+    if len(sequences) != len(set(sequences)):
+        raise ValueError("duplicate chapter sequence")
+    if book.cover:
+        cover = Path(book.cover)
+        if not cover.is_file():
+            raise FileNotFoundError(f"cover file not found: {cover}")
+        media_type = mimetypes.guess_type(cover.name)[0]
+        if media_type not in {"image/jpeg", "image/png", "image/gif", "image/webp"}:
+            raise ValueError(f"unsupported cover media type: {cover.name}")
+
+
+def _paragraph_class(boundary: ParagraphBoundary) -> str:
+    if boundary is ParagraphBoundary.EXPANDED:
+        return ' class="paragraph-expanded"'
+    if boundary is ParagraphBoundary.SCENE_BREAK:
+        return ' class="paragraph-scene-break"'
+    return ""
+
+
+def _apply_paragraph_boundaries(body: str, paragraphs: list[Paragraph]) -> str:
+    index = 0
+    def replace(match: re.Match[str]) -> str:
+        nonlocal index
+        if index >= len(paragraphs):
+            return match.group(0)
+        boundary = paragraphs[index].boundary
+        index += 1
+        return f"<p{_paragraph_class(boundary)}>"
+    return _P_OPEN.sub(replace, body)
+
+
+def _pandoc_chapter(chapter: Chapter, destination: Path, language: str) -> None:
+    source = destination.with_suffix(".md")
+    fragment = destination.with_suffix(".html")
+    source.write_text(_chapter_markdown(chapter), encoding="utf-8")
+    _run_pandoc(["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)])
+    body = _apply_paragraph_boundaries(fragment.read_text(encoding="utf-8").strip(), chapter.paragraphs)
+    language = escape(language)
+    chapter_title = escape(f"{chapter.label} {chapter.title}".rstrip())
+    destination.write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE html>\n'
+        f'<html xmlns="http://www.w3.org/1999/xhtml" lang="{language}" xml:lang="{language}">\n'
+        '<head>\n<meta charset="utf-8" />\n'
+        f'<title>{chapter_title}</title>\n<link rel="stylesheet" type="text/css" href="../styles/stylesheet.css" />\n'
+        '</head>\n<body>\n' + body + '\n</body>\n</html>\n', encoding="utf-8")
+
+
+def _pandoc_preamble(book: Book, destination: Path) -> None:
+    source = destination.with_suffix(".md")
+    fragment = destination.with_suffix(".html")
+    source.write_text(_preamble_markdown(book), encoding="utf-8")
+    _run_pandoc(["pandoc", str(source), "--from=markdown", "--to=html5", "--output", str(fragment)])
+    body = _apply_paragraph_boundaries(fragment.read_text(encoding="utf-8").strip(), book.preamble)
+    language = escape(book.language)
+    destination.write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE html>\n'
+        f'<html xmlns="http://www.w3.org/1999/xhtml" lang="{language}" xml:lang="{language}">\n'
+        '<head>\n<meta charset="utf-8" />\n'
+        f'<title>{escape(book.title)}</title>\n<link rel="stylesheet" type="text/css" href="../styles/stylesheet.css" />\n'
+        '</head>\n<body>\n' + body + '\n</body>\n</html>\n', encoding="utf-8")
+
+
+from .epub import EpubPackageBuilder
 
 def render(book: Book, output: str | Path) -> Path:
     """Render chapters with Pandoc, then delegate EPUB assembly."""
