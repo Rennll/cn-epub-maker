@@ -25,6 +25,7 @@ _VARIABLES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("id", _ID_PATTERN),
     ("number", re.compile(r"\d+")),
 )
+_VARIABLE_PRIORITY = {name: index for index, (name, _) in enumerate(_VARIABLES)}
 _FORMAT_MARKER_PATTERN = re.compile(r"[:：=＝|｜]|(?:字數|字数|頁數|页数|更新|發布|发布|來源|来源|作者|網址|网址|版本|日期|時間|时间)")
 
 
@@ -238,7 +239,7 @@ def _deterministic_pattern(
 
 
 def _variable_priority(family: str) -> int:
-    return next(index for index, (name, _) in enumerate(_VARIABLES) if name == family)
+    return _VARIABLE_PRIORITY[family]
 
 
 def _pattern_to_regex(pattern: str) -> str:
