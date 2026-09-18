@@ -179,3 +179,92 @@ def test_preview_broader_detects_same_count_different_locations():
     preview = inspection.RulePreview(2, 2, ("candidate",), (2, 5))
 
     assert inspection._preview_is_broader(group, preview) is True
+
+
+def test_cli_inspect_config_feeds_normal_build_pipeline(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    import novel_epub.cli as cli
+    import novel_epub.execution as execution
+
+    source = tmp_path / "book.txt"
+    config = tmp_path / "junk-config.json"
+    epub = tmp_path / "book.epub"
+    original = "第一章\n本章字數：1234\n正文內容\n本章字數：5678\n"
+    source.write_text(original, encoding="utf-8")
+
+    real_inspect_source = cli.inspect_source
+
+    def inspect_with_answer(input_path, output_path, *, encoding=None):
+        return real_inspect_source(
+            input_path,
+            output_path,
+            encoding=encoding,
+            input_fn=lambda _prompt: "a",
+        )
+
+    monkeypatch.setattr(cli, "inspect_source", inspect_with_answer)
+
+    assert cli.main.__module__ == "novel_epub.cli"
+
+    monkeypatch.setattr(
+        cli.sys,
+        "argv",
+        ["novel-epub", "inspect", str(source), "--output", str(config)],
+    )
+    assert cli.main() == 0
+
+    payload = json.loads(config.read_text(encoding="utf-8"))
+    assert payload["junk_rules"] == [
+        {
+            "target": "line",
+            "matcher": "regex",
+            "pattern": "^本章字數：\\\\d+$",
+        }
+    ]
+
+    captured = {}
+
+    def fake_render(book, output):
+        captured["book"] = book
+        output = __import__("pathlib").Path(output)
+        output.write_bytes(b"fake epub")
+        return output
+
+    monkeypatch.setattr(execution, "render", fake_render)
+    monkeypatch.setattr(
+        execution,
+        "validate_epub",
+        lambda _path: SimpleNamespace(ok=True, errors=[]),
+    )
+
+    monkeypatch.setattr(
+        cli.sys,
+        "argv",
+        [
+            "novel-epub",
+            "build",
+            str(source),
+            "--output",
+            str(epub),
+            "--title",
+            "測試書",
+            "--author",
+            "測試作者",
+            "--config",
+            str(config),
+        ],
+    )
+    assert cli.main() == 0
+
+    rendered_text = "\\n".join(
+        paragraph.text
+        for volume in captured["book"].volumes
+        for chapter in volume.chapters
+        for paragraph in chapter.paragraphs
+    )
+    assert "本章字數：1234" not in rendered_text
+    assert "本章字數：5678" not in rendered_text
+    assert "正文內容" in rendered_text
+    assert source.read_text(encoding="utf-8") == original
+    assert epub.read_bytes() == b"fake epub"
