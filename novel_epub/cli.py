@@ -9,7 +9,8 @@ from .configuration_resolver import resolve_conversion_request
 from .execution import ExecutionResult, execute
 from .inspection import inspect_source
 from .transforms import OpenCCTransformer
-from .validator import run_epubcheck, validate_epub
+from .validation.epub import validate_epub
+from .validation.epubcheck import run_epubcheck
 
 
 def _report_execution(result: ExecutionResult) -> None:
@@ -78,9 +79,9 @@ def inspect(args: argparse.Namespace) -> int:
 
 
 def validate(args: argparse.Namespace) -> int:
-    errors = validate_epub(args.epub)
-    if errors:
-        for error in errors:
+    validation = validate_epub(args.epub)
+    if not validation.ok:
+        for error in validation.errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
 

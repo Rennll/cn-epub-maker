@@ -20,7 +20,8 @@ from .transforms import (
     TransformPipeline,
     TransformationError,
 )
-from .validator import ValidationReport, validate_book, validate_epub
+from .validation.book import ValidationReport, validate_book
+from .validation.epub import validate_epub
 
 
 @dataclass(frozen=True)
@@ -160,8 +161,9 @@ def execute(
         execution.warnings.extend(plan.warnings)
         render(result.book, plan.path)
         execution.epub_path = plan.path
-        execution.epub_validation_errors = validate_epub(plan.path)
-        if execution.epub_validation_errors:
+        epub_validation = validate_epub(plan.path)
+        execution.epub_validation_errors = epub_validation.errors
+        if not epub_validation.ok:
             execution.return_code = 3
             execution.errors = list(execution.epub_validation_errors)
             return execution

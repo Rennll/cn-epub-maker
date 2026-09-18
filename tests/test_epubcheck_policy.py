@@ -4,7 +4,7 @@ from novel_epub.validator import EpubCheckResult, run_epubcheck
 
 
 def test_epubcheck_unavailable_is_not_ok_when_required(monkeypatch, tmp_path: Path):
-    monkeypatch.setattr("novel_epub.validator.shutil.which", lambda _: None)
+    monkeypatch.setattr("novel_epub.validation.epubcheck.shutil.which", lambda _: None)
 
     result = run_epubcheck(tmp_path / "book.epub", required=True)
 
@@ -16,7 +16,7 @@ def test_epubcheck_unavailable_is_not_ok_when_required(monkeypatch, tmp_path: Pa
 
 
 def test_epubcheck_unavailable_is_allowed_for_optional_validation(monkeypatch, tmp_path: Path):
-    monkeypatch.setattr("novel_epub.validator.shutil.which", lambda _: None)
+    monkeypatch.setattr("novel_epub.validation.epubcheck.shutil.which", lambda _: None)
 
     result = run_epubcheck(tmp_path / "book.epub", required=False)
 
@@ -29,8 +29,8 @@ def test_epubcheck_nonzero_exit_is_validation_failure(monkeypatch, tmp_path: Pat
         stdout = "ERROR: invalid EPUB"
         stderr = ""
 
-    monkeypatch.setattr("novel_epub.validator.shutil.which", lambda _: "/usr/bin/epubcheck")
-    monkeypatch.setattr("novel_epub.validator.subprocess.run", lambda *args, **kwargs: Completed())
+    monkeypatch.setattr("novel_epub.validation.epubcheck.shutil.which", lambda _: "/usr/bin/epubcheck")
+    monkeypatch.setattr("novel_epub.validation.epubcheck.subprocess.run", lambda *args, **kwargs: Completed())
 
     result = run_epubcheck(tmp_path / "book.epub", required=True)
 

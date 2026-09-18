@@ -109,6 +109,41 @@ def test_nav_target_must_exist(tmp_path: Path):
     assert any("nav target missing" in error for error in errors)
 
 
+def test_missing_container_is_reported(tmp_path: Path):
+    path = tmp_path / "book.epub"
+    with ZipFile(path, "w") as zf:
+        zf.writestr("mimetype", "application/epub+zip")
+    errors = validate_epub(path)
+    assert "missing required EPUB file: META-INF/container.xml" in errors
+
+
+def test_invalid_opf_xml_is_reported(tmp_path: Path):
+    path = _write_epub(
+        tmp_path,
+        container=CONTAINER,
+        opf="<package>",
+        files={},
+    )
+    errors = validate_epub(path)
+    assert any("invalid content.opf" in error for error in errors)
+
+
+def test_multiple_nav_items_are_reported(tmp_path: Path):
+    opf = _opf(
+        '<item id="nav1" href="nav1.xhtml" media-type="application/xhtml+xml" properties="nav" />'
+        '<item id="nav2" href="nav2.xhtml" media-type="application/xhtml+xml" properties="nav" />',
+        "",
+    )
+    path = _write_epub(
+        tmp_path,
+        container=CONTAINER,
+        opf=opf,
+        files={"EPUB/nav1.xhtml": NAV, "EPUB/nav2.xhtml": NAV},
+    )
+    errors = validate_epub(path)
+    assert "EPUB must contain exactly one nav manifest item" in errors
+
+
 def test_container_must_resolve_to_existing_opf(tmp_path: Path):
     container = CONTAINER.replace("EPUB/content.opf", "EPUB/missing.opf")
     path = _write_epub(
