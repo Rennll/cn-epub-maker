@@ -133,7 +133,7 @@ def test_execute_builds_physical_document_from_transformed_lines(tmp_path, monke
         lambda book, warnings: type("Report", (), {"errors": [], "warnings": []})(),
     )
     monkeypatch.setattr("novel_epub.execution.render", lambda book, path: None)
-    monkeypatch.setattr("novel_epub.execution.validate_epub", lambda path: [])
+    monkeypatch.setattr("novel_epub.execution.validate_epub", lambda path: ValidationReport())
 
     result = execute(request)
 
