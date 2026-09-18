@@ -12,14 +12,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from ..models import Book, Chapter, Paragraph, ParagraphBoundary
-
-CSS = """@charset "UTF-8";
-body { font-size: 1em; line-height: 1.7; margin: 1em; text-align: left; }
-p { text-indent: 2em; margin: 0; padding: 0; }
-p.paragraph-expanded { margin-top: 1.5em; }
-p.paragraph-scene-break { margin-top: 2.5em; }
-h1 { text-align: center; break-before: page; page-break-before: always; }
-"""
+from .epub import CSS, EpubPackageBuilder, _iter_chapters
 
 _MARKDOWN_CHARS = re.compile(r"([\\`*{}\[\]()#+.!_>|~\-=\^$:])")
 _P_OPEN = re.compile(r"<p(\s[^>]*)?>")
@@ -153,8 +146,6 @@ def _pandoc_preamble(book: Book, destination: Path) -> None:
         f'<title>{escape(book.title)}</title>\n<link rel="stylesheet" type="text/css" href="../styles/stylesheet.css" />\n'
         '</head>\n<body>\n' + body + '\n</body>\n</html>\n', encoding="utf-8")
 
-
-from .epub import EpubPackageBuilder
 
 def render(book: Book, output: str | Path) -> Path:
     """Render chapters with Pandoc, then delegate EPUB assembly."""
