@@ -39,6 +39,12 @@ class DetectionGroup:
     suggested_rule: JunkRule | None
     qualified: bool = True
 
+    def __post_init__(self) -> None:
+        if self.qualified and self.suggested_rule is None:
+            raise ValueError("qualified detection group requires a suggested JunkRule")
+        if not self.qualified and self.suggested_rule is not None:
+            raise ValueError("unqualified detection group cannot have a suggested JunkRule")
+
 
 @dataclass(frozen=True)
 class RulePreview:
@@ -163,7 +169,7 @@ def _has_format_evidence(family: str, pattern: str, values: list[str]) -> bool:
 def _observed_variable_has_format(family: str, value: str) -> bool:
     """Check the observed values themselves, rather than inferring from family name."""
     if family == "url":
-        return bool(re.match(r"^(?:https?://|www\.)", value) or value.startswith("["))
+        return bool(re.search(r"(?:https?://|www\.)", value) or value.startswith("["))
     if family == "date":
         return bool(re.search(r"[-/]\d|年\d|\d日$", value))
     if family == "time":
@@ -217,3 +223,18 @@ def _pattern_to_regex(pattern: str) -> str:
         alternate = pattern.replace(":", "：", 1)
         return primary + "|" + _pattern_to_regex(alternate)
     return primary
+
+
+def _make_group(
+    scope: str,
+    pattern: str,
+    occurrences: list[int],
+    evidence: tuple[str, ...],
+    rule: JunkRule | None,
+    qualified: bool,
+) -> DetectionGroup:
+    return DetectionGroup(scope, pattern, tuple(occurrences), evidence, rule, qualified)
+
+
+def _group_sort_key(group: DetectionGroup) -> tuple[int, int, str]:
+    return (group.occurrences[0], 0 if group.scope == "line" else 1, group.pattern)
