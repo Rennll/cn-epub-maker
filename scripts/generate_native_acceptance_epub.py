@@ -7,11 +7,12 @@ from novel_epub.models import Book, Chapter, Paragraph, ParagraphBoundary, Volum
 from novel_epub.renderers.native import NativeRenderer
 
 
-def build_acceptance_book() -> Book:
+def build_acceptance_book(cover: str | None = None) -> Book:
     return Book(
         title="Native Renderer 驗收測試",
         author="cn-epub-maker",
         language="zh-TW",
+        cover=cover,
         preamble=[
             Paragraph("這是前言。Traditional Chinese 中文與 punctuation：，。！？：「」『』（）"),
             Paragraph("第二段前言，用來確認前言內容與導覽。"),
@@ -90,9 +91,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    book = build_acceptance_book()
-    if args.cover is not None:
-        book.cover = str(args.cover)
+    book = build_acceptance_book(str(args.cover) if args.cover is not None else None)
 
     NativeRenderer().render(book, args.output)
     print(args.output)
