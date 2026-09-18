@@ -79,9 +79,9 @@ def inspect(args: argparse.Namespace) -> int:
 
 
 def validate(args: argparse.Namespace) -> int:
-    errors = validate_epub(args.epub)
-    if errors:
-        for error in errors:
+    validation = validate_epub(args.epub)
+    if validation.errors:
+        for error in validation.errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
 
