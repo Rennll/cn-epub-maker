@@ -40,7 +40,7 @@ def test_preview_matches_cleaner_block_rules():
 
     assert preview.matched_count == result.stats["removed"]
     assert preview.locations == detail["locations"] == (1, 3)
-    assert preview.examples == detail["content"] == ("廣告\\n內容", "廣告\\n內容")
+    assert preview.examples == detail["content"] == ("廣告\n內容", "廣告\n內容")
     assert [line.text for line in document.lines] == [
         "廣告", "內容", "", "正文", "段落", "", "廣告", "內容"
     ]
