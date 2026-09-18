@@ -162,9 +162,8 @@ def execute(
         render(result.book, plan.path)
         execution.epub_path = plan.path
         epub_validation = validate_epub(plan.path)
-        epub_validation_errors = getattr(epub_validation, "errors", epub_validation)
-        execution.epub_validation_errors = list(epub_validation_errors)
-        if epub_validation_errors:
+        execution.epub_validation_errors = epub_validation.errors
+        if not epub_validation.ok:
             execution.return_code = 3
             execution.errors = list(execution.epub_validation_errors)
             return execution
