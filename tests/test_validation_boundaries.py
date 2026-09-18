@@ -18,7 +18,7 @@ def test_book_validation_is_independent_of_epub_validation():
 
     assert report.errors == []
     assert len(report.warnings) == 1
-    assert report.warnings[0].code == "empty_chapter"
+    assert report.warnings[0].kind == "empty_chapter"
 
 
 def test_book_validation_reports_semantic_errors_without_an_epub(tmp_path: Path):
@@ -36,8 +36,8 @@ def test_book_validation_reports_semantic_errors_without_an_epub(tmp_path: Path)
     assert not (tmp_path / "book.epub").exists()
 
 
-def test_epub_validation_is_independent_of_book_model():
-    path = Path("/tmp/nonexistent-validation-test.epub")
+def test_epub_validation_is_independent_of_book_model(tmp_path: Path):
+    path = tmp_path / "nonexistent.epub"
 
     assert validate_epub(path) == [f"EPUB not found: {path}"]
 
