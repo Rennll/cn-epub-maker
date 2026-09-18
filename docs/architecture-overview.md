@@ -217,3 +217,12 @@ This overview should change when the system's major responsibilities, boundaries
 Detailed behavior belongs in the appropriate canonical design document, source code, tests, or repository configuration. Historical implementation chronology belongs primarily in Git history, pull requests, and issue discussions.
 
 The overview is the canonical high-level architecture map. It does not define every component-level contract and should not be used as a substitute for the detailed design documents.
+
+
+### Renderer / EPUB packaging boundary
+
+The renderer is responsible for converting the canonical `Book` model into rendered XHTML. The current implementation uses Pandoc for Markdown-to-HTML conversion and applies project-specific XHTML normalization and paragraph presentation semantics.
+
+EPUB packaging is a separate output concern. `EpubPackageBuilder` consumes already-rendered XHTML files and assembles the EPUB container, package metadata, manifest, spine, navigation, stylesheet, and optional cover. It does not invoke Pandoc or interpret Markdown.
+
+This boundary is intentionally concrete rather than a generic renderer abstraction: the project currently has one Pandoc rendering backend and one EPUB package format. Additional renderer backends should only introduce a new abstraction when an actual requirement exists.

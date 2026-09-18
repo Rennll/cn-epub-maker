@@ -203,3 +203,60 @@ def test_render_preserves_markdown_special_character_literals(tmp_path: Path):
         assert "===\nTerm" not in chapter
         assert "===<br />" in chapter
         assert ": Definition" in chapter
+
+
+def test_epub_package_builder_rejects_unknown_cover_media_type(tmp_path: Path):
+    from novel_epub.renderers.epub import EpubPackageBuilder, EpubPackagingError
+
+    book = make_book()
+    cover = tmp_path / "cover.unknown"
+    cover.write_bytes(b"cover")
+    book.cover = str(cover)
+    rendered = tmp_path / "chapter.xhtml"
+    rendered.write_text(
+        '<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml">'
+        "<body><p>已渲染</p></body></html>",
+        encoding="utf-8",
+    )
+    output = tmp_path / "book.epub"
+
+    with pytest.raises(EpubPackagingError, match="cannot determine media type for cover"):
+        EpubPackageBuilder().build(
+            book,
+            output,
+            [(book.volumes[0].chapters[0], rendered), (book.volumes[1].chapters[0], rendered)],
+        )
+
+
+def test_epub_package_builder_does_not_require_pandoc(tmp_path: Path):
+    from novel_epub.renderers.epub import EpubPackageBuilder
+
+    book = make_book()
+    rendered = tmp_path / "chapter.xhtml"
+    rendered.write_text(
+        '<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml">'
+        "<body><p>已渲染</p></body></html>",
+        encoding="utf-8",
+    )
+    output = tmp_path / "book.epub"
+
+    rendered_second = tmp_path / "chapter-2.xhtml"
+    rendered_second.write_text(
+        '<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml">'
+        "<body><p>第二章</p></body></html>",
+        encoding="utf-8",
+    )
+
+    EpubPackageBuilder().build(
+        book,
+        output,
+        [
+            (book.volumes[0].chapters[0], rendered),
+            (book.volumes[1].chapters[0], rendered_second),
+        ],
+    )
+
+    with zipfile.ZipFile(output) as zf:
+        assert zf.read("EPUB/text/ch000001.xhtml").decode("utf-8").find("已渲染") >= 0
+        assert "EPUB/content.opf" in zf.namelist()
+        assert "EPUB/nav.xhtml" in zf.namelist()
