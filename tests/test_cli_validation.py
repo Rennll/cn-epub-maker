@@ -24,7 +24,7 @@ def test_validate_does_not_fail_when_epubcheck_unavailable(tmp_path: Path, monke
     epub = tmp_path / "book.epub"
     epub.write_bytes(b"")
 
-    monkeypatch.setattr("novel_epub.cli.validate_epub", lambda path: [])
+    monkeypatch.setattr("novel_epub.cli.validate_epub", lambda path: ValidationReport())
     monkeypatch.setattr(
         "novel_epub.cli.run_epubcheck",
         lambda path, required=False: EpubCheckResult(available=False, ok=True, errors=[]),
@@ -38,7 +38,7 @@ def test_validate_fails_when_epubcheck_reports_errors(tmp_path: Path, monkeypatc
     epub = tmp_path / "book.epub"
     epub.write_bytes(b"")
 
-    monkeypatch.setattr("novel_epub.cli.validate_epub", lambda path: [])
+    monkeypatch.setattr("novel_epub.cli.validate_epub", lambda path: ValidationReport())
     monkeypatch.setattr(
         "novel_epub.cli.run_epubcheck",
         lambda path, required=False: EpubCheckResult(
@@ -56,7 +56,7 @@ def test_validate_requires_epubcheck_when_requested(tmp_path: Path, monkeypatch,
     epub = tmp_path / "book.epub"
     epub.write_bytes(b"")
 
-    monkeypatch.setattr("novel_epub.cli.validate_epub", lambda path: [])
+    monkeypatch.setattr("novel_epub.cli.validate_epub", lambda path: ValidationReport())
     monkeypatch.setattr(
         "novel_epub.cli.run_epubcheck",
         lambda path, required=False: EpubCheckResult(
