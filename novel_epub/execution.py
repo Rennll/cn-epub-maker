@@ -161,8 +161,9 @@ def execute(
         execution.warnings.extend(plan.warnings)
         render(result.book, plan.path)
         execution.epub_path = plan.path
-        execution.epub_validation_errors = validate_epub(plan.path)
-        if execution.epub_validation_errors:
+        epub_validation = validate_epub(plan.path)
+        execution.epub_validation_errors = epub_validation.errors
+        if not epub_validation.ok:
             execution.return_code = 3
             execution.errors = list(execution.epub_validation_errors)
             return execution
