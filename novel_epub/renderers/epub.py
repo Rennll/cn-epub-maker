@@ -86,6 +86,8 @@ def _content_opf(
     cover_meta = ""
     if cover_name:
         media_type = mimetypes.guess_type(cover_name)[0]
+        if not media_type:
+            raise EpubPackagingError(f"cannot determine media type for cover: {cover_name}")
         manifest.append(
             f'<item id="cover-image" href="images/{escape(Path(cover_name).name)}" '
             f'media-type="{media_type}" properties="cover-image" />'
