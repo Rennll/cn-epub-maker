@@ -94,16 +94,6 @@ def test_repeated_identical_blocks_produce_a_block_candidate():
     assert group.suggested_rule.matcher == "exact"
     assert group.suggested_rule.pattern == "A\nB"
 
-from novel_epub.junk_detection import detect_document
-from novel_epub.physical import build_physical_document
-
-
-def test_multi_variable_number_still_requires_format_marker():
-    groups = detect_document(build_physical_document(["章 1 2026-09-18", "章 2 2026-09-19"]))
-    group = next(group for group in groups if group.pattern == "章 <number> <date>")
-    assert group.qualified is False
-    assert group.suggested_rule is None
-
 
 def test_repeated_line_with_date_and_time_uses_both_variables():
     document = build_physical_document(["更新時間：2026-09-18 21:34", "正文", "更新時間：2026-09-19 08:12"])
@@ -130,7 +120,6 @@ def test_multi_variable_pattern_keeps_literal_skeleton_anchored():
     assert group.occurrences == (1, 2)
     assert group.suggested_rule.pattern.startswith("^")
     assert group.suggested_rule.pattern.endswith("$")
-
 
 def test_multi_variable_number_still_requires_format_marker():
     groups = detect_document(build_physical_document(["章 1 2026-09-18", "章 2 2026-09-19"]))
