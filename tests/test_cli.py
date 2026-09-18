@@ -43,6 +43,10 @@ def test_cli_inspect_config_feeds_normal_build_and_junk_cleaner(tmp_path, monkey
             for volume in book.volumes
             for chapter in volume.chapters
             for paragraph in chapter.paragraphs
+        ] + [
+            paragraph.text
+            for chapter in book.chapters
+            for paragraph in chapter.paragraphs
         ]
         output.write_bytes(b"fake epub")
         return output
