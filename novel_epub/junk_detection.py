@@ -26,7 +26,9 @@ _VARIABLES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("number", re.compile(r"\d+")),
 )
 _VARIABLE_PRIORITY = {name: index for index, (name, _) in enumerate(_VARIABLES)}
-_FORMAT_MARKER_PATTERN = re.compile(r"[:：=＝|｜]|(?:字數|字数|頁數|页数|更新|發布|发布|來源|来源|作者|網址|网址|版本|日期|時間|时间)")
+_FORMAT_MARKER_PATTERN = re.compile(
+    r"(?:字數|字数|頁數|页数|更新|發布|发布|來源|来源|作者|網址|网址|版本|日期|時間|时间)"
+)
 
 
 @dataclass(frozen=True)
@@ -125,13 +127,15 @@ def _detect_blocks(document: PhysicalDocument) -> list[DetectionGroup]:
     lines_by_number = {line.number: line.text for line in document.lines}
     for block in document.blocks:
         text = "\n".join(lines_by_number[number] for number in block.line_numbers)
-        exact.setdefault(text, []).append(block.index)
+        # DetectionGroup exposes user-facing 1-based block locations, while
+        # PhysicalBlock.index remains an internal 0-based index.
+        exact.setdefault(text, []).append(block.index + 1)
         candidate = _deterministic_pattern(text)
         if candidate is None:
             continue
         pattern, families, _ = candidate
         key = (families, pattern)
-        patterned.setdefault(key, []).append(block.index)
+        patterned.setdefault(key, []).append(block.index + 1)
         pattern_values.setdefault(key, []).append(text)
     return _make_groups("block", exact, patterned, pattern_values)
 
