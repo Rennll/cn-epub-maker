@@ -28,7 +28,7 @@ _VARIABLES: tuple[tuple[str, re.Pattern[str]], ...] = (
 _VARIABLE_PRIORITY = {name: index for index, (name, _) in enumerate(_VARIABLES)}
 _FAMILY_FORMAT_MARKERS: dict[str, re.Pattern[str]] = {
     "number": re.compile(r"(?:字數|字数|頁數|页数|章節數|章节数|字數統計|字数统计)"),
-    "date": re.compile(r"(?:更新日期|更新時間|更新时間|发布日期|發布日期|更新日|出版日期|日期)"),
+    "date": re.compile(r"(?:更新日期|更新時間|更新时間|发布日期|發布日期|更新日|出版日期|更新|日期)"),
     "time": re.compile(r"(?:更新時間|更新时间|發布時間|发布时间|時間|时间)"),
     "id": re.compile(r"(?:ID|Id|id|編號|编号|版本)"),
     "url": re.compile(r"(?:網址|网址|來源|来源|連結|链接|URL|Url|url)"),
@@ -200,6 +200,8 @@ def _observed_variable_has_format(family: str, value: str) -> bool:
         return bool(re.search(r":|時\d{1,2}分", value))
     if family == "id":
         return bool(re.search(r"[A-Za-z]", value) and re.search(r"\d", value))
+    if family == "number":
+        return bool(re.search(r"\d+", value))
     return False
 
 
