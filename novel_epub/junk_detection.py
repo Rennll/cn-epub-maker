@@ -87,7 +87,7 @@ def _preview_blocks(document: PhysicalDocument, rule: JunkRule) -> RulePreview:
         len(matches),
         len(matches),
         tuple(text for _, text in matches[:5]),
-        tuple(index for index, _ in matches),
+        tuple(index + 1 for index, _ in matches),
     )
 
 

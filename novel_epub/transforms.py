@@ -65,9 +65,17 @@ class JunkCleaner:
                     warnings.append(f"rule {index} regex {rule.pattern!r}: {exc}; rule skipped")
                     per_rule.append({"rule": index, "matched": 0, "removed": 0})
                     continue
-            current, count = self._apply_rule(current, rule)
+            current, count, locations, removed_content = self._apply_rule(current, rule)
             matched += count
-            per_rule.append({"rule": index, "matched": count, "removed": count})
+            per_rule.append(
+                {
+                    "rule": index,
+                    "matched": count,
+                    "removed": count,
+                    "locations": locations,
+                    "content": removed_content,
+                }
+            )
         canonical = "\n".join("" if line.strip() == "" else line for line in current.split("\n"))
         return TransformResult(
             text=canonical,
@@ -78,21 +86,32 @@ class JunkCleaner:
         )
 
     @staticmethod
-    def _apply_rule(text: str, rule: JunkRule) -> tuple[str, int]:
+    def _apply_rule(
+        text: str, rule: JunkRule
+    ) -> tuple[str, int, tuple[int, ...], tuple[str, ...]]:
         lines = text.split("\n")
         if rule.target == "line":
             out: list[tuple[str, bool]] = []
-            count = 0
-            for line in lines:
+            locations: list[int] = []
+            removed_content: list[str] = []
+            for number, line in enumerate(lines, 1):
                 if _matches(line, rule.matcher, rule.pattern):
-                    count += 1
+                    locations.append(number)
+                    removed_content.append(line)
                     out.append(("", True))
                 else:
                     out.append((line, False))
-            return JunkCleaner._cleanup_removed_blank_runs(out), count
+            return (
+                JunkCleaner._cleanup_removed_blank_runs(out),
+                len(locations),
+                tuple(locations),
+                tuple(removed_content),
+            )
 
         out: list[tuple[str, bool]] = []
-        count = 0
+        locations: list[int] = []
+        removed_content: list[str] = []
+        block_index = 1
         i = 0
         while i < len(lines):
             if lines[i].strip() == "":
@@ -104,12 +123,19 @@ class JunkCleaner:
                 i += 1
             block = lines[start:i]
             if _matches("\n".join(block), rule.matcher, rule.pattern):
-                count += 1
+                locations.append(block_index)
+                removed_content.append("\n".join(block))
                 # Collapsed removed block to a single marker for blank-run merging
                 out.append(("", True))
             else:
                 out.extend((line, False) for line in block)
-        return JunkCleaner._cleanup_removed_blank_runs(out), count
+            block_index += 1
+        return (
+            JunkCleaner._cleanup_removed_blank_runs(out),
+            len(locations),
+            tuple(locations),
+            tuple(removed_content),
+        )
 
     @staticmethod
     def _cleanup_removed_blank_runs(lines: list[tuple[str, bool]]) -> str:
