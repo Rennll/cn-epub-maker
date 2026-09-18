@@ -7,6 +7,9 @@ import pytest
 
 from novel_epub.configuration import ConversionRequest
 from novel_epub.configuration_resolver import resolve_conversion_request
+from novel_epub.junk_detection import detect_document, preview_rule
+from novel_epub.physical import build_physical_document
+from novel_epub.transforms import JunkRule
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "novel_epub"
@@ -75,3 +78,49 @@ def test_intermediate_schema_contains_provenance_but_not_request(tmp_path: Path)
     assert "ConversionRequest" not in intermediate
     assert "TransformAudit" in intermediate
     assert "transformations" in intermediate
+
+
+def test_inspection_detection_is_read_only():
+    document = build_physical_document(["更新日期：2026-01-01", "正文", "更新日期：2026-02-02"])
+    before = document
+    groups = detect_document(document)
+    qualified = [group for group in groups if group.qualified]
+    assert qualified
+    preview = preview_rule(document, qualified[0].suggested_rule)
+    assert document is before
+    assert document.lines == before.lines
+    assert document.blocks == before.blocks
+    assert document.blank_runs == before.blank_runs
+    assert preview.matched_count == len(preview.locations)
+
+
+def test_inspection_suggestions_use_the_canonical_junk_rule():
+    document = build_physical_document(["來源：ID-10001", "正文", "來源：ID-10002"])
+    for group in detect_document(document):
+        if group.qualified:
+            assert isinstance(group.suggested_rule, JunkRule)
+            assert group.suggested_rule == JunkRule(
+                group.suggested_rule.target, group.suggested_rule.matcher, group.suggested_rule.pattern
+            )
+
+
+def test_inspection_detection_does_not_depend_on_semantic_parser_or_book():
+    tree = ast.parse((PACKAGE / "junk_detection.py").read_text(encoding="utf-8"))
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module)
+        elif isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+    assert imported.isdisjoint({"novel_epub.parser", "novel_epub.models"})
+
+
+def test_normal_execution_does_not_depend_on_inspection():
+    tree = ast.parse((PACKAGE / "execution.py").read_text(encoding="utf-8"))
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module)
+        elif isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+    assert "novel_epub.junk_detection" not in imported
