@@ -111,7 +111,7 @@ class JunkCleaner:
         out: list[tuple[str, bool]] = []
         locations: list[int] = []
         removed_content: list[str] = []
-        block_index = 0
+        block_index = 1
         i = 0
         while i < len(lines):
             if lines[i].strip() == "":
