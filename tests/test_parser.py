@@ -185,3 +185,68 @@ def test_text_containing_extra_word_is_not_automatically_a_chapter():
     chapters = list(result.book.iter_chapters())
     assert len(chapters) == 1
     assert chapters[0].paragraphs[0].text == "正文：這一段提到番外1，但不是標題。"
+
+
+def test_heading_detector_and_event_generator_keep_semantics_out_of_detection():
+    from novel_epub.parser_stages import (
+        ChapterEvent,
+        HeadingDetector,
+        StructuralEventGenerator,
+        TextEvent,
+    )
+    from novel_epub.physical import build_physical_document
+
+    document = build_physical_document(["第十章 開始", "正文"])
+    events = StructuralEventGenerator(HeadingDetector()).generate(document)
+
+    assert isinstance(events[0], ChapterEvent)
+    assert events[0].number == 10
+    assert events[0].title == "開始"
+    assert isinstance(events[1], TextEvent)
+    assert events[1].text == "正文"
+
+
+def test_book_builder_constructs_book_from_structural_events():
+    from novel_epub.parser_stages import (
+        BookBuilder,
+        ChapterEvent,
+        TextEvent,
+        VolumeEvent,
+    )
+
+    book, warnings = BookBuilder(title="書", author="作者").build(
+        [
+            VolumeEvent(1, "一", "第一卷", ""),
+            ChapterEvent(2, 1, "第一章", "開始"),
+            TextEvent(3, "正文"),
+        ]
+    )
+
+    assert not warnings
+    assert book.volumes[0].chapters[0].number == 1
+    assert book.volumes[0].chapters[0].title == "開始"
+    assert book.volumes[0].chapters[0].paragraphs[0].text == "正文"
+
+
+def test_parse_document_uses_explicit_stages_without_changing_boundary_objects():
+    from novel_epub.analysis import analyze_document
+    from novel_epub.dfm import build_formatting_model
+    from novel_epub.parser import parse_document
+    from novel_epub.physical import build_physical_document
+
+    document = build_physical_document(["簡介", "", "第一章 開始", "正文"])
+    analysis = analyze_document(document)
+    formatting_model = build_formatting_model(document, analysis)
+
+    result = parse_document(
+        document,
+        title="書",
+        author="作者",
+        analysis=analysis,
+        formatting_model=formatting_model,
+    )
+
+    assert result.analysis is analysis
+    assert result.formatting_model is formatting_model
+    assert result.book.preamble[0].text == "簡介"
+    assert result.book.chapters[0].number == 1
