@@ -105,7 +105,7 @@ line 351
 ...
 
 SuggestedRule:
-line:regex:^本章字數：\d+$
+line:regex:^本章字數：\\d+$
 ```
 
 A group does not necessarily map one-to-one to the final JunkRule.
@@ -175,7 +175,7 @@ Internal ranking heuristics are allowed, but the first version does not require 
 
 ## 8. Detection Evidence
 
-The first version uses four evidence families:
+The current implementation uses three evidence families:
 
 ### Repetition
 
@@ -184,10 +184,6 @@ Repeated identical lines or blocks.
 ### Pattern
 
 Different occurrences sharing a stable literal skeleton and deterministic variables.
-
-### Boundary / Position
-
-Repeated occurrence in similar physical context, such as a block start, block end, or other stable position.
 
 ### Format / Marker
 
@@ -213,7 +209,7 @@ For example:
 ```text
 target = line
 matcher = regex
-pattern = ^本章字數：\d+$
+pattern = ^本章字數：\\d+$
 ```
 
 A SuggestedRule is a recommendation, not yet configuration. It becomes a formal configuration rule only after the user accepts it or edits it into a valid rule.
@@ -268,12 +264,12 @@ Richer UI or non-interactive workflows may be added later without changing this 
 
 ## 12. Output Config
 
-Inspection outputs a new config file containing only accepted/final JunkRules.
+Inspection outputs a new JSON config file containing only accepted/final JunkRules.
 
 Example:
 
 ```text
-cn-epub-maker inspect novel.txt --output junk-config.toml
+cn-epub-maker inspect novel.txt --output junk-config.json
 ```
 
 The generated config:
@@ -297,7 +293,7 @@ Detection evidence, occurrence locations, pattern descriptions, preview results,
 Audit / provenance reporting is an optional future feature. If needed, it can be implemented as a separate inspection report, for example:
 
 ```text
-junk-config.toml
+junk-config.json
 inspection-report.json
 ```
 
