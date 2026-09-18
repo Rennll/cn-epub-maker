@@ -4,6 +4,8 @@ from pathlib import Path
 from zipfile import ZipFile
 import xml.etree.ElementTree as ET
 
+from .report import ValidationReport
+
 
 _OPF_NS = "http://www.idpf.org/2007/opf"
 _CONTAINER_NS = "urn:oasis:names:tc:opendocument:xmlns:container"
@@ -98,7 +100,7 @@ def _validate_epub_structure(zf: ZipFile, errors: list[str]) -> None:
             errors.append(f"spine idref missing from manifest: {idref}")
 
 
-def validate_epub(path: str | Path) -> list[str]:
+def validate_epub(path: str | Path) -> ValidationReport:
     """Validate the internal structure and references of an EPUB archive."""
     errors: list[str] = []
     path = Path(path)
@@ -117,4 +119,4 @@ def validate_epub(path: str | Path) -> list[str]:
                 _validate_epub_structure(zf, errors)
     except Exception as exc:
         errors.append(f"invalid EPUB archive: {exc}")
-    return errors
+    return ValidationReport(errors=errors)
