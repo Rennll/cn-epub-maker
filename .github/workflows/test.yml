@@ -96,45 +96,19 @@ jobs:
       - name: Telegram - Success
         if: success()
         continue-on-error: true
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          curl --fail --silent --show-error --request POST \
-            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
-            --data-urlencode "text=${GITHUB_SHA:0:7} PASS"
+        uses: Rennll/ai-collaboration/github-actions/telegram-ci@main
+        with:
+          status: success
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
 
       - name: Telegram - Failure
         if: failure()
         continue-on-error: true
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          if [ "${{ steps.pytest.outcome }}" = "failure" ]; then
-            failed_stage="pytest"
-            if grep -q "short test summary info" /tmp/pytest.log; then
-              error_summary="$(sed -n '/short test summary info/,$p' /tmp/pytest.log | tail -c 3500)"
-            else
-              error_summary="$(tail -c 3500 /tmp/pytest.log)"
-            fi
-          elif [ "${{ steps.build.outcome }}" = "failure" ]; then
-            failed_stage="build/validate"
-            error_summary="$(tail -c 3500 /tmp/build.log)"
-          elif [ "${{ steps.policy.outcome }}" = "failure" ]; then
-            failed_stage="EPUBCheck policy"
-            error_summary="$(tail -c 3500 /tmp/policy.log)"
-          else
-            failed_stage="CI"
-            error_summary="No detailed step output was captured."
-          fi
-
-          message="❌ ${failed_stage} FAILED
-
-          ${error_summary}"
-
-          curl --fail --silent --show-error --request POST \
-            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
-            --data-urlencode "text=${message}"
+        uses: Rennll/ai-collaboration/github-actions/telegram-ci@main
+        with:
+          status: failure
+          failed-step: ${{ steps.pytest.outcome == 'failure' && 'pytest' || steps.build.outcome == 'failure' && 'build/validate' || steps.policy.outcome == 'failure' && 'EPUBCheck policy' || 'CI' }}
+          log-file: ${{ steps.pytest.outcome == 'failure' && '/tmp/pytest.log' || steps.build.outcome == 'failure' && '/tmp/build.log' || steps.policy.outcome == 'failure' && '/tmp/policy.log' || '' }}
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
