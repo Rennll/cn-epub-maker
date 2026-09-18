@@ -169,3 +169,13 @@ def test_inspect_writes_output_only_after_interaction_completes(tmp_path):
     inspect_source(source, output, input_fn=accept)
 
     assert output.exists()
+
+
+def test_preview_broader_detects_same_count_different_locations():
+    group = inspection.DetectionGroup(
+        "line", "candidate", (2, 4), ("repetition",),
+        inspection.JunkRule("line", "exact", "candidate"), True
+    )
+    preview = inspection.RulePreview(2, 2, ("candidate",), (2, 5))
+
+    assert inspection._preview_is_broader(group, preview) is True
