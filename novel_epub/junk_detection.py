@@ -18,13 +18,14 @@ _URL_PATTERN = re.compile(
 _ID_PATTERN = re.compile(
     r"(?<![A-Za-z0-9_-])(?=[A-Za-z0-9_-]*[A-Za-z])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]{8,}(?![A-Za-z0-9_-])"
 )
-_VARIABLES: tuple[tuple[str, re.Pattern[str], str], ...] = (
-    ("url", _URL_PATTERN, "format"),
-    ("date", re.compile(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日"), "format"),
-    ("time", re.compile(r"\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分"), "format"),
-    ("id", _ID_PATTERN, "format"),
-    ("number", re.compile(r"\d+"), "pattern"),
+_VARIABLES: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("url", _URL_PATTERN),
+    ("date", re.compile(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日")),
+    ("time", re.compile(r"\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分")),
+    ("id", _ID_PATTERN),
+    ("number", re.compile(r"\d+")),
 )
+_FORMAT_MARKER_PATTERN = re.compile(r"[:：=＝|｜]|(?:字數|字数|頁數|页数|更新|發布|发布|來源|来源|作者|網址|网址|版本|日期|時間|时间)")
 
 
 @dataclass(frozen=True)
@@ -35,7 +36,14 @@ class DetectionGroup:
     pattern: str
     occurrences: tuple[int, ...]
     evidence: tuple[str, ...]
-    suggested_rule: JunkRule
+    suggested_rule: JunkRule | None
+    qualified: bool = True
+
+    def __post_init__(self) -> None:
+        if self.qualified and self.suggested_rule is None:
+            raise ValueError("qualified detection group requires a suggested JunkRule")
+        if not self.qualified and self.suggested_rule is not None:
+            raise ValueError("unqualified detection group cannot have a suggested JunkRule")
 
 
 @dataclass(frozen=True)
@@ -136,28 +144,45 @@ def _make_groups(
     groups: list[DetectionGroup] = []
     for text, occurrences in exact.items():
         if len(occurrences) >= 2:
-            groups.append(_make_group(scope, text, occurrences, ("repetition",), JunkRule(scope, "exact", text)))
+            groups.append(_make_group(scope, text, occurrences, ("repetition",), JunkRule(scope, "exact", text), True))
     for (family, pattern), occurrences in patterned.items():
         values = pattern_values[(family, pattern)]
         if len(occurrences) < 2 or len(set(values)) < 2:
             continue
-        evidence = ("repetition", "pattern", "format") if family != "number" else ("repetition", "pattern")
-        groups.append(
-            _make_group(
-                scope,
-                pattern,
-                occurrences,
-                evidence,
-                JunkRule(scope, "regex", _pattern_to_regex(pattern)),
-            )
-        )
+        format_evidence = _has_format_evidence(family, pattern, values)
+        evidence = ("repetition", "pattern", "format") if format_evidence else ("repetition", "pattern")
+        qualified = family != "number" or format_evidence
+        rule = JunkRule(scope, "regex", _pattern_to_regex(pattern)) if qualified else None
+        groups.append(_make_group(scope, pattern, occurrences, evidence, rule, qualified))
     return groups
+
+
+def _has_format_evidence(family: str, pattern: str, values: list[str]) -> bool:
+    """Return true only when the observed content contains concrete format evidence."""
+    if not values:
+        return False
+    if family == "number":
+        return bool(_FORMAT_MARKER_PATTERN.search(pattern))
+    return all(_observed_variable_has_format(family, value) for value in values)
+
+
+def _observed_variable_has_format(family: str, value: str) -> bool:
+    """Check the observed values themselves, rather than inferring from family name."""
+    if family == "url":
+        return bool(re.search(r"(?:https?://|www\.)", value) or value.startswith("["))
+    if family == "date":
+        return bool(re.search(r"[-/]\d|年\d|\d日$", value))
+    if family == "time":
+        return bool(re.search(r":|時\d{1,2}分", value))
+    if family == "id":
+        return bool(re.search(r"[A-Za-z]", value) and re.search(r"\d", value))
+    return False
 
 
 def _deterministic_pattern(text: str) -> tuple[str, str, tuple[str, ...]] | None:
     # Families are checked in a deliberate priority order; the first matching
     # family owns the deterministic abstraction for the line/block.
-    for family, expression, _ in _VARIABLES:
+    for family, expression in _VARIABLES:
         matches = tuple(expression.finditer(text))
         if not matches:
             continue
@@ -191,11 +216,10 @@ def _pattern_to_regex(pattern: str) -> str:
         cursor = match.end()
     parts.append(re.escape(pattern[cursor:]))
     primary = "^" + "".join(parts) + "$"
-
-    # Detection canonicalizes a full-width Chinese colon to ASCII for the
-    # human-readable pattern. Keep the suggested rule readable while making
-    # the executable regex match both source spellings.
     if "：" not in pattern and ":" in pattern:
+        # Detection canonicalizes a full-width Chinese colon to ASCII for the
+        # human-readable pattern. Keep the suggested rule readable while making
+        # the executable regex match both source spellings.
         alternate = pattern.replace(":", "：", 1)
         return primary + "|" + _pattern_to_regex(alternate)
     return primary
@@ -206,9 +230,10 @@ def _make_group(
     pattern: str,
     occurrences: list[int],
     evidence: tuple[str, ...],
-    rule: JunkRule,
+    rule: JunkRule | None,
+    qualified: bool,
 ) -> DetectionGroup:
-    return DetectionGroup(scope, pattern, tuple(occurrences), evidence, rule)
+    return DetectionGroup(scope, pattern, tuple(occurrences), evidence, rule, qualified)
 
 
 def _group_sort_key(group: DetectionGroup) -> tuple[int, int, str]:

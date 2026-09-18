@@ -20,17 +20,51 @@ def test_repeated_line_becomes_detection_group_with_exact_rule():
     assert group.scope == "line"
     assert group.pattern == "本章字數：<number>"
     assert group.occurrences == (2, 4)
+    assert group.qualified is True
+    assert group.suggested_rule is not None
     assert group.suggested_rule.target == "line"
     assert group.suggested_rule.matcher == "regex"
     assert group.suggested_rule.pattern == r"^本章字數：\d+$"
     assert "repetition" in group.evidence
     assert "pattern" in group.evidence
+    assert "format" in group.evidence
+
+
+def test_repeated_numbered_headings_are_detected_but_not_qualified():
+    document = build_physical_document(
+        [
+            "第一章",
+            "第1章",
+            "正文",
+            "第2章",
+            "第3章",
+            "結尾",
+        ]
+    )
+
+    groups = detect_document(document)
+
+    numeric_groups = [group for group in groups if group.pattern == "第<number>章"]
+    assert len(numeric_groups) == 1
+    group = numeric_groups[0]
+    assert group.qualified is False
+    assert group.suggested_rule is None
+    assert group.evidence == ("repetition", "pattern")
+
+
+def test_generic_numeric_pattern_without_format_marker_is_not_qualified():
+    document = build_physical_document(["100", "正文", "200", "300"])
+
+    groups = detect_document(document)
+
+    numeric_groups = [group for group in groups if group.pattern == "<number>"]
+    assert len(numeric_groups) == 1
+    assert numeric_groups[0].qualified is False
+    assert numeric_groups[0].suggested_rule is None
 
 
 def test_identical_repeated_line_uses_exact_rule():
-    document = build_physical_document(
-        ["正文", "本章完", "其他", "本章完"]
-    )
+    document = build_physical_document(["正文", "本章完", "其他", "本章完"])
 
     groups = detect_document(document)
 
