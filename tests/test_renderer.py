@@ -203,3 +203,23 @@ def test_render_preserves_markdown_special_character_literals(tmp_path: Path):
         assert "===\nTerm" not in chapter
         assert "===<br />" in chapter
         assert ": Definition" in chapter
+
+
+def test_epub_package_builder_does_not_require_pandoc(tmp_path: Path):
+    from novel_epub.renderers.epub import EpubPackageBuilder
+
+    book = make_book()
+    rendered = tmp_path / "chapter.xhtml"
+    rendered.write_text(
+        '<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml">'
+        "<body><p>已渲染</p></body></html>",
+        encoding="utf-8",
+    )
+    output = tmp_path / "book.epub"
+
+    EpubPackageBuilder().build(book, output, [(book.volumes[0].chapters[0], rendered)])
+
+    with zipfile.ZipFile(output) as zf:
+        assert zf.read("EPUB/text/ch000001.xhtml").decode("utf-8").find("已渲染") >= 0
+        assert "EPUB/content.opf" in zf.namelist()
+        assert "EPUB/nav.xhtml" in zf.namelist()
