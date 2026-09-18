@@ -24,6 +24,7 @@ _DEFAULTS: dict[str, Any] = {
     "opencc_profile": "s2twp",
     "punctuation": True,
     "full_source": False,
+    "renderer": "pandoc",
 }
 
 
@@ -79,6 +80,10 @@ def resolve_conversion_request(
         if not isinstance(resolved[key], bool):
             raise ValueError(f"{key} must be a boolean")
 
+    renderer = resolved["renderer"]
+    if renderer not in {"pandoc", "native"}:
+        raise ValueError(f"invalid renderer: {renderer}")
+
     language = resolved["lang"]
     if not isinstance(language, str) or not language.strip():
         raise ValueError("lang must be a non-empty string")
@@ -120,6 +125,7 @@ def resolve_conversion_request(
         parser=ParserPolicy(paragraph_mode=paragraph_mode),
         transformations=transformations,
         full_source=resolved["full_source"],
+        renderer=renderer,
     )
 
     destination_value = resolved.get("destination")
