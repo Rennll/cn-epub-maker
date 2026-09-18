@@ -1,4 +1,5 @@
-from .book import ValidationReport, validate_book
+from .book import validate_book
+from .report import ValidationReport
 from .epub import validate_epub
 from .epubcheck import EpubCheckResult, run_epubcheck
 
