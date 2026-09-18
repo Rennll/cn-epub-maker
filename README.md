@@ -178,6 +178,18 @@ CLI 與 config 可以混用。config 中的規則會先保留原本順序，CLI 
 
 JunkRule 的完整設定格式與規則語義見 [`docs/junk-rule-configuration.md`](docs/junk-rule-configuration.md)。
 
+## Junk Detection / Inspection
+
+可以先對 TXT 執行獨立的 inspection workflow，找出可能適合轉成 JunkRule 的重複或規律內容：
+
+```bash
+novel-epub inspect novel.txt --output junk-config.json
+```
+
+Inspection 是 read-only 的，不會直接修改來源檔，也不會自動刪除內容。它會觀察 physical line / block，產生 Detection Groups、Suggested JunkRules 與 Rule Preview，讓使用者接受、編輯或略過建議；接受後輸出的 JSON config 可以交給一般 `build` 使用。
+
+相關契約見 [`docs/junk-detection-contract.md`](docs/junk-detection-contract.md)。
+
 ## Full Source Mode
 
 如果希望停用內容 transformation，可以使用：
