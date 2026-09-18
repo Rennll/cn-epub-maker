@@ -14,7 +14,17 @@ def test_cli_inspect_config_feeds_normal_build_and_junk_cleaner(tmp_path, monkey
     original = "第一章\n正文\n本章完\n其他正文\n本章完\n"
 
     source.write_text(original, encoding="utf-8")
-    monkeypatch.setattr("builtins.input", lambda _prompt: "a")
+    real_inspect_source = cli.inspect_source
+
+    def inspect_with_answer(input_path, output_path, *, encoding=None):
+        return real_inspect_source(
+            input_path,
+            output_path,
+            encoding=encoding,
+            input_fn=lambda _prompt: "a",
+        )
+
+    monkeypatch.setattr(cli, "inspect_source", inspect_with_answer)
     monkeypatch.setitem(configuration_resolver._DEFAULTS, "renderer", "native")
     monkeypatch.setattr(
         execution,
