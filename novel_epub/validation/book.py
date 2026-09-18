@@ -5,16 +5,6 @@ from ..parser_stages import WarningItem
 from .report import ValidationReport
 
 
-@dataclass
-class ValidationReport:
-    errors: list[str]
-    warnings: list[WarningItem]
-
-    @property
-    def ok(self) -> bool:
-        return not self.errors
-
-
 def validate_book(book: Book, warnings: list[WarningItem]) -> ValidationReport:
     """Validate semantic invariants of a parsed Book model."""
     errors: list[str] = []
@@ -27,4 +17,4 @@ def validate_book(book: Book, warnings: list[WarningItem]) -> ValidationReport:
     for chapter in book.iter_chapters():
         if not chapter.paragraphs:
             warnings.append(WarningItem("empty_chapter", 0, f"empty chapter: {chapter.label}"))
-    return ValidationReport(errors, warnings)
+    return ValidationReport(errors=errors, warnings=warnings)
