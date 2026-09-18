@@ -80,9 +80,8 @@ def inspect(args: argparse.Namespace) -> int:
 
 def validate(args: argparse.Namespace) -> int:
     validation = validate_epub(args.epub)
-    validation_errors = validation.errors if hasattr(validation, "errors") else validation
-    if validation_errors:
-        for error in validation_errors:
+    if not validation.ok:
+        for error in validation.errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
 
