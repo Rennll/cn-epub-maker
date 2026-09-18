@@ -101,7 +101,7 @@ jobs:
           curl --fail --silent --show-error --request POST \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
-            --data-urlencode "text=ooooooo PASS\nRepository: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nRun: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            --data-urlencode "text=${{ github.event.head_commit.message || github.event.pull_request.title }} PASS"
 
       - name: Telegram - Failure
         if: failure()
