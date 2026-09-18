@@ -20,7 +20,8 @@ from .transforms import (
     TransformPipeline,
     TransformationError,
 )
-from .validator import ValidationReport, validate_book, validate_epub
+from .validation.book import ValidationReport, validate_book
+from .validation.epub import validate_epub
 
 
 @dataclass(frozen=True)
