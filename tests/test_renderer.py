@@ -217,7 +217,21 @@ def test_epub_package_builder_does_not_require_pandoc(tmp_path: Path):
     )
     output = tmp_path / "book.epub"
 
-    EpubPackageBuilder().build(book, output, [(book.volumes[0].chapters[0], rendered)])
+    rendered_second = tmp_path / "chapter-2.xhtml"
+    rendered_second.write_text(
+        '<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml">'
+        "<body><p>第二章</p></body></html>",
+        encoding="utf-8",
+    )
+
+    EpubPackageBuilder().build(
+        book,
+        output,
+        [
+            (book.volumes[0].chapters[0], rendered),
+            (book.volumes[1].chapters[0], rendered_second),
+        ],
+    )
 
     with zipfile.ZipFile(output) as zf:
         assert zf.read("EPUB/text/ch000001.xhtml").decode("utf-8").find("已渲染") >= 0
