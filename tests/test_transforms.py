@@ -28,6 +28,14 @@ def test_line_removal_collapses_blank_runs_created_around_removed_junk():
     assert result.text == "正文\n\n下一段"
 
 
+def test_line_removal_preserves_blank_runs_between_consecutive_removed_items():
+    result = JunkCleaner([JunkRule("line", "contains", "廣告")]).transform(
+        "正文\n\n廣告A\n\n廣告B\n\n下一段"
+    )
+
+    assert result.text == "正文\n\n下一段"
+
+
 def test_block_removal_collapses_blank_runs_created_around_removed_junk():
     result = JunkCleaner([JunkRule("block", "exact", "廣告\n內容")]).transform(
         "正文\n\n廣告\n內容\n\n下一段"
