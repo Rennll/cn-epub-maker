@@ -3,13 +3,14 @@ from pathlib import Path
 
 from novel_epub.cli import validate
 from novel_epub.validator import EpubCheckResult
+from novel_epub.validation.report import ValidationReport
 
 
 def test_validate_runs_epubcheck_when_available(tmp_path: Path, monkeypatch, capsys):
     epub = tmp_path / "book.epub"
     epub.write_bytes(b"")
 
-    monkeypatch.setattr("novel_epub.cli.validate_epub", lambda path: [])
+    monkeypatch.setattr("novel_epub.cli.validate_epub", lambda path: ValidationReport())
     monkeypatch.setattr(
         "novel_epub.cli.run_epubcheck",
         lambda path, required=False: EpubCheckResult(available=True, ok=True, errors=[]),
