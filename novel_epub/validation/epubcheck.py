@@ -13,9 +13,11 @@ class EpubCheckResult:
     errors: list[str]
 
 
-def run_epubcheck(path: str | Path, *, required: bool = False, which=shutil.which, runner=subprocess.run) -> EpubCheckResult:
+def run_epubcheck(path: str | Path, *, required: bool = False, which=None, runner=None) -> EpubCheckResult:
     """Run the optional external EPUBCheck executable."""
     path = Path(path)
+    which = shutil.which if which is None else which
+    runner = subprocess.run if runner is None else runner
     command = which("epubcheck")
     if command is None:
         if required:
