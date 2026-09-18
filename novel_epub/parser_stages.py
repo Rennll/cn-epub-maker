@@ -40,6 +40,11 @@ class ChapterEvent:
 
 @dataclass(frozen=True)
 class UnparseableChapterEvent:
+    """A chapter-shaped heading whose number could not be parsed.
+
+    Consumers must treat this event as a warning and skip it as a chapter.
+    """
+
     line: int
     raw_number: str
 
