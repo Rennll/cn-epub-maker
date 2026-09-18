@@ -112,30 +112,41 @@ class JunkCleaner:
 
     @staticmethod
     def _cleanup_removed_blank_runs(lines: list[tuple[str, bool]]) -> str:
-        """Remove only blank-line redundancy created by a junk-removal boundary."""
+        """Collapse blank runs joined by a removed line/block to one source run."""
         out: list[str] = []
         i = 0
         while i < len(lines):
-            if lines[i][1]:
-                start = i
-                while i < len(lines) and (lines[i][1] or lines[i][0].strip() == ""):
-                    i += 1
-                segment = lines[start:i]
-                blank_runs: list[int] = []
-                current = 0
-                for line, removed in segment:
-                    if removed:
-                        if current:
-                            blank_runs.append(current)
-                            current = 0
-                    else:
-                        current += 1
-                if current:
-                    blank_runs.append(current)
-                out.extend("" for _ in range(max(blank_runs, default=0)))
+            if not lines[i][1]:
+                out.append(lines[i][0])
+                i += 1
                 continue
-            out.append(lines[i][0])
-            i += 1
+
+            # A removed item can join the blank run on its left with the one
+            # on its right. Preserve the larger original run rather than
+            # allowing the two runs to accumulate.
+            start = i
+            while start > 0 and lines[start - 1][0].strip() == "" and not lines[start - 1][1]:
+                start -= 1
+
+            end = i + 1
+            while end < len(lines) and (
+                lines[end][1] or lines[end][0].strip() == ""
+            ):
+                end += 1
+
+            left_blanks = i - start
+            right_blanks = sum(
+                1
+                for line, removed in lines[i + 1:end]
+                if not removed and line.strip() == ""
+            )
+            keep = max(left_blanks, right_blanks)
+            if start < i:
+                # Remove the already-emitted left blank lines from the output.
+                del out[-left_blanks:]
+            out.extend("" for _ in range(keep))
+            i = end
+
         return "\n".join(out)
 
 def _matches(target: str, matcher: str, pattern: str) -> bool:
