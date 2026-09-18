@@ -81,21 +81,21 @@ class JunkCleaner:
     def _apply_rule(text: str, rule: JunkRule) -> tuple[str, int]:
         lines = text.split("\n")
         if rule.target == "line":
-            out: list[str] = []
+            out: list[tuple[str, bool]] = []
             count = 0
             for line in lines:
                 if _matches(line, rule.matcher, rule.pattern):
                     count += 1
                 else:
-                    out.append(line)
-            return "\n".join(out), count
+                    out.append((line, False))
+            return JunkCleaner._cleanup_removed_blank_runs(out), count
 
-        out: list[str] = []
+        out: list[tuple[str, bool]] = []
         count = 0
         i = 0
         while i < len(lines):
             if lines[i].strip() == "":
-                out.append(lines[i])
+                out.append((lines[i], False))
                 i += 1
                 continue
             start = i
@@ -104,9 +104,39 @@ class JunkCleaner:
             block = lines[start:i]
             if _matches("\n".join(block), rule.matcher, rule.pattern):
                 count += 1
+                # Keep a marker at the removal boundary so cleanup can distinguish
+                # a newly merged blank run from an untouched source blank run.
+                if out and out[-1][0].strip() == "":
+                    out[-1] = (out[-1][0], True)
+                out.append(("", True))
+                if i < len(lines) and lines[i].strip() == "":
+                    out[-1] = (out[-1][0], True)
             else:
-                out.extend(block)
-        return "\n".join(out), count
+                out.extend((line, False) for line in block)
+        return JunkCleaner._cleanup_removed_blank_runs(out), count
+
+    @staticmethod
+    def _cleanup_removed_blank_runs(lines: list[tuple[str, bool]]) -> str:
+        """Collapse only blank runs whose topology changed because of removal."""
+        out: list[str] = []
+        i = 0
+        while i < len(lines):
+            if lines[i][0].strip() != "":
+                out.append(lines[i][0])
+                i += 1
+                continue
+            start = i
+            while i < len(lines) and lines[i][0].strip() == "":
+                i += 1
+            run = lines[start:i]
+            if any(changed for _, changed in run):
+                # Preserve the largest original blank run while removing only
+                # redundancy introduced by joining runs across removed content.
+                length = max(1, sum(1 for _, changed in run if not changed))
+                out.extend("" for _ in range(length))
+            else:
+                out.extend(line for line, _ in run)
+        return "\n".join(out)
 
 
 def _matches(target: str, matcher: str, pattern: str) -> bool:
