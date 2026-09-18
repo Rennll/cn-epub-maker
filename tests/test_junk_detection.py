@@ -93,3 +93,62 @@ def test_repeated_identical_blocks_produce_a_block_candidate():
     assert group.suggested_rule.target == "block"
     assert group.suggested_rule.matcher == "exact"
     assert group.suggested_rule.pattern == "A\nB"
+
+
+def test_repeated_line_with_date_and_time_uses_both_variables():
+    document = build_physical_document(
+        [
+            "更新時間：2026-09-18 21:34",
+            "正文",
+            "更新時間：2026-09-19 08:12",
+        ]
+    )
+
+    groups = detect_document(document)
+
+    assert len(groups) == 1
+    group = groups[0]
+    assert group.scope == "line"
+    assert group.pattern == "更新時間：<date> <time>"
+    assert group.occurrences == (1, 3)
+    assert group.qualified is True
+    assert group.suggested_rule is not None
+    assert group.suggested_rule.matcher == "regex"
+    assert group.suggested_rule.pattern == (
+        r"^更新時間：(?:\d{4}(?:[-/]\d{1,2}[-/]\d{1,2}|年\d{1,2}月\d{1,2}日)) "
+        r"(?:\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分)$"
+    )
+
+
+def test_multi_variable_pattern_keeps_literal_skeleton_anchored():
+    document = build_physical_document(
+        [
+            "更新時間：2026-09-18 21:34",
+            "更新時間：2026-09-19 08:12",
+            "更新時間：2026-09-20 17:45 extra",
+        ]
+    )
+
+    groups = detect_document(document)
+
+    group = next(group for group in groups if group.pattern == "更新時間：<date> <time>")
+    assert group.occurrences == (1, 2)
+    assert group.suggested_rule is not None
+    assert group.suggested_rule.pattern.startswith("^")
+    assert group.suggested_rule.pattern.endswith("$")
+
+
+def test_multi_variable_number_still_requires_format_marker():
+    document = build_physical_document(
+        [
+            "章 1 2026-09-18",
+            "章 2 2026-09-19",
+        ]
+    )
+
+    groups = detect_document(document)
+
+    pattern_groups = [group for group in groups if group.pattern == "章 <number> <date>"]
+    assert len(pattern_groups) == 1
+    assert pattern_groups[0].qualified is False
+    assert pattern_groups[0].suggested_rule is None
