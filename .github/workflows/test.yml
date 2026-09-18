@@ -31,8 +31,10 @@ jobs:
           printf '#!/usr/bin/env bash\nexec java -jar /opt/epubcheck-5.3.0/epubcheck.jar "$@"\n' > /usr/local/bin/epubcheck
           chmod +x /usr/local/bin/epubcheck
           epubcheck --version
-      - run: python -m pytest -q
-      - name: Build real-reader acceptance EPUB
+      - id: pytest
+        run: python -m pytest -q
+      - id: build
+        name: Build real-reader acceptance EPUB
         run: |
           python -m novel_epub.cli build tests/fixtures/real_reader_acceptance.txt \
             --title "Real Reader Acceptance Baseline" \
@@ -46,7 +48,8 @@ jobs:
           name: real-reader-acceptance-epub
           path: /tmp/real-reader-acceptance.epub
           if-no-files-found: error
-      - name: Verify strict EPUBCheck CLI path
+      - id: policy
+        name: Verify strict EPUBCheck CLI path
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -87,3 +90,31 @@ jobs:
               zf.writestr("EPUB/text/ch000001.xhtml", chapter)
           PY
           python -m novel_epub.cli validate --require-epubcheck /tmp/epubcheck-policy.epub
+
+      - name: Telegram - Success
+        if: success()
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl --fail --silent --show-error --request POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=ooooooo PASS\nRepository: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nRun: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Telegram - Failure
+        if: failure()
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          pytest_status="${{ steps.pytest.outcome }}"
+          build_status="${{ steps.build.outcome }}"
+          policy_status="${{ steps.policy.outcome }}"
+
+          curl --fail --silent --show-error --request POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=❌ CI FAILED\nRepository: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\npytest: ${pytest_status}\nbuild/validate: ${build_status}\nEPUBCheck policy: ${policy_status}\nRun: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
