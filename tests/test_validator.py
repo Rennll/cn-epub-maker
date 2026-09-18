@@ -87,7 +87,7 @@ def test_spine_reference_must_exist_in_manifest(tmp_path: Path):
         opf=opf,
         files={"EPUB/nav.xhtml": NAV},
     )
-    errors = validate_epub(path)
+    errors = validate_epub(path).errors
     assert any("spine idref missing from manifest" in error for error in errors)
 
 
@@ -105,7 +105,7 @@ def test_nav_target_must_exist(tmp_path: Path):
         opf=opf,
         files={"EPUB/nav.xhtml": nav},
     )
-    errors = validate_epub(path)
+    errors = validate_epub(path).errors
     assert any("nav target missing" in error for error in errors)
 
 
@@ -151,5 +151,5 @@ def test_container_must_resolve_to_existing_opf(tmp_path: Path):
         container=container,
         opf="<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"3.0\" />",
     )
-    errors = validate_epub(path)
+    errors = validate_epub(path).errors
     assert any("container rootfile missing" in error for error in errors)
