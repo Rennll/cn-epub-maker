@@ -12,6 +12,7 @@ from novel_epub.configuration import (
     TransformationPolicy,
 )
 from novel_epub.execution import execute
+from novel_epub.validation.report import ValidationReport
 
 
 def _auto_request(source: Path, destination: Path) -> ConversionRequest:
@@ -42,7 +43,7 @@ def test_execute_records_auto_detected_encoding_without_mutating_request(tmp_pat
     request = _auto_request(source, destination)
 
     monkeypatch.setattr("novel_epub.execution.render", lambda book, path: None)
-    monkeypatch.setattr("novel_epub.execution.validate_epub", lambda path: [])
+    monkeypatch.setattr("novel_epub.execution.validate_epub", lambda path: ValidationReport())
 
     result = execute(request)
 
