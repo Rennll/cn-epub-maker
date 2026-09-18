@@ -92,3 +92,79 @@ def test_native_renderer_preserves_navigation_and_metadata(tmp_path: Path):
         assert "前言" in nav
         assert "第一卷 九洲一号群" in nav
         assert "第1章 開始" in nav
+
+
+def test_native_renderer_preserves_chapter_order_across_volumes(tmp_path: Path):
+    book = make_book()
+    book.volumes[0].chapters.append(
+        Chapter(
+            sequence=2,
+            number="2",
+            label="第2章",
+            title="第二章",
+            paragraphs=[Paragraph("第二章內容")],
+        )
+    )
+    book.volumes.append(
+        Volume(
+            sequence=2,
+            number="2",
+            label="第二卷",
+            title="後續",
+            chapters=[
+                Chapter(
+                    sequence=3,
+                    number="3",
+                    label="第3章",
+                    title="第三章",
+                    paragraphs=[Paragraph("第三章內容")],
+                )
+            ],
+        )
+    )
+    output = tmp_path / "book.epub"
+
+    NativeRenderer().render(book, output)
+
+    with zipfile.ZipFile(output) as zf:
+        names = zf.namelist()
+        assert names[names.index("EPUB/text/ch000001.xhtml"):] [:3] == [
+            "EPUB/text/ch000001.xhtml",
+            "EPUB/text/ch000002.xhtml",
+            "EPUB/text/ch000003.xhtml",
+        ]
+        opf = ET.fromstring(zf.read("EPUB/content.opf"))
+        opf_ns = {"opf": "http://www.idpf.org/2007/opf"}
+        spine = [
+            item.attrib["idref"]
+            for item in opf.findall("opf:spine/opf:itemref", opf_ns)
+        ]
+        assert spine == ["preamble", "ch000001", "ch000002", "ch000003"]
+
+
+def test_native_renderer_rejects_duplicate_chapter_sequences(tmp_path: Path):
+    book = make_book()
+    book.volumes.append(
+        Volume(
+            sequence=2,
+            number="2",
+            label="第二卷",
+            title="後續",
+            chapters=[
+                Chapter(
+                    sequence=1,
+                    number="2",
+                    label="第2章",
+                    title="重複",
+                    paragraphs=[Paragraph("內容")],
+                )
+            ],
+        )
+    )
+
+    try:
+        NativeRenderer().render(book, tmp_path / "book.epub")
+    except Exception as exc:
+        assert str(exc) == "duplicate chapter sequence"
+    else:
+        raise AssertionError("duplicate chapter sequence should fail")
