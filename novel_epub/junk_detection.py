@@ -229,7 +229,12 @@ def _deterministic_pattern(
             families.append(family)
         cursor = end
     pieces.append(text[cursor:])
-    return "".join(pieces), tuple(families), tuple(values)
+    pattern = "".join(pieces)
+    if "url" in families:
+        # Keep the historical URL candidate spelling stable: full-width
+        # Chinese colon is canonicalized to ASCII in the human-readable pattern.
+        pattern = pattern.replace("：<url>", ":<url>")
+    return pattern, tuple(families), tuple(values)
 
 
 def _variable_priority(family: str) -> int:
