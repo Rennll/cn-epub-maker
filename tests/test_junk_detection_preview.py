@@ -1,3 +1,4 @@
+import pytest
 from novel_epub.junk_detection import preview_rule
 from novel_epub.physical import build_physical_document
 from novel_epub.transforms import JunkCleaner, JunkRule
