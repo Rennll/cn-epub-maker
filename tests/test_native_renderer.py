@@ -46,6 +46,7 @@ def test_native_renderer_emits_minimal_xhtml_and_reuses_package_builder(tmp_path
         chapter = ET.fromstring(zf.read("EPUB/text/ch000001.xhtml"))
         ns = {"x": "http://www.w3.org/1999/xhtml"}
         assert chapter.find("./x:head/x:title", ns).text == "第1章 開始"
+        assert chapter.find("./x:body/x:h1", ns).text == "第1章 開始"
         stylesheet = chapter.find("./x:head/x:link[@rel='stylesheet']", ns)
         assert stylesheet.attrib["href"] == "../styles/stylesheet.css"
 
