@@ -39,7 +39,11 @@ def run_epubcheck(path: str | Path, *, required: bool = False) -> EpubCheckResul
     if completed.returncode == 0:
         return EpubCheckResult(available=True, ok=True, errors=[])
 
-    errors = [output for output in (completed.stdout, completed.stderr) if output]
+    errors: list[str] = []
+    if completed.stdout:
+        errors.append(f"EPUBCheck stdout: {completed.stdout}")
+    if completed.stderr:
+        errors.append(f"EPUBCheck stderr: {completed.stderr}")
     if not errors:
         errors.append(f"EPUBCheck exited with status {completed.returncode}")
     return EpubCheckResult(available=True, ok=False, errors=errors)
