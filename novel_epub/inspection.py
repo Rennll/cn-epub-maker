@@ -31,8 +31,14 @@ def inspect_source(
 
     accepted: list[JunkRule] = []
     for index, group in enumerate(groups, 1):
+        _print_group(index, group)
+        if not group.qualified or group.suggested_rule is None:
+            print("  candidate is not qualified for automatic JunkRule generation; skipping")
+            continue
         preview = preview_rule(document, group.suggested_rule)
-        _print_group(index, group, preview)
+        _print_preview(preview)
+        if _preview_is_broader(group, preview):
+            print("  WARNING: preview is broader than the detected group; review before accepting.")
         while True:
             decision = input_fn("[a] accept [e] edit [s] skip: ").strip().lower()
             if decision == "a":
@@ -74,18 +80,16 @@ def _write_junk_config_contents(path: Path, rules: list[JunkRule] | tuple[JunkRu
     )
 
 
-def _print_group(index: int, group: DetectionGroup, preview: RulePreview) -> None:
+def _print_group(index: int, group: DetectionGroup) -> None:
     print(f"[{index}] {group.scope}: {group.pattern}")
     print(f"  occurrences: {group.occurrences}")
     print(f"  evidence: {', '.join(group.evidence)}")
-    print(
-        "  suggested rule: "
-        f"{group.suggested_rule.target}:{group.suggested_rule.matcher}:"
-        f"{group.suggested_rule.pattern}"
-    )
-    _print_preview(preview)
-    if _preview_is_broader(group, preview):
-        print("  WARNING: preview is broader than the detected group; review before accepting.")
+    if group.suggested_rule is not None:
+        print(
+            "  suggested rule: "
+            f"{group.suggested_rule.target}:{group.suggested_rule.matcher}:"
+            f"{group.suggested_rule.pattern}"
+        )
 
 
 def _print_preview(preview: RulePreview) -> None:
@@ -113,6 +117,8 @@ def _edit_rule(
     group: DetectionGroup,
 ) -> JunkRule:
     original = group.suggested_rule
+    if original is None:
+        raise ValueError("cannot edit an unqualified detection group")
     while True:
         value = input_fn(
             "rule TARGET:MATCHER:PATTERN "
