@@ -32,7 +32,9 @@ jobs:
           chmod +x /usr/local/bin/epubcheck
           epubcheck --version
       - id: pytest
-        run: python -m pytest -q
+        run: |
+          set -o pipefail
+          python -m pytest -q 2>&1 | tee /tmp/pytest.log
       - id: build
         name: Build real-reader acceptance EPUB
         run: |
@@ -41,7 +43,7 @@ jobs:
             --author "測試作者" \
             --lang "zh-TW" \
             --output /tmp/real-reader-acceptance.epub
-          python -m novel_epub.cli validate --require-epubcheck /tmp/real-reader-acceptance.epub
+          python -m novel_epub.cli validate --require-epubcheck /tmp/real-reader-acceptance.epub 2>&1 | tee /tmp/build.log
       - name: Upload real-reader acceptance EPUB
         uses: actions/upload-artifact@v4
         with:
@@ -89,7 +91,7 @@ jobs:
               zf.writestr("EPUB/nav.xhtml", nav)
               zf.writestr("EPUB/text/ch000001.xhtml", chapter)
           PY
-          python -m novel_epub.cli validate --require-epubcheck /tmp/epubcheck-policy.epub
+          python -m novel_epub.cli validate --require-epubcheck /tmp/epubcheck-policy.epub 2>&1 | tee /tmp/policy.log
 
       - name: Telegram - Success
         if: success()
@@ -110,11 +112,29 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          pytest_status="${{ steps.pytest.outcome }}"
-          build_status="${{ steps.build.outcome }}"
-          policy_status="${{ steps.policy.outcome }}"
+          if [ "${{ steps.pytest.outcome }}" = "failure" ]; then
+            failed_stage="pytest"
+            if grep -q "short test summary info" /tmp/pytest.log; then
+              error_summary="$(sed -n '/short test summary info/,$p' /tmp/pytest.log | tail -c 3500)"
+            else
+              error_summary="$(tail -c 3500 /tmp/pytest.log)"
+            fi
+          elif [ "${{ steps.build.outcome }}" = "failure" ]; then
+            failed_stage="build/validate"
+            error_summary="$(tail -c 3500 /tmp/build.log)"
+          elif [ "${{ steps.policy.outcome }}" = "failure" ]; then
+            failed_stage="EPUBCheck policy"
+            error_summary="$(tail -c 3500 /tmp/policy.log)"
+          else
+            failed_stage="CI"
+            error_summary="No detailed step output was captured."
+          fi
+
+          message="❌ ${failed_stage} FAILED
+
+          ${error_summary}"
 
           curl --fail --silent --show-error --request POST \
             "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
-            --data-urlencode "text=❌ CI FAILED\nRepository: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\npytest: ${pytest_status}\nbuild/validate: ${build_status}\nEPUBCheck policy: ${policy_status}\nRun: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            --data-urlencode "text=${message}"
