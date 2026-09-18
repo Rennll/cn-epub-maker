@@ -66,6 +66,22 @@ def test_native_renderer_emits_minimal_xhtml_and_reuses_package_builder(tmp_path
         assert "EPUB/nav.xhtml" in zf.namelist()
 
 
+def test_native_renderer_renders_preamble_xhtml_content(tmp_path: Path):
+    output = tmp_path / "book.epub"
+
+    NativeRenderer().render(make_book(), output)
+
+    with zipfile.ZipFile(output) as zf:
+        preamble = ET.fromstring(zf.read("EPUB/text/preamble.xhtml"))
+        ns = {"x": "http://www.w3.org/1999/xhtml"}
+        assert preamble.find("./x:head/x:title", ns).text == "測試書"
+        assert preamble.find("./x:body/x:h1", ns).text == "測試書"
+        paragraphs = preamble.findall(".//x:body/x:p", ns)
+        assert [p.text for p in paragraphs] == ["前言第一段", "前言第二段"]
+        assert "\\n" not in zf.read("EPUB/text/preamble.xhtml").decode("utf-8")
+
+
+
 def test_native_renderer_preserves_navigation_and_metadata(tmp_path: Path):
     output = tmp_path / "book.epub"
 
