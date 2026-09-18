@@ -94,3 +94,4 @@ def test_cli_inspect_config_feeds_normal_build_and_junk_cleaner(tmp_path, monkey
     assert "正文" in captured["paragraphs"]
     assert "其他正文" in captured["paragraphs"]
     assert source.read_text(encoding="utf-8") == original
+
