@@ -105,6 +105,7 @@ class JunkCleaner:
             block = lines[start:i]
             if _matches("\n".join(block), rule.matcher, rule.pattern):
                 count += 1
+                # Collapsed removed block to a single marker for blank-run merging
                 out.append(("", True))
             else:
                 out.extend((line, False) for line in block)
