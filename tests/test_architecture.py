@@ -81,7 +81,7 @@ def test_intermediate_schema_contains_provenance_but_not_request(tmp_path: Path)
 
 
 def test_inspection_detection_is_read_only():
-    document = build_physical_document(["廣告：2026-01-01", "正文", "廣告：2026-02-02"])
+    document = build_physical_document(["更新日期：2026-01-01", "正文", "更新日期：2026-02-02"])
     before = document
     groups = detect_document(document)
     qualified = [group for group in groups if group.qualified]
