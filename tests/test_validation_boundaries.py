@@ -39,7 +39,7 @@ def test_book_validation_reports_semantic_errors_without_an_epub(tmp_path: Path)
 def test_epub_validation_is_independent_of_book_model(tmp_path: Path):
     path = tmp_path / "nonexistent.epub"
 
-    assert validate_epub(path) == [f"EPUB not found: {path}"]
+    assert validate_epub(path).errors == [f"EPUB not found: {path}"]
 
 
 def test_epub_validation_can_validate_a_generated_archive(tmp_path: Path):
@@ -70,7 +70,7 @@ def test_epub_validation_can_validate_a_generated_archive(tmp_path: Path):
         zf.writestr("EPUB/nav.xhtml", nav)
         zf.writestr("EPUB/text/ch000001.xhtml", "<html />")
 
-    assert validate_epub(path) == []
+    assert validate_epub(path).errors == []
 
 
 def test_epubcheck_can_be_exercised_without_running_epubcheck(monkeypatch, tmp_path: Path):
