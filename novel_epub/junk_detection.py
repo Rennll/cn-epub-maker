@@ -153,6 +153,8 @@ def _make_groups(
 
 def _has_format_evidence(family: str, pattern: str, values: list[str]) -> bool:
     """Return true only when the observed content contains concrete format evidence."""
+    if not values:
+        return False
     if family == "number":
         return bool(_FORMAT_MARKER_PATTERN.search(pattern))
     return all(_observed_variable_has_format(family, value) for value in values)
@@ -209,21 +211,9 @@ def _pattern_to_regex(pattern: str) -> str:
     parts.append(re.escape(pattern[cursor:]))
     primary = "^" + "".join(parts) + "$"
     if "：" not in pattern and ":" in pattern:
+        # Detection canonicalizes a full-width Chinese colon to ASCII for the
+        # human-readable pattern. Keep the suggested rule readable while making
+        # the executable regex match both source spellings.
         alternate = pattern.replace(":", "：", 1)
         return primary + "|" + _pattern_to_regex(alternate)
     return primary
-
-
-def _make_group(
-    scope: str,
-    pattern: str,
-    occurrences: list[int],
-    evidence: tuple[str, ...],
-    rule: JunkRule | None,
-    qualified: bool,
-) -> DetectionGroup:
-    return DetectionGroup(scope, pattern, tuple(occurrences), evidence, rule, qualified)
-
-
-def _group_sort_key(group: DetectionGroup) -> tuple[int, int, str]:
-    return (group.occurrences[0], 0 if group.scope == "line" else 1, group.pattern)
