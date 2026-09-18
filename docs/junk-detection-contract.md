@@ -335,6 +335,20 @@ Removal
 
 Unknown content is never removed merely because Detection found it. Removal occurs only after the user has explicitly accepted or authored the corresponding JunkRule and the normal build pipeline invokes JunkCleaner.
 
+## 15.1 Cross-stage invariants
+
+The inspection contract also participates in the repository-wide architecture contract. In particular:
+
+- Detection observes physical source content and MUST NOT depend on semantic `Book` structures.
+- Detection MUST NOT execute `JunkCleaner`.
+- SuggestedRules use the canonical `JunkRule` contract; there is no second executable rule language.
+- Rule Preview and JunkCleaner MUST use the same matching semantics.
+- Accepted inspection output is ordinary build configuration; inspection history is not part of that configuration.
+- Normal build MUST NOT implicitly invoke inspection.
+- The normal transformation order remains `JunkCleaner → OpenCC → Punctuation Conversion`.
+
+These are cross-stage invariants; the repository-wide list is maintained in [`docs/architecture-contract.md`](architecture-contract.md).
+
 ## 16. Architecture Boundary
 
 Junk Detection is an independent inspection process rather than a mandatory stage of the normal build pipeline.
