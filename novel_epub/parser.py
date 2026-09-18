@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
-
 from .analysis import DocumentAnalysis, analyze_document
 from .dfm import DocumentFormattingModel, build_formatting_model
 from .models import Book
