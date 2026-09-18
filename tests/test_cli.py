@@ -37,6 +37,9 @@ def test_cli_inspect_config_feeds_normal_build_and_junk_cleaner(tmp_path, monkey
     def fake_render(_self, book, output):
         captured["paragraphs"] = [
             paragraph.text
+            for paragraph in book.preamble
+        ] + [
+            paragraph.text
             for volume in book.volumes
             for chapter in volume.chapters
             for paragraph in chapter.paragraphs
