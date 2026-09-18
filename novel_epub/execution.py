@@ -160,7 +160,10 @@ def execute(
             destination=destination,
         )
         execution.warnings.extend(plan.warnings)
-        render(result.book, plan.path)
+        if request.policy.renderer == "native":
+            NativeRenderer().render(result.book, plan.path)
+        else:
+            render(result.book, plan.path)
         execution.epub_path = plan.path
         epub_validation = validate_epub(plan.path)
         execution.epub_validation_errors = epub_validation.errors
