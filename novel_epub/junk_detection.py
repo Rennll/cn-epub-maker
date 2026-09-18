@@ -101,8 +101,8 @@ def _preview_blocks(document: PhysicalDocument, rule: JunkRule) -> RulePreview:
 
 def _detect_lines(document: PhysicalDocument) -> list[DetectionGroup]:
     exact: dict[str, list[int]] = {}
-    patterned: dict[tuple[str, str], list[int]] = {}
-    pattern_values: dict[tuple[str, str], list[str]] = {}
+    patterned: dict[tuple[tuple[str, ...], str], list[int]] = {}
+    pattern_values: dict[tuple[tuple[str, ...], str], list[str]] = {}
     for line in document.lines:
         if line.blank:
             continue
@@ -110,8 +110,8 @@ def _detect_lines(document: PhysicalDocument) -> list[DetectionGroup]:
         candidate = _deterministic_pattern(line.text)
         if candidate is None:
             continue
-        pattern, family, _ = candidate
-        key = (family, pattern)
+        pattern, families, _ = candidate
+        key = (families, pattern)
         patterned.setdefault(key, []).append(line.number)
         pattern_values.setdefault(key, []).append(line.text)
     return _make_groups("line", exact, patterned, pattern_values)
@@ -119,8 +119,8 @@ def _detect_lines(document: PhysicalDocument) -> list[DetectionGroup]:
 
 def _detect_blocks(document: PhysicalDocument) -> list[DetectionGroup]:
     exact: dict[str, list[int]] = {}
-    patterned: dict[tuple[str, str], list[int]] = {}
-    pattern_values: dict[tuple[str, str], list[str]] = {}
+    patterned: dict[tuple[tuple[str, ...], str], list[int]] = {}
+    pattern_values: dict[tuple[tuple[str, ...], str], list[str]] = {}
     lines_by_number = {line.number: line.text for line in document.lines}
     for block in document.blocks:
         text = "\n".join(lines_by_number[number] for number in block.line_numbers)
@@ -128,8 +128,8 @@ def _detect_blocks(document: PhysicalDocument) -> list[DetectionGroup]:
         candidate = _deterministic_pattern(text)
         if candidate is None:
             continue
-        pattern, family, _ = candidate
-        key = (family, pattern)
+        pattern, families, _ = candidate
+        key = (families, pattern)
         patterned.setdefault(key, []).append(block.index)
         pattern_values.setdefault(key, []).append(text)
     return _make_groups("block", exact, patterned, pattern_values)
@@ -138,32 +138,40 @@ def _detect_blocks(document: PhysicalDocument) -> list[DetectionGroup]:
 def _make_groups(
     scope: str,
     exact: dict[str, list[int]],
-    patterned: dict[tuple[str, str], list[int]],
-    pattern_values: dict[tuple[str, str], list[str]],
+    patterned: dict[tuple[tuple[str, ...], str], list[int]],
+    pattern_values: dict[tuple[tuple[str, ...], str], list[str]],
 ) -> list[DetectionGroup]:
     groups: list[DetectionGroup] = []
     for text, occurrences in exact.items():
         if len(occurrences) >= 2:
             groups.append(_make_group(scope, text, occurrences, ("repetition",), JunkRule(scope, "exact", text), True))
-    for (family, pattern), occurrences in patterned.items():
-        values = pattern_values[(family, pattern)]
+    for (families, pattern), occurrences in patterned.items():
+        values = pattern_values[(families, pattern)]
         if len(occurrences) < 2 or len(set(values)) < 2:
             continue
-        format_evidence = _has_format_evidence(family, pattern, values)
+        format_evidence = _has_format_evidence(families, pattern, values)
         evidence = ("repetition", "pattern", "format") if format_evidence else ("repetition", "pattern")
-        qualified = family != "number" or format_evidence
+        qualified = "number" not in families or format_evidence
         rule = JunkRule(scope, "regex", _pattern_to_regex(pattern)) if qualified else None
         groups.append(_make_group(scope, pattern, occurrences, evidence, rule, qualified))
     return groups
 
 
-def _has_format_evidence(family: str, pattern: str, values: list[str]) -> bool:
+def _has_format_evidence(
+    families: tuple[str, ...],
+    pattern: str,
+    values: list[str],
+) -> bool:
     """Return true only when the observed content contains concrete format evidence."""
     if not values:
         return False
-    if family == "number":
+    if "number" in families and len(families) == 1:
         return bool(_FORMAT_MARKER_PATTERN.search(pattern))
-    return all(_observed_variable_has_format(family, value) for value in values)
+    return all(
+        _observed_variable_has_format(family, value)
+        for family in families
+        for value in values
+    )
 
 
 def _observed_variable_has_format(family: str, value: str) -> bool:
@@ -179,24 +187,48 @@ def _observed_variable_has_format(family: str, value: str) -> bool:
     return False
 
 
-def _deterministic_pattern(text: str) -> tuple[str, str, tuple[str, ...]] | None:
-    # Families are checked in a deliberate priority order; the first matching
-    # family owns the deterministic abstraction for the line/block.
-    for family, expression in _VARIABLES:
-        matches = tuple(expression.finditer(text))
-        if not matches:
-            continue
-        pieces, values, cursor = [], [], 0
-        for match in matches:
-            pieces.extend((text[cursor:match.start()], f"<{family}>"))
-            values.append(match.group(0))
-            cursor = match.end()
-        pieces.append(text[cursor:])
-        pattern = "".join(pieces)
-        if family == "url":
-            pattern = pattern.replace("：<url>", ":<url>")
-        return pattern, family, tuple(values)
-    return None
+def _deterministic_pattern(
+    text: str,
+) -> tuple[str, tuple[str, ...], tuple[str, ...]] | None:
+    """Abstract every non-overlapping supported variable in one deterministic pass."""
+    matches: list[tuple[int, int, str, str]] = []
+    cursor = 0
+    while cursor < len(text):
+        best: tuple[int, int, str, str] | None = None
+        for family, expression in _VARIABLES:
+            match = expression.search(text, cursor)
+            if match is None:
+                continue
+            candidate = (match.start(), match.end(), family, match.group(0))
+            if best is None or (candidate[0], _variable_priority(candidate[2])) < (
+                best[0],
+                _variable_priority(best[2]),
+            ):
+                best = candidate
+        if best is None:
+            break
+        matches.append(best)
+        cursor = best[1]
+
+    if not matches:
+        return None
+
+    pieces: list[str] = []
+    values: list[str] = []
+    families: list[str] = []
+    cursor = 0
+    for start, end, family, value in matches:
+        pieces.extend((text[cursor:start], f"<{family}>"))
+        values.append(value)
+        if family not in families:
+            families.append(family)
+        cursor = end
+    pieces.append(text[cursor:])
+    return "".join(pieces), tuple(families), tuple(values)
+
+
+def _variable_priority(family: str) -> int:
+    return next(index for index, (name, _) in enumerate(_VARIABLES) if name == family)
 
 
 def _pattern_to_regex(pattern: str) -> str:
