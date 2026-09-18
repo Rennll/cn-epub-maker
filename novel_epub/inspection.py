@@ -102,13 +102,11 @@ def _print_preview(preview: RulePreview) -> None:
         print(f"  examples: {preview.examples}")
 
 
-# locations and occurrences share the same index domain (line number for
-# line-scope groups, block index for block-scope groups).
+# Both APIs expose user-facing 1-based locations. A preview is broader when it
+# matches at least one occurrence outside the detected group, regardless of the
+# total match count.
 def _preview_is_broader(group: DetectionGroup, preview: RulePreview) -> bool:
-    return (
-        preview.matched_count > len(group.occurrences)
-        and not set(preview.locations).issubset(group.occurrences)
-    )
+    return not set(preview.locations).issubset(set(group.occurrences))
 
 
 def _edit_rule(

@@ -89,7 +89,7 @@ def test_repeated_identical_blocks_produce_a_block_candidate():
     block_groups = [group for group in groups if group.scope == "block"]
     assert len(block_groups) == 1
     group = block_groups[0]
-    assert group.occurrences == (0, 1)
+    assert group.occurrences == (1, 2)
     assert group.suggested_rule.target == "block"
     assert group.suggested_rule.matcher == "exact"
     assert group.suggested_rule.pattern == "A\nB"
@@ -110,7 +110,7 @@ def test_repeated_line_with_date_and_time_uses_both_variables():
 def test_repeated_block_with_date_and_time_uses_both_variables():
     groups = detect_document(build_physical_document(["更新時間：2026-09-18 21:34", "", "更新時間：2026-09-19 08:12"]))
     group = next(group for group in groups if group.scope == "block" and group.pattern == "更新時間：<date> <time>")
-    assert group.occurrences == (0, 1)
+    assert group.occurrences == (1, 2)
     assert group.qualified is True
 
 
@@ -126,3 +126,11 @@ def test_multi_variable_number_still_requires_format_marker():
     group = next(group for group in groups if group.pattern == "章 <number> <date>")
     assert group.qualified is False
     assert group.suggested_rule is None
+
+
+def test_numeric_pattern_with_only_punctuation_is_not_qualified():
+    groups = detect_document(build_physical_document(["第1章：100", "第2章：200", "第3章：300"]))
+    group = next(group for group in groups if group.pattern == "第<number>章：<number>")
+    assert group.qualified is False
+    assert group.suggested_rule is None
+    assert group.evidence == ("repetition", "pattern")

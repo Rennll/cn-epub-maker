@@ -1,3 +1,4 @@
+import pytest
 from novel_epub.junk_detection import preview_rule
 from novel_epub.physical import build_physical_document
 from novel_epub.transforms import JunkCleaner, JunkRule
@@ -44,6 +45,27 @@ def test_preview_matches_cleaner_block_rules():
     assert [line.text for line in document.lines] == [
         "廣告", "內容", "", "正文", "段落", "", "廣告", "內容"
     ]
+
+
+@pytest.mark.parametrize(
+    "matcher, pattern",
+    [
+        ("contains", "廣告"),
+        ("regex", r"^廣告[^\n]*\n內容$"),
+    ],
+)
+def test_preview_matches_cleaner_block_contains_and_regex(matcher, pattern):
+    document = build_physical_document(
+        ["廣告A", "內容", "", "正文", "段落", "", "廣告B", "內容"]
+    )
+    rule = JunkRule("block", matcher, pattern)
+
+    preview = preview_rule(document, rule)
+    result, detail = _cleaner_details(document, rule)
+
+    assert preview.matched_count == result.stats["removed"]
+    assert preview.locations == detail["locations"] == (1, 3)
+    assert preview.examples == detail["content"] == ("廣告A\n內容", "廣告B\n內容")
 
 
 def test_preview_matches_cleaner_url_forms():
