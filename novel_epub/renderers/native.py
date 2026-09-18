@@ -60,7 +60,7 @@ class NativeRenderer:
     @staticmethod
     def _render_chapter(book: Book, chapter: Chapter, destination: Path) -> None:
         title = escape(f"{chapter.label} {chapter.title}".rstrip())
-        body = f"<h1>{title}</h1>\\n" + "".join(NativeRenderer._paragraph(paragraph) for paragraph in chapter.paragraphs)
+        body = f"<h1>{title}</h1>\n" + "".join(NativeRenderer._paragraph(paragraph) for paragraph in chapter.paragraphs)
         destination.write_text(
             NativeRenderer._document(book.language, title, body),
             encoding="utf-8",
