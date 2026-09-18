@@ -160,7 +160,7 @@ def _make_groups(
             continue
         format_evidence = _has_format_evidence(families, pattern, values)
         evidence = ("repetition", "pattern", "format") if format_evidence else ("repetition", "pattern")
-        qualified = "number" not in families or format_evidence
+        qualified = format_evidence
         rule = JunkRule(scope, "regex", _pattern_to_regex(pattern)) if qualified else None
         groups.append(_make_group(scope, pattern, occurrences, evidence, rule, qualified))
     return groups
