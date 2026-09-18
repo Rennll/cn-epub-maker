@@ -117,7 +117,7 @@ def test_inspect_source_encoding_failure_does_not_create_output(tmp_path, monkey
     source.write_bytes("中文".encode("utf-8"))
 
     def fail_read_lines(_source, _encoding):
-        raise UnicodeDecodeError("utf-8", b"\\x80", 0, 1, "invalid start byte")
+        raise UnicodeDecodeError("utf-8", b"\x80", 0, 1, "invalid start byte")
 
     monkeypatch.setattr(inspection, "read_lines", fail_read_lines)
 
