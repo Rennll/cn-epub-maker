@@ -8,10 +8,16 @@ from ..models import Book, Chapter, Paragraph, ParagraphBoundary
 from .epub import EpubPackageBuilder, _iter_chapters
 
 
+class NativeRenderingError(Exception):
+    """Fatal native renderer failure."""
+
+
+
 class NativeRenderer:
     """Render the semantic Book model directly to minimal EPUB XHTML."""
 
     def render(self, book: Book, output: str | Path) -> Path:
+        self._validate_book(book)
         output = Path(output)
         with TemporaryDirectory(prefix="novel-epub-native-") as tmp:
             root = Path(tmp)
@@ -36,6 +42,20 @@ class NativeRenderer:
                 preamble_file,
             )
         return output
+
+    @staticmethod
+    def _validate_book(book: Book) -> None:
+        sequences = [chapter.sequence for _volume, chapter in _iter_chapters(book)]
+        if len(sequences) != len(set(sequences)):
+            raise NativeRenderingError("duplicate chapter sequence")
+        if not book.title.strip():
+            raise NativeRenderingError("book title is empty")
+        if not book.author.strip():
+            raise NativeRenderingError("author is empty")
+        if not sequences:
+            raise NativeRenderingError("book contains no chapters")
+        if book.cover and not Path(book.cover).is_file():
+            raise FileNotFoundError(f"cover file not found: {book.cover}")
 
     @staticmethod
     def _render_chapter(book: Book, chapter: Chapter, destination: Path) -> None:
