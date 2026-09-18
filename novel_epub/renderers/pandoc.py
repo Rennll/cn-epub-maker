@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import mimetypes
 import re
 import subprocess
 from html import escape
@@ -22,6 +23,12 @@ _P_OPEN = re.compile(r"<p(\s[^>]*)?>")
 _NS_EPUB = "http://www.idpf.org/2007/ops"
 _NS_OPF = "http://www.idpf.org/2007/opf"
 _NS_DC = "http://purl.org/dc/elements/1.1/"
+
+
+def _iter_chapters(book: Book):
+    for volume in book.volumes:
+        yield from ((volume, chapter) for chapter in volume.chapters)
+    yield from ((None, chapter) for chapter in book.chapters)
 
 
 class RenderingError(Exception):
