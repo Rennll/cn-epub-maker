@@ -9,7 +9,8 @@ from .configuration_resolver import resolve_conversion_request
 from .execution import ExecutionResult, execute
 from .inspection import inspect_source
 from .transforms import OpenCCTransformer
-from .validator import run_epubcheck, validate_epub
+from .validation.epub import validate_epub
+from .validation.epubcheck import run_epubcheck
 
 
 def _report_execution(result: ExecutionResult) -> None:
