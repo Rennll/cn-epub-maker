@@ -56,7 +56,7 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="{_NS_EPUB}" lang="{language}" xml:lang="{language}">
 <head><meta charset="utf-8" /><title>{title}</title></head>
 <body>
-<nav epub:type="toc" id="toc"><h1>{title}</h1><ol>{''.join(groups)}</ol></body>
+<nav epub:type="toc" id="toc"><h1>{title}</h1><ol>{''.join(groups)}</ol></nav></body>
 </html>
 '''
 
