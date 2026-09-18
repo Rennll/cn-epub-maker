@@ -11,6 +11,7 @@ from .normalize import read_lines
 from .output_destination import plan_output_destination
 from .parser import parse_lines
 from .physical import build_physical_document
+from .renderers.native import NativeRenderer, NativeRenderingError
 from .renderers.pandoc import RenderingError, render
 from .transforms import (
     JunkCleaner,
@@ -172,7 +173,7 @@ def execute(
         return execution
     except TransformationError as exc:
         execution.errors = [str(exc)]
-    except RenderingError as exc:
+    except (RenderingError, NativeRenderingError) as exc:
         execution.errors = [str(exc)]
     except FileNotFoundError as exc:
         execution.errors = [f"required executable or file not found: {exc}"]
