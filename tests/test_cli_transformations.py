@@ -4,6 +4,7 @@ from novel_epub.cli import build, main
 from novel_epub.cli_adapter import namespace_to_inputs
 from novel_epub.configuration_resolver import resolve_conversion_request
 from novel_epub.transforms import JunkRule, TransformAudit, TransformationError
+from novel_epub.validation.report import ValidationReport
 
 
 def _build_request(tmp_path, **overrides):
@@ -52,7 +53,7 @@ def _stub_build_dependencies(monkeypatch, captured, source_lines=None):
         lambda book, warnings: SimpleNamespace(errors=[]),
     )
     monkeypatch.setattr("novel_epub.execution.render", lambda book, output: None)
-    monkeypatch.setattr("novel_epub.execution.validate_epub", lambda output: [])
+    monkeypatch.setattr("novel_epub.execution.validate_epub", lambda output: ValidationReport())
 
 
 def test_build_applies_default_v2_transformations(tmp_path, monkeypatch):
