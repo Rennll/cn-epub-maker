@@ -8,6 +8,7 @@ from .transforms import JunkRule
 
 
 DestinationMode = Literal["automatic", "explicit"]
+RendererName = Literal["pandoc", "native"]
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class TransformationPolicy:
 
 @dataclass(frozen=True)
 class ConversionPolicy:
+    renderer: RendererName
     encoding: str
     parser: ParserPolicy
     transformations: TransformationPolicy
