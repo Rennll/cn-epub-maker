@@ -81,21 +81,22 @@ class JunkCleaner:
     def _apply_rule(text: str, rule: JunkRule) -> tuple[str, int]:
         lines = text.split("\n")
         if rule.target == "line":
-            out: list[str] = []
+            out: list[tuple[str, bool]] = []
             count = 0
             for line in lines:
                 if _matches(line, rule.matcher, rule.pattern):
                     count += 1
+                    out.append(("", True))
                 else:
-                    out.append(line)
-            return "\n".join(out), count
+                    out.append((line, False))
+            return JunkCleaner._cleanup_removed_blank_runs(out), count
 
-        out: list[str] = []
+        out: list[tuple[str, bool]] = []
         count = 0
         i = 0
         while i < len(lines):
             if lines[i].strip() == "":
-                out.append(lines[i])
+                out.append((lines[i], False))
                 i += 1
                 continue
             start = i
@@ -104,10 +105,46 @@ class JunkCleaner:
             block = lines[start:i]
             if _matches("\n".join(block), rule.matcher, rule.pattern):
                 count += 1
+                # Collapsed removed block to a single marker for blank-run merging
+                out.append(("", True))
             else:
-                out.extend(block)
-        return "\n".join(out), count
+                out.extend((line, False) for line in block)
+        return JunkCleaner._cleanup_removed_blank_runs(out), count
 
+    @staticmethod
+    def _cleanup_removed_blank_runs(lines: list[tuple[str, bool]]) -> str:
+        """Collapse blank runs joined by removed line/block markers."""
+        out: list[str] = []
+        i = 0
+        while i < len(lines):
+            if not lines[i][1] and lines[i][0].strip() != "":
+                out.append(lines[i][0])
+                i += 1
+                continue
+
+            start = i
+            has_removed = False
+            max_blank_run = 0
+            blank_run = 0
+            while i < len(lines) and (
+                lines[i][1] or lines[i][0].strip() == ""
+            ):
+                removed = lines[i][1]
+                if removed:
+                    has_removed = True
+                    max_blank_run = max(max_blank_run, blank_run)
+                    blank_run = 0
+                else:
+                    blank_run += 1
+                i += 1
+            max_blank_run = max(max_blank_run, blank_run)
+
+            if has_removed:
+                out.extend([""] * max_blank_run)
+            else:
+                out.extend(lines[index][0] for index in range(start, i))
+
+        return "\n".join(out)
 
 def _matches(target: str, matcher: str, pattern: str) -> bool:
     if matcher == "exact":

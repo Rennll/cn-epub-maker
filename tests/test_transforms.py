@@ -20,6 +20,46 @@ def test_line_exact_removes_whole_line_and_canonicalizes_blank_whitespace():
     assert result.stats["matched"] == 1
 
 
+def test_line_removal_collapses_blank_runs_created_around_removed_junk():
+    result = JunkCleaner([JunkRule("line", "exact", "廣告")]).transform(
+        "正文\n\n廣告\n\n下一段"
+    )
+
+    assert result.text == "正文\n\n下一段"
+
+
+def test_line_removal_preserves_blank_runs_between_consecutive_removed_items():
+    result = JunkCleaner([JunkRule("line", "contains", "廣告")]).transform(
+        "正文\n\n廣告A\n\n廣告B\n\n下一段"
+    )
+
+    assert result.text == "正文\n\n下一段"
+
+
+def test_block_removal_collapses_blank_runs_created_around_removed_junk():
+    result = JunkCleaner([JunkRule("block", "exact", "廣告\n內容")]).transform(
+        "正文\n\n廣告\n內容\n\n下一段"
+    )
+
+    assert result.text == "正文\n\n下一段"
+
+
+def test_junk_removal_preserves_larger_existing_blank_run():
+    result = JunkCleaner([JunkRule("line", "exact", "廣告")]).transform(
+        "正文\n\n\n廣告\n\n下一段"
+    )
+
+    assert result.text == "正文\n\n\n下一段"
+
+
+def test_no_junk_removal_preserves_existing_blank_structure():
+    source = "正文\n\n\n下一段"
+
+    result = JunkCleaner([JunkRule("line", "exact", "廣告")]).transform(source)
+
+    assert result.text == source
+
+
 def test_contains_removes_whole_target_not_substring():
     result = JunkCleaner([JunkRule("line", "contains", "廣告")]).transform(
         "保留廣告內容\n正常"
