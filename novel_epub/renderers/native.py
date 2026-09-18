@@ -55,7 +55,7 @@ class NativeRenderer:
         if not sequences:
             raise NativeRenderingError("book contains no chapters")
         if book.cover and not Path(book.cover).is_file():
-            raise FileNotFoundError(f"cover file not found: {book.cover}")
+            raise NativeRenderingError(f"cover file not found: {book.cover}")
 
     @staticmethod
     def _render_chapter(book: Book, chapter: Chapter, destination: Path) -> None:
