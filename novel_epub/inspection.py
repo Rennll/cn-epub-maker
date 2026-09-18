@@ -25,10 +25,6 @@ def inspect_source(
     if output_path.exists():
         raise FileExistsError(f"inspection output already exists: {output_path}")
 
-    # Reserve the output before interactive review so a later write cannot
-    # unexpectedly collide with a file created while the user is deciding.
-    output_path.touch(exist_ok=False)
-
     lines, _ = read_lines(source, encoding)
     document = build_physical_document(lines)
     groups = detect_document(document)
