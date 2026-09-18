@@ -69,7 +69,7 @@ class NativeRenderer:
     @staticmethod
     def _render_preamble(book: Book, destination: Path) -> None:
         title = escape(book.title)
-        body = f"<h1>{title}</h1>\\n" + "".join(NativeRenderer._paragraph(paragraph) for paragraph in book.preamble)
+        body = f"<h1>{title}</h1>\n" + "".join(NativeRenderer._paragraph(paragraph) for paragraph in book.preamble)
         destination.write_text(
             NativeRenderer._document(book.language, title, body),
             encoding="utf-8",
