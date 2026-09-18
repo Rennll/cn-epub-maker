@@ -7,6 +7,7 @@ from .cli_adapter import namespace_to_inputs
 from .configuration_adapter import ConfigurationFileError, load_config_file
 from .configuration_resolver import resolve_conversion_request
 from .execution import ExecutionResult, execute
+from .inspection import inspect_source
 from .transforms import OpenCCTransformer
 from .validator import run_epubcheck, validate_epub
 
@@ -66,6 +67,16 @@ def build(request, *, keep_intermediate=False, intermediate=None):
     return result.return_code
 
 
+def inspect(args: argparse.Namespace) -> int:
+    try:
+        inspect_source(args.input, args.output, encoding=args.encoding)
+    except (OSError, ValueError, ConfigurationFileError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(f"Config: {args.output}")
+    return 0
+
+
 def validate(args: argparse.Namespace) -> int:
     errors = validate_epub(args.epub)
     if errors:
@@ -121,6 +132,12 @@ def main() -> int:
         metavar="TARGET:MATCHER:PATTERN",
         help="add a JunkCleaner rule; may be repeated",
     )
+
+    inspect_parser = sub.add_parser("inspect", help="inspect TXT for candidate JunkRules")
+    inspect_parser.add_argument("input")
+    inspect_parser.add_argument("-o", "--output", required=True)
+    inspect_parser.add_argument("--encoding")
+    inspect_parser.set_defaults(func=inspect)
 
     validate_parser = sub.add_parser("validate", help="validate an EPUB archive")
     validate_parser.add_argument("epub")
