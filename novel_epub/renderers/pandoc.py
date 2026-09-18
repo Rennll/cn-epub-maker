@@ -77,12 +77,6 @@ def _markdown(book: Book) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _iter_chapters(book: Book):
-    for volume in book.volumes:
-        yield from ((volume, chapter) for chapter in volume.chapters)
-    yield from ((None, chapter) for chapter in book.chapters)
-
-
 def _validate_book(book: Book) -> None:
     sequences = [chapter.sequence for _volume, chapter in _iter_chapters(book)]
     if len(sequences) != len(set(sequences)):
