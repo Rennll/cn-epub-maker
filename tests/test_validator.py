@@ -57,7 +57,7 @@ def test_valid_epub_structure_passes(tmp_path: Path):
             "EPUB/text/ch000001.xhtml": "<html xmlns=\"http://www.w3.org/1999/xhtml\"><body><h1>Chapter</h1></body></html>",
         },
     )
-    assert validate_epub(path).errors == []
+    assert validate_epub(path) == []
 
 
 def test_missing_opf_target_is_reported(tmp_path: Path):
@@ -72,7 +72,7 @@ def test_missing_opf_target_is_reported(tmp_path: Path):
         opf=opf,
         files={"EPUB/nav.xhtml": NAV},
     )
-    errors = validate_epub(path).errors
+    errors = validate_epub(path)
     assert any("manifest target missing" in error for error in errors)
 
 
@@ -87,7 +87,7 @@ def test_spine_reference_must_exist_in_manifest(tmp_path: Path):
         opf=opf,
         files={"EPUB/nav.xhtml": NAV},
     )
-    errors = validate_epub(path).errors
+    errors = validate_epub(path)
     assert any("spine idref missing from manifest" in error for error in errors)
 
 
@@ -105,7 +105,7 @@ def test_nav_target_must_exist(tmp_path: Path):
         opf=opf,
         files={"EPUB/nav.xhtml": nav},
     )
-    errors = validate_epub(path).errors
+    errors = validate_epub(path)
     assert any("nav target missing" in error for error in errors)
 
 
@@ -113,7 +113,7 @@ def test_missing_container_is_reported(tmp_path: Path):
     path = tmp_path / "book.epub"
     with ZipFile(path, "w") as zf:
         zf.writestr("mimetype", "application/epub+zip")
-    errors = validate_epub(path).errors
+    errors = validate_epub(path)
     assert "missing required EPUB file: META-INF/container.xml" in errors
 
 
@@ -124,7 +124,7 @@ def test_invalid_opf_xml_is_reported(tmp_path: Path):
         opf="<package>",
         files={},
     )
-    errors = validate_epub(path).errors
+    errors = validate_epub(path)
     assert any("invalid content.opf" in error for error in errors)
 
 
@@ -140,7 +140,7 @@ def test_multiple_nav_items_are_reported(tmp_path: Path):
         opf=opf,
         files={"EPUB/nav1.xhtml": NAV, "EPUB/nav2.xhtml": NAV},
     )
-    errors = validate_epub(path).errors
+    errors = validate_epub(path)
     assert "EPUB must contain exactly one nav manifest item" in errors
 
 
@@ -151,5 +151,5 @@ def test_container_must_resolve_to_existing_opf(tmp_path: Path):
         container=container,
         opf="<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"3.0\" />",
     )
-    errors = validate_epub(path).errors
+    errors = validate_epub(path)
     assert any("container rootfile missing" in error for error in errors)
