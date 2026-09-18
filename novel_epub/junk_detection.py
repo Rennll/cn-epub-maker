@@ -26,9 +26,13 @@ _VARIABLES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("number", re.compile(r"\d+")),
 )
 _VARIABLE_PRIORITY = {name: index for index, (name, _) in enumerate(_VARIABLES)}
-_FORMAT_MARKER_PATTERN = re.compile(
-    r"(?:字數|字数|頁數|页数|更新|發布|发布|來源|来源|作者|網址|网址|版本|日期|時間|时间)"
-)
+_FAMILY_FORMAT_MARKERS: dict[str, re.Pattern[str]] = {
+    "number": re.compile(r"(?:字數|字数|頁數|页数|章節數|章节数|字數統計|字数统计)"),
+    "date": re.compile(r"(?:更新日期|更新時間|更新时間|发布日期|發布日期|更新日|出版日期|更新|日期)"),
+    "time": re.compile(r"(?:更新時間|更新时间|發布時間|发布时间|時間|时间)"),
+    "id": re.compile(r"(?:ID|Id|id|編號|编号|版本)"),
+    "url": re.compile(r"(?:網址|网址|來源|来源|連結|链接|URL|Url|url)"),
+}
 
 
 @dataclass(frozen=True)
@@ -156,7 +160,7 @@ def _make_groups(
             continue
         format_evidence = _has_format_evidence(families, pattern, values)
         evidence = ("repetition", "pattern", "format") if format_evidence else ("repetition", "pattern")
-        qualified = "number" not in families or format_evidence
+        qualified = format_evidence
         rule = JunkRule(scope, "regex", _pattern_to_regex(pattern)) if qualified else None
         groups.append(_make_group(scope, pattern, occurrences, evidence, rule, qualified))
     return groups
@@ -171,12 +175,14 @@ def _has_format_evidence(
     if not values:
         return False
 
-    if "number" in families and not _FORMAT_MARKER_PATTERN.search(pattern):
-        return False
-
+    # Qualification is family-aware: every detected variable family needs
+    # its own contextual marker. A marker for one family must not implicitly
+    # qualify a different family in the same pattern.
     for family in families:
-        if family == "number":
-            continue
+        marker = _FAMILY_FORMAT_MARKERS[family]
+        if not marker.search(pattern):
+            return False
+
         expression = dict(_VARIABLES)[family]
         observed = [match.group(0) for value in values for match in expression.finditer(value)]
         if not observed or not all(_observed_variable_has_format(family, value) for value in observed):
@@ -194,6 +200,8 @@ def _observed_variable_has_format(family: str, value: str) -> bool:
         return bool(re.search(r":|時\d{1,2}分", value))
     if family == "id":
         return bool(re.search(r"[A-Za-z]", value) and re.search(r"\d", value))
+    if family == "number":
+        return bool(re.search(r"\d+", value))
     return False
 
 

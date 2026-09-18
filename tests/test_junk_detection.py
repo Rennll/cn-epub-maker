@@ -134,3 +134,78 @@ def test_numeric_pattern_with_only_punctuation_is_not_qualified():
     assert group.qualified is False
     assert group.suggested_rule is None
     assert group.evidence == ("repetition", "pattern")
+
+
+def test_repeated_narrative_dates_are_not_qualified_without_date_context():
+    groups = detect_document(
+        build_physical_document(
+            [
+                "他在2026-09-18回到城裡。",
+                "正文",
+                "他在2026-09-19回到城裡。",
+            ]
+        )
+    )
+    group = next(group for group in groups if group.pattern == "他在<date>回到城裡。")
+    assert group.qualified is False
+    assert group.suggested_rule is None
+
+
+def test_repeated_update_dates_remain_qualified():
+    groups = detect_document(
+        build_physical_document(
+            [
+                "更新日期：2026-09-18",
+                "正文",
+                "更新日期：2026-09-19",
+            ]
+        )
+    )
+    group = next(group for group in groups if group.pattern == "更新日期：<date>")
+    assert group.qualified is True
+    assert group.suggested_rule is not None
+
+
+def test_repeated_narrative_times_are_not_qualified_without_time_context():
+    groups = detect_document(
+        build_physical_document(
+            [
+                "他在21:34回到城裡。",
+                "正文",
+                "他在08:12回到城裡。",
+            ]
+        )
+    )
+    group = next(group for group in groups if group.pattern == "他在<time>回到城裡。")
+    assert group.qualified is False
+    assert group.suggested_rule is None
+
+
+def test_repeated_update_times_remain_qualified():
+    groups = detect_document(
+        build_physical_document(
+            [
+                "更新時間：21:34",
+                "正文",
+                "更新時間：08:12",
+            ]
+        )
+    )
+    group = next(group for group in groups if group.pattern == "更新時間：<time>")
+    assert group.qualified is True
+    assert group.suggested_rule is not None
+
+
+def test_multi_variable_qualification_requires_each_family_marker():
+    groups = detect_document(
+        build_physical_document(
+            [
+                "更新日期：2026-09-18 21:34",
+                "正文",
+                "更新日期：2026-09-19 08:12",
+            ]
+        )
+    )
+    group = next(group for group in groups if group.pattern == "更新日期：<date> <time>")
+    assert group.qualified is False
+    assert group.suggested_rule is None
