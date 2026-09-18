@@ -94,6 +94,22 @@ def test_inspect_missing_source_does_not_create_output(tmp_path):
     assert not output.exists()
 
 
+def test_inspect_source_encoding_failure_does_not_create_output(tmp_path, monkeypatch):
+    source = tmp_path / "book.txt"
+    output = tmp_path / "junk-config.json"
+    source.write_bytes("中文".encode("utf-8"))
+
+    def fail_read_lines(_source, _encoding):
+        raise UnicodeDecodeError("utf-8", b"\x80", 0, 1, "invalid start byte")
+
+    monkeypatch.setattr(inspection, "read_lines", fail_read_lines)
+
+    with pytest.raises(UnicodeDecodeError):
+        inspect_source(source, output, encoding="ascii")
+
+    assert not output.exists()
+
+
 def test_inspect_detection_failure_does_not_create_output(tmp_path, monkeypatch):
     source = tmp_path / "book.txt"
     output = tmp_path / "junk-config.json"
