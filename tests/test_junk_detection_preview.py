@@ -50,7 +50,7 @@ def test_preview_matches_cleaner_block_rules():
     "matcher, pattern",
     [
         ("contains", "廣告"),
-        ("regex", r"^廣告\\n內容$"),
+        ("regex", r"^廣告\n內容$"),
     ],
 )
 def test_preview_matches_cleaner_block_contains_and_regex(matcher, pattern):
