@@ -26,6 +26,23 @@ def test_inspect_accept_writes_only_accepted_rules(tmp_path):
     }
 
 
+def test_inspect_skips_unqualified_numbered_headings(tmp_path):
+    source = tmp_path / "book.txt"
+    output = tmp_path / "junk-config.json"
+    source.write_text(
+        "第一章\n第1章\n正文\n第2章\n第3章\n結尾\n",
+        encoding="utf-8",
+    )
+
+    def unexpected_prompt(_):
+        raise AssertionError("unqualified numeric heading must not be offered for acceptance")
+
+    rules = inspect_source(source, output, input_fn=unexpected_prompt)
+
+    assert rules == ()
+    assert json.loads(output.read_text(encoding="utf-8")) == {"junk_rules": []}
+
+
 def test_inspect_skip_does_not_write_candidate(tmp_path):
     source = tmp_path / "book.txt"
     output = tmp_path / "junk-config.json"
@@ -100,7 +117,7 @@ def test_inspect_source_encoding_failure_does_not_create_output(tmp_path, monkey
     source.write_bytes("中文".encode("utf-8"))
 
     def fail_read_lines(_source, _encoding):
-        raise UnicodeDecodeError("utf-8", b"\x80", 0, 1, "invalid start byte")
+        raise UnicodeDecodeError("utf-8", b"\\x80", 0, 1, "invalid start byte")
 
     monkeypatch.setattr(inspection, "read_lines", fail_read_lines)
 
