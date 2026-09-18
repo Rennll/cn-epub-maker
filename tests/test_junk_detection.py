@@ -120,6 +120,29 @@ def test_repeated_line_with_date_and_time_uses_both_variables():
     )
 
 
+def test_repeated_block_with_date_and_time_uses_both_variables():
+    document = build_physical_document(
+        [
+            "更新時間：2026-09-18 21:34",
+            "",
+            "更新時間：2026-09-19 08:12",
+        ]
+    )
+
+    groups = detect_document(document)
+
+    block_groups = [
+        group
+        for group in groups
+        if group.scope == "block" and group.pattern == "更新時間：<date> <time>"
+    ]
+    assert len(block_groups) == 1
+    group = block_groups[0]
+    assert group.occurrences == (0, 1)
+    assert group.qualified is True
+    assert group.suggested_rule is not None
+
+
 def test_multi_variable_pattern_keeps_literal_skeleton_anchored():
     document = build_physical_document(
         [
