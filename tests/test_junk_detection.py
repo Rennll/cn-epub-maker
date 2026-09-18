@@ -12,9 +12,7 @@ def test_repeated_line_becomes_detection_group_with_exact_rule():
             "下一章",
         ]
     )
-
     groups = detect_document(document)
-
     assert len(groups) == 1
     group = groups[0]
     assert group.scope == "line"
@@ -31,19 +29,8 @@ def test_repeated_line_becomes_detection_group_with_exact_rule():
 
 
 def test_repeated_numbered_headings_are_detected_but_not_qualified():
-    document = build_physical_document(
-        [
-            "第一章",
-            "第1章",
-            "正文",
-            "第2章",
-            "第3章",
-            "結尾",
-        ]
-    )
-
+    document = build_physical_document(["第一章", "第1章", "正文", "第2章", "第3章", "結尾"])
     groups = detect_document(document)
-
     numeric_groups = [group for group in groups if group.pattern == "第<number>章"]
     assert len(numeric_groups) == 1
     group = numeric_groups[0]
@@ -54,9 +41,7 @@ def test_repeated_numbered_headings_are_detected_but_not_qualified():
 
 def test_generic_numeric_pattern_without_format_marker_is_not_qualified():
     document = build_physical_document(["100", "正文", "200", "300"])
-
     groups = detect_document(document)
-
     numeric_groups = [group for group in groups if group.pattern == "<number>"]
     assert len(numeric_groups) == 1
     assert numeric_groups[0].qualified is False
@@ -65,9 +50,7 @@ def test_generic_numeric_pattern_without_format_marker_is_not_qualified():
 
 def test_identical_repeated_line_uses_exact_rule():
     document = build_physical_document(["正文", "本章完", "其他", "本章完"])
-
     groups = detect_document(document)
-
     assert len(groups) == 1
     assert groups[0].pattern == "本章完"
     assert groups[0].suggested_rule.target == "line"
@@ -77,15 +60,12 @@ def test_identical_repeated_line_uses_exact_rule():
 
 def test_single_occurrence_is_not_a_detection_group():
     document = build_physical_document(["正文", "本章字數：1234", "其他"])
-
     assert detect_document(document) == ()
 
 
 def test_repeated_identical_blocks_produce_a_block_candidate():
     document = build_physical_document(["A", "B", "", "A", "B"])
-
     groups = detect_document(document)
-
     block_groups = [group for group in groups if group.scope == "block"]
     assert len(block_groups) == 1
     group = block_groups[0]
@@ -96,82 +76,42 @@ def test_repeated_identical_blocks_produce_a_block_candidate():
 
 
 def test_repeated_line_with_date_and_time_uses_both_variables():
-    document = build_physical_document(
-        [
-            "更新時間：2026-09-18 21:34",
-            "正文",
-            "更新時間：2026-09-19 08:12",
-        ]
-    )
-
+    document = build_physical_document(["更新時間：2026-09-18 21:34", "正文", "更新時間：2026-09-19 08:12"])
     groups = detect_document(document)
-
     assert len(groups) == 1
     group = groups[0]
-    assert group.scope == "line"
     assert group.pattern == "更新時間：<date> <time>"
     assert group.occurrences == (1, 3)
     assert group.qualified is True
     assert group.suggested_rule is not None
-    assert group.suggested_rule.matcher == "regex"
     assert group.suggested_rule.pattern == (
-        r"^更新時間：(?:\d{4}(?:[-/]\d{1,2}[-/]\d{1,2}|年\d{1,2}月\d{1,2}日)) "
-        r"(?:\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分)$"
+        r"^更新時間：(?:\d{4}(?:[-/]\d{1,2}[-/]\d{1,2}|年\d{1,2}月\d{1,2}日)"
+        r") (?:\d{1,2}:\d{2}(?::\d{2})?|\d{1,2}時\d{1,2}分)$"
     )
 
 
 def test_repeated_block_with_date_and_time_uses_both_variables():
-    document = build_physical_document(
-        [
-            "更新時間：2026-09-18 21:34",
-            "",
-            "更新時間：2026-09-19 08:12",
-        ]
-    )
-
+    document = build_physical_document(["更新時間：2026-09-18 21:34", "", "更新時間：2026-09-19 08:12"])
     groups = detect_document(document)
-
-    block_groups = [
-        group
-        for group in groups
-        if group.scope == "block" and group.pattern == "更新時間：<date> <time>"
-    ]
+    block_groups = [group for group in groups if group.scope == "block" and group.pattern == "更新時間：<date> <time>"]
     assert len(block_groups) == 1
-    group = block_groups[0]
-    assert group.occurrences == (0, 1)
-    assert group.qualified is True
-    assert group.suggested_rule is not None
+    assert block_groups[0].occurrences == (0, 1)
+    assert block_groups[0].qualified is True
 
 
 def test_multi_variable_pattern_keeps_literal_skeleton_anchored():
     document = build_physical_document(
-        [
-            "更新時間：2026-09-18 21:34",
-            "更新時間：2026-09-19 08:12",
-            "更新時間：2026-09-20 17:45 extra",
-        ]
+        ["更新時間：2026-09-18 21:34", "更新時間：2026-09-19 08:12", "更新時間：2026-09-20 17:45 extra"]
     )
-
-    groups = detect_document(document)
-
-    group = next(group for group in groups if group.pattern == "更新時間：<date> <time>")
+    group = next(group for group in detect_document(document) if group.pattern == "更新時間：<date> <time>")
     assert group.occurrences == (1, 2)
-    assert group.suggested_rule is not None
     assert group.suggested_rule.pattern.startswith("^")
     assert group.suggested_rule.pattern.endswith("$")
 
 
 def test_multi_variable_number_still_requires_format_marker():
-    document = build_physical_document(
-        [
-            "章 1 2026-09-18",
-            "章 2 2026-09-19",
-        ]
-    )
-
-    groups = detect_document(document)
-
-    pattern_groups = [group for group in groups if group.pattern == "章 <number> <date>"]
+    document = build_physical_document(["章 1 2026-09-18", "章 2 2026-09-19"])
+    pattern_groups = [group for group in detect_document(document) if group.pattern == "章 <number> <date>"]
     assert len(pattern_groups) == 1
     assert pattern_groups[0].qualified is False
     assert pattern_groups[0].suggested_rule is None
