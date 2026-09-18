@@ -123,4 +123,4 @@ def test_normal_execution_does_not_depend_on_inspection():
             imported.add(node.module)
         elif isinstance(node, ast.Import):
             imported.update(alias.name for alias in node.names)
-    assert "novel_epub.inspection" not in imported
+    assert "novel_epub.junk_detection" not in imported
