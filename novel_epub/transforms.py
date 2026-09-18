@@ -112,40 +112,36 @@ class JunkCleaner:
 
     @staticmethod
     def _cleanup_removed_blank_runs(lines: list[tuple[str, bool]]) -> str:
-        """Collapse blank runs joined by a removed line/block to one source run."""
+        """Collapse blank runs joined by removed line/block markers."""
         out: list[str] = []
         i = 0
         while i < len(lines):
-            if not lines[i][1]:
+            if not lines[i][1] and lines[i][0].strip() != "":
                 out.append(lines[i][0])
                 i += 1
                 continue
 
-            # A removed item can join the blank run on its left with the one
-            # on its right. Preserve the larger original run rather than
-            # allowing the two runs to accumulate.
             start = i
-            while start > 0 and lines[start - 1][0].strip() == "" and not lines[start - 1][1]:
-                start -= 1
-
-            end = i + 1
-            while end < len(lines) and (
-                lines[end][1] or lines[end][0].strip() == ""
+            has_removed = False
+            max_blank_run = 0
+            blank_run = 0
+            while i < len(lines) and (
+                lines[i][1] or lines[i][0].strip() == ""
             ):
-                end += 1
+                removed = lines[i][1]
+                if removed:
+                    has_removed = True
+                    max_blank_run = max(max_blank_run, blank_run)
+                    blank_run = 0
+                else:
+                    blank_run += 1
+                i += 1
+            max_blank_run = max(max_blank_run, blank_run)
 
-            left_blanks = i - start
-            right_blanks = sum(
-                1
-                for line, removed in lines[i + 1:end]
-                if not removed and line.strip() == ""
-            )
-            keep = max(left_blanks, right_blanks)
-            if start < i:
-                # Remove the already-emitted left blank lines from the output.
-                del out[-left_blanks:]
-            out.extend("" for _ in range(keep))
-            i = end
+            if has_removed:
+                out.extend([""] * max_blank_run)
+            else:
+                out.extend(lines[index][0] for index in range(start, i))
 
         return "\n".join(out)
 
