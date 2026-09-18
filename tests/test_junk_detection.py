@@ -142,11 +142,11 @@ def test_repeated_narrative_dates_are_not_qualified_without_date_context():
             [
                 "他在2026-09-18回到城裡。",
                 "正文",
-                "他在2026-09-19離開城裡。",
+                "他在2026-09-19回到城裡。",
             ]
         )
     )
-    group = next(group for group in groups if group.pattern == "他在<date>回到城裡。" or group.pattern == "他在<date>離開城裡。")
+    group = next(group for group in groups if group.pattern == "他在<date>回到城裡。")
     assert group.qualified is False
     assert group.suggested_rule is None
 
@@ -172,11 +172,11 @@ def test_repeated_narrative_times_are_not_qualified_without_time_context():
             [
                 "他在21:34回到城裡。",
                 "正文",
-                "他在08:12離開城裡。",
+                "他在08:12回到城裡。",
             ]
         )
     )
-    group = next(group for group in groups if group.pattern == "他在<time>回到城裡。" or group.pattern == "他在<time>離開城裡。")
+    group = next(group for group in groups if group.pattern == "他在<time>回到城裡。")
     assert group.qualified is False
     assert group.suggested_rule is None
 
