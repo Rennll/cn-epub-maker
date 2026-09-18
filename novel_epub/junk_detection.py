@@ -162,16 +162,21 @@ def _has_format_evidence(
     pattern: str,
     values: list[str],
 ) -> bool:
-    """Return true only when the observed content contains concrete format evidence."""
+    """Return true only when each variable family has concrete format evidence."""
     if not values:
         return False
-    if "number" in families and len(families) == 1:
-        return bool(_FORMAT_MARKER_PATTERN.search(pattern))
-    return all(
-        _observed_variable_has_format(family, value)
-        for family in families
-        for value in values
-    )
+
+    if "number" in families and not _FORMAT_MARKER_PATTERN.search(pattern):
+        return False
+
+    for family in families:
+        if family == "number":
+            continue
+        expression = dict(_VARIABLES)[family]
+        observed = [match.group(0) for value in values for match in expression.finditer(value)]
+        if not observed or not all(_observed_variable_has_format(family, value) for value in observed):
+            return False
+    return True
 
 
 def _observed_variable_has_format(family: str, value: str) -> bool:
