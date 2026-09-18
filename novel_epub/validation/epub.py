@@ -105,7 +105,7 @@ def validate_epub(path: str | Path) -> ValidationReport:
     errors: list[str] = []
     path = Path(path)
     if not path.is_file():
-        return [f"EPUB not found: {path}"]
+        return ValidationReport(errors=[f"EPUB not found: {path}"])
     try:
         with ZipFile(path) as zf:
             names = zf.namelist()
