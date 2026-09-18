@@ -98,7 +98,8 @@ def test_cli_inspect_config_feeds_normal_build_and_junk_cleaner(tmp_path, monkey
 
     assert epub.read_bytes() == b"fake epub"
     assert "本章完" not in captured["paragraphs"]
-    assert "正文" in captured["paragraphs"]
-    assert "其他正文" in captured["paragraphs"]
+    rendered_text = "\n".join(captured["paragraphs"])
+    assert "正文" in rendered_text
+    assert "其他正文" in rendered_text
     assert source.read_text(encoding="utf-8") == original
 
