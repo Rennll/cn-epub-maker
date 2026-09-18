@@ -44,11 +44,11 @@ class TransformationPolicy:
 
 @dataclass(frozen=True)
 class ConversionPolicy:
-    renderer: RendererName
     encoding: str
     parser: ParserPolicy
     transformations: TransformationPolicy
     full_source: bool
+    renderer: RendererName = "pandoc"
 
 
 @dataclass(frozen=True)
