@@ -2,45 +2,199 @@
 
 ## Current Context
 
-The V2.x architecture refactor is complete, including DD-04 Intermediate semantics and the #31 Intermediate chapter-manifest cleanup.
+The repository is now past the main V2.x architecture refactor and the inspection hardening sequence.
 
-The project is now in the validation and release-correctness phase. Focus on verifying existing contracts in real EPUB output and resolving remaining operational decisions.
+The current main baseline is:
 
-GitHub Issues are the authoritative work queue. Do not duplicate the issue backlog or create a second roadmap here.
+`9a40524b0ec93baeb94f678efc080d25cfd0bf75`
 
-## Implementation Queue Rules
+The recent completed work includes:
+
+- #60 Junk Detection baseline
+- #67 parser refactor
+- #68 renderer / EPUB packaging separation
+- #69 validation split
+- #75 JunkCleaner blank-line cleanup
+- #81 candidate qualification / false-positive protection
+- #82 inspection output lifecycle / failure safety
+- #83 Rule Preview ↔ JunkCleaner integration invariant
+- #84 deterministic multi-variable pattern abstraction
+- #94 / #95 inspection CLI → generated JSON config → normal build E2E coverage
+- #96 repository-wide architecture contract
+- #97 architecture boundary regression tests
+
+The current architecture should be treated as an established baseline rather than an invitation to start another broad refactor.
+
+The public inspection workflow is now:
+
+```text
+novel-epub inspect source.txt --output junk-config.json
+    ↓
+Detection
+    ↓
+Candidate qualification
+    ↓
+Suggested JunkRule
+    ↓
+Rule Preview
+    ↓
+User accept / edit / skip
+    ↓
+JSON JunkRule config
+    ↓
+normal novel-epub build --config junk-config.json
+    ↓
+JunkCleaner
+```
+
+Normal build remains separate:
+
+```text
+Raw TXT
+  ↓
+Representation Normalization
+  ↓
+JunkCleaner → OpenCC → Punctuation
+  ↓
+PhysicalDocument
+  ↓
+Document Analysis / Formatting Model
+  ↓
+Parser / Semantic Inference
+  ↓
+Book
+  ↓
+Book Validation
+  ↓
+Renderer
+  ↓
+EPUB
+  ↓
+EPUB Validation
+```
+
+Inspection is read-only and does not implicitly run during normal builds.
+
+## GitHub Issue State
+
+GitHub Issues remain the authoritative work queue. This document must not become a second priority tracker.
+
+At the time of this handoff, the remaining open issues are:
+
+### #71 — Architecture: second-stage refactoring roadmap
+
+This is a tracking issue, not an implementation task.
+
+Its historical sequence is now substantially complete. In particular, #81, #82, #83, #84, and #73 are closed. Do not treat the old sequence in #71 as an active dependency chain.
+
+If #71 is revisited, update its body to reflect the current state rather than reopening completed architecture work.
+
+### #70 — Preserve source-line provenance through transformations
+
+This remains intentionally deferred.
+
+The native XHTML/EPUB 3 work in #73 is now complete, so the original dependency condition has been reached. However, #70 should still not be implemented merely because its dependency is satisfied.
+
+Only start #70 when there is a concrete debugging, audit, reporting, or user-facing provenance requirement that justifies adding provenance to the transformation pipeline.
+
+Do not introduce source provenance preemptively.
+
+## Current Work Queue Rules
 
 1. Inspect the current open GitHub Issues before choosing work.
-2. Work from the highest-priority unblocked issue.
-3. Do not work on an issue marked `status:blocked` while any issue in its `Blocked by` section remains incomplete.
-4. If multiple unblocked issues have the same priority, prefer the issue that is upstream in the dependency chain.
-5. Read the issue body, its direct dependencies, and referenced canonical docs before implementation.
-6. Use Issue state as completion state. Do not create `status:ready`, `status:in-progress`, or `status:done` labels as a second state system.
-7. Keep dependency metadata in the issue body using the `## Dependencies` / `### Blocked by` / `### Blocking` convention. Record only direct dependencies.
-8. After implementation, run focused tests and relevant end-to-end regression tests before closing the issue.
-9. When a blocker is closed, remove `status:blocked` from issues that are now unblocked and keep their dependency sections accurate.
-10. Update canonical documentation only when a stable contract or decision changes.
+2. Treat GitHub Issue state and issue bodies as authoritative.
+3. Do not treat historical order numbers in old issue text as the current priority system.
+4. Do not work on a deferred issue unless its reopen condition is actually satisfied.
+5. Read the issue body, direct dependencies, and referenced canonical docs before implementation.
+6. Keep dependency metadata in issues accurate; do not recreate dependency state in this document.
+7. After implementation, run focused tests and relevant end-to-end regression tests before closing the issue.
+8. Update canonical documentation when a stable contract or architectural decision changes.
+9. Do not create a new architecture issue merely to continue the completed V2.x refactor.
+10. Prefer a concrete product/correctness requirement over speculative infrastructure.
 
-## Current Work Queue
+## Established Architecture Boundaries
 
-Do not maintain a static priority chain in this document. Issue state, priority, dependencies, and current requirements are authoritative in GitHub and must be inspected at the start of each session.
+The following boundaries are now protected by `docs/architecture-contract.md` and regression tests:
 
-The current repository state includes completed architecture work such as #31. Do not treat closed issues or their historical dependency chains as active blockers.
+1. Physical source representation and semantic `Book` representation remain separate.
+2. Detection observes physical lines/blocks and does not depend on semantic Parser structures.
+3. Detection never mutates source content or executes `JunkCleaner`.
+4. SuggestedRule always uses the canonical `JunkRule` model.
+5. Rule Preview and JunkCleaner share the same matching semantics.
+6. Inspection output is ordinary build configuration, not inspection history.
+7. Normal build does not implicitly invoke inspection.
+8. Configuration resolution produces an immutable `ConversionRequest` and does not execute conversion.
+9. Transformation order remains `JunkCleaner → OpenCC → Punctuation`.
+10. Intermediate remains an artifact around the canonical `Book`, not a second semantic model.
+11. Parser owns semantic inference; Renderer consumes `Book` rather than reparsing source text.
+12. Book validation and EPUB validation remain separate concerns.
+13. Full Source Mode does not bypass the Document Analysis / Parser input contract.
+14. Configuration rule ordering is preserved through resolution and execution.
 
-Parser-specific and validation work should not be artificially blocked unless the issue itself establishes a direct dependency.
+When a future change crosses one of these boundaries, update the relevant contract and tests first.
 
-## Session Guidance
+## Inspection / Junk Detection Notes
 
-When starting a new session:
+The inspection subsystem is now considered functionally integrated, not merely experimental.
 
-1. Inspect the current open GitHub Issues before choosing work.
-2. Check `docs/deferred-decision-audit.md` when an issue involves an unresolved design decision.
-3. Read the issue's dependency metadata before implementation.
-4. Preserve current architecture boundaries and non-goals unless new evidence or requirements justify reopening them.
-5. For EPUB-generation work, trace the current end-to-end path from `Book` through rendering, package assembly, and validation before proposing implementation changes.
+Important current contracts:
+
+- Detection is observation, not classification or removal.
+- Candidate qualification is intentionally conservative.
+- Numeric/structured patterns must not become destructive SuggestedRules from repetition alone.
+- Pattern abstraction remains deterministic and narrow.
+- Multi-variable patterns are supported without turning the detector into a general parser.
+- Preview is read-only and uses canonical JunkRule matching semantics.
+- Accepted inspection output contains only final JunkRules.
+- Detection evidence, preview data, acceptance history, and provenance are not stored in the formal JunkRule config.
+- Failed inspection runs must not leave a misleading final output file.
+- Existing output files remain protected from overwrite.
+
+The relevant canonical documents are:
+
+- `docs/architecture-contract.md`
+- `docs/junk-detection-contract.md`
+- `docs/junk-rule-configuration.md`
+- `docs/physical-document-and-formatting-contract.md`
+
+## Deferred Decisions
+
+Before reopening an architectural question, check:
+
+`docs/deferred-decision-audit.md`
+
+Current frozen decisions include:
+
+- no automatic chapter renumbering;
+- no implicit generic semantic chapter inference;
+- no punctuation/sentence-length paragraph splitting;
+- no global Arabic numeral conversion.
+
+These should not be reintroduced as convenience heuristics.
+
+## Next Session Guidance
+
+At the beginning of the next session:
+
+1. Inspect the live open GitHub Issues again; do not rely on this file as a static roadmap.
+2. Confirm whether #70 has acquired a concrete provenance/reporting requirement.
+3. If not, do not implement #70 solely because it is open.
+4. If a new product or correctness issue exists, create or work from that issue instead of extending the old architecture roadmap.
+5. Preserve the current physical/semantic, inspection/transform, configuration/execution, parser/renderer, and validation boundaries.
+6. For EPUB-generation changes, trace the full path from `Book` through rendering, packaging, and validation before changing architecture.
+7. Prefer focused regression tests and realistic fixtures over broad refactors.
 
 ## Handoff Notes
 
-Use this section only for session-specific context that cannot be recovered from the repository, GitHub Issues, or decision register.
+Use this section only for session-specific context that cannot be recovered from the repository or GitHub Issues.
 
-Currently: none.
+Current session completed:
+
+- architecture contract formalized;
+- architecture boundary regression tests added;
+- inspection CLI-to-build workflow covered end-to-end;
+- no known architecture defect requiring another refactor.
+
+Current recommendation for the next session:
+
+Do not start another architecture cleanup by default. First inspect the live issue queue and only proceed when there is a concrete requirement or correctness gap to address.
