@@ -1,24 +1,24 @@
 # Next Session Handoff
 
-這份文件只記錄無法直接從 GitHub Issues、commit history 或其他 canonical docs 得知，但下一個 session 可能需要知道的上下文。
+This document records only session-specific context that cannot be reliably recovered from GitHub Issues, commit history, or canonical documentation, but may be useful in the next session.
 
 ## Current Session
 
-本 session 已完成：
+Completed during this session:
 
-- architecture contract 與 architecture boundary regression tests。
-- inspection CLI → JSON config → normal build 的 E2E coverage。
+- Formalized the architecture contract and added architecture boundary regression tests.
+- Added end-to-end coverage for the inspection CLI → JSON configuration → normal build workflow.
 
-這些內容已由 repository history / tests / canonical docs 保存，不在此重複細節。
+These details are already preserved by the repository history, tests, and canonical documentation and are not repeated here.
 
 ## Next Session
 
-開始工作前先查看當時的 open Issues。
+Start by checking the current open GitHub Issues.
 
-不要因為上一個 session 做了大量 architecture work，就預設下一步仍然需要 architecture refactor。若沒有新的具體需求或 correctness gap，維持目前架構即可。
+Do not assume that another architecture refactor is needed simply because the previous session involved substantial architecture work. If there is no new concrete requirement or correctness gap, keep the current architecture unchanged.
 
-若要重新處理已經 deferred 的工作，先確認 Issue 本身記載的 reopen condition 是否已成立。
+Before resuming any deferred work, verify that the reopen condition documented in the corresponding Issue has actually been met.
 
 ## Session-specific Notes
 
-目前沒有其他無法從 repository、Issues 或 canonical docs 恢復的重要資訊。
+There is currently no other session-specific context that cannot be recovered from the repository, Issues, or canonical documentation.
