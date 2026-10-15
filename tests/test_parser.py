@@ -252,7 +252,6 @@ def test_parse_document_uses_explicit_stages_without_changing_boundary_objects()
     assert result.book.chapters[0].number == 1
 
 
-
 def test_chapters_before_first_volume_keep_source_order_including_extra_chapters():
     result = parse_lines([
         "第1章 A",
@@ -265,6 +264,9 @@ def test_chapters_before_first_volume_keep_source_order_including_extra_chapters
     ], title="書", author="作者")
 
     chapters = list(result.book.iter_chapters())
+    assert len(result.book.chapters) == 2
+    assert len(result.book.volumes) == 1
+    assert result.book.volumes[0].chapters[0].label == "第2章"
     assert [(chapter.sequence, chapter.label) for chapter in chapters] == [
         (1, "第1章"),
         (2, "番外1"),
