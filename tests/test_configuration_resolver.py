@@ -13,7 +13,7 @@ def test_resolver_applies_application_defaults():
     )
 
     assert request.source == Path("book.txt")
-    assert request.destination == Path("書名_作者.epub")
+    assert request.destination is None
     assert request.destination_mode == "automatic"
     assert request.book_metadata.title == "書名"
     assert request.book_metadata.author == "作者"
