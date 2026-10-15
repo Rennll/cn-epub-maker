@@ -70,18 +70,32 @@ def legacy_transform(text: str) -> str:
 def make_input(size_mb: int, url_count: int) -> str:
     target_chars = size_mb * 1024 * 1024
     urls = [f"https://example.com/chapter/{i}?q=a,b" for i in range(url_count)]
+    separator = " 中文, "
     filler = "這是測試正文, 用來量測標點轉換效能。English, too! "
+    fixed_chars = sum(map(len, urls)) + len(separator) * url_count
+    remaining = target_chars - fixed_chars
+    if remaining < 0:
+        raise ValueError(
+            f"{url_count} URLs and separators exceed the requested {target_chars:,} characters"
+        )
+
+    # Distribute the exact remaining character budget across the slots before,
+    # between, and after URLs, so URL lengths are counted rather than deducted
+    # from a budget that was already allocated to filler.
+    slot_count = url_count + 1
+    base, extra = divmod(remaining, slot_count)
+
+    def filler_of_length(length: int) -> str:
+        return (filler * (length // len(filler) + 1))[:length]
+
     chunks: list[str] = []
-    remaining = target_chars
     for index, url in enumerate(urls):
-        slots_left = len(urls) - index + 1
-        chunk_len = max(0, remaining // slots_left)
-        chunk = (filler * (chunk_len // len(filler) + 1))[:chunk_len]
-        chunks.extend((chunk, url, " 中文, "))
-        remaining -= len(chunk) + len(url) + len(" 中文, ")
-    if remaining > 0:
-        chunks.append((filler * (remaining // len(filler) + 1))[:remaining])
-    return "".join(chunks)
+        slot_length = base + (1 if index < extra else 0)
+        chunks.extend((filler_of_length(slot_length), url, separator))
+    chunks.append(filler_of_length(base + (1 if url_count < extra else 0)))
+    result = "".join(chunks)
+    assert len(result) == target_chars
+    return result
 
 
 def timed(label: str, function, text: str) -> tuple[str, float, str]:
