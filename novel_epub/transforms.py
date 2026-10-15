@@ -256,13 +256,12 @@ class PunctuationTransformer:
         return (char.isascii() and char.isalnum()) or cls._is_chinese(char)
 
     def transform(self, text: str) -> TransformResult:
-        protected = {
-            match.span(): match.group(0)
+        # Index protected spans by start offset once. Scanning every span for
+        # every character made this loop O(len(text) * number_of_spans).
+        protected_by_start = {
+            match.start(): match.group(0)
             for match in self._URL_OR_EMAIL.finditer(text)
         }
-        # Index spans by their start offset once. Scanning every protected span
-        # for every character made this loop O(len(text) * number_of_spans).
-        protected_by_start = {start: value for (start, _), value in protected.items()}
         converted: list[str] = []
         chinese_context = False
         i = 0
