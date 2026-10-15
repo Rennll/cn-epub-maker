@@ -62,18 +62,17 @@ def _markdown(book: Book) -> str:
     lines: list[str] = []
     for paragraph in book.preamble:
         lines.extend([_escape_markdown(paragraph.text), ""])
-    if book.volumes:
-        for volume in book.volumes:
-            volume_text = f"{volume.label} {volume.title}".rstrip()
-            lines.extend([f"# {_escape_markdown(volume_text)}", ""])
-            for chapter in volume.chapters:
-                lines.extend([_chapter_heading(chapter, 2), ""])
-                for paragraph in chapter.paragraphs:
-                    lines.extend([_escape_markdown(paragraph.text), ""])
-    for chapter in book.chapters:
+    for chapter in sorted(book.chapters, key=lambda c: c.sequence):
         lines.extend([_chapter_heading(chapter), ""])
         for paragraph in chapter.paragraphs:
             lines.extend([_escape_markdown(paragraph.text), ""])
+    for volume in book.volumes:
+        volume_text = f"{volume.label} {volume.title}".rstrip()
+        lines.extend([f"# {_escape_markdown(volume_text)}", ""])
+        for chapter in sorted(volume.chapters, key=lambda c: c.sequence):
+            lines.extend([_chapter_heading(chapter, 2), ""])
+            for paragraph in chapter.paragraphs:
+                lines.extend([_escape_markdown(paragraph.text), ""])
     return "\n".join(lines).rstrip() + "\n"
 
 
