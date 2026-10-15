@@ -28,9 +28,14 @@ class EpubPackagingError(Exception):
 
 
 def _iter_chapters(book: Book):
-    for volume in book.volumes:
-        yield from ((volume, chapter) for chapter in volume.chapters)
-    yield from ((None, chapter) for chapter in book.chapters)
+    """Yield chapters in canonical Book order while retaining their volume."""
+    volumes_by_sequence = {
+        chapter.sequence: volume
+        for volume in book.volumes
+        for chapter in volume.chapters
+    }
+    for chapter in book.iter_chapters():
+        yield volumes_by_sequence.get(chapter.sequence), chapter
 
 
 def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
@@ -41,13 +46,16 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
     groups: list[str] = []
     if book.preamble:
         groups.append('<li><a href="text/preamble.xhtml">前言</a></li>')
-    if book.volumes:
-        for volume in book.volumes:
-            label = escape(f"{volume.label} {volume.title}".rstrip())
-            children = "".join(chapter_li(ch) for ch in volume.chapters)
-            groups.append(f"<li><span>{label}</span><ol>{children}</ol></li>")
-    if book.chapters:
-        groups.extend(chapter_li(chapter) for chapter in book.chapters)
+    structural_groups: list[tuple[int, int, str]] = []
+    for volume_index, volume in enumerate(book.volumes):
+        label = escape(f"{volume.label} {volume.title}".rstrip())
+        children = "".join(chapter_li(ch) for ch in sorted(volume.chapters, key=lambda c: c.sequence))
+        markup = f"<li><span>{label}</span><ol>{children}</ol></li>"
+        first_sequence = min((ch.sequence for ch in volume.chapters), default=float("inf"))
+        structural_groups.append((first_sequence, volume_index, markup))
+    for chapter in book.chapters:
+        structural_groups.append((chapter.sequence, len(book.volumes), chapter_li(chapter)))
+    groups.extend(markup for _sequence, _tie_breaker, markup in sorted(structural_groups))
 
     title = escape(book.title)
     language = escape(book.language)
