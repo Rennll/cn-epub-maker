@@ -231,7 +231,6 @@ def test_epub_heading_text_is_literal(tmp_path):
 
 
 
-
 def test_epub_spine_and_nav_keep_top_level_chapters_before_later_volumes(tmp_path):
     _require_pandoc()
     output = tmp_path / "book.epub"
@@ -267,3 +266,32 @@ def test_epub_spine_and_nav_keep_top_level_chapters_before_later_volumes(tmp_pat
         assert nav_links == ["text/ch000001.xhtml", "text/ch000002.xhtml"]
         nav_text = " ".join(nav.itertext())
         assert nav_text.index("第一章 卷前") < nav_text.index("第一卷 卷一")
+
+
+def test_epub_nav_keeps_empty_volumes_in_declared_order(tmp_path):
+    book = Book(
+        title="空卷順序測試",
+        author="測試作者",
+        language="zh-TW",
+        chapters=[
+            Chapter(sequence=1, number=1, label="第一章", title="卷前", paragraphs=[Paragraph(text="卷前內容")]),
+        ],
+        volumes=[
+            Volume(sequence=1, number="1", label="第一卷", title="空卷"),
+            Volume(
+                sequence=2,
+                number="2",
+                label="第二卷",
+                title="有內容",
+                chapters=[
+                    Chapter(sequence=2, number=2, label="第二章", title="卷內", paragraphs=[Paragraph(text="卷內內容")]),
+                ],
+            ),
+        ],
+    )
+    from novel_epub.renderers.epub import _nav_xhtml
+
+    nav = ET.fromstring(_nav_xhtml(book, {1: "text/ch000001.xhtml", 2: "text/ch000002.xhtml"}))
+    nav_text = " ".join(nav.itertext())
+    assert nav_text.index("第一章 卷前") < nav_text.index("第一卷 空卷")
+    assert nav_text.index("第一卷 空卷") < nav_text.index("第二卷 有內容")
