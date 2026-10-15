@@ -103,3 +103,37 @@ def test_cli_inspect_config_feeds_normal_build_and_junk_cleaner(tmp_path, monkey
     assert "其他正文" in rendered_text
     assert source.read_text(encoding="utf-8") == original
 
+
+def test_cli_build_sanitizes_automatic_filename_for_path_separator_title(
+    tmp_path, monkeypatch, capsys
+):
+    source = tmp_path / "source.txt"
+    source.write_text("第一章\n正文\n", encoding="utf-8")
+    monkeypatch.setitem(configuration_resolver._DEFAULTS, "renderer", "native")
+    monkeypatch.setattr(
+        execution,
+        "validate_epub",
+        lambda _path: SimpleNamespace(ok=True, errors=[]),
+    )
+
+    def fake_render(_self, _book, output):
+        output.write_bytes(b"fake epub")
+        return output
+
+    monkeypatch.setattr(execution.NativeRenderer, "render", fake_render)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "novel-epub", "build", str(source),
+            "--title", "Fate/Zero", "--author", "作者",
+            "--no-opencc", "--no-punctuation",
+        ],
+    )
+
+    assert cli.main() == 0
+    output = tmp_path / "Fate／Zero_作者.epub"
+    assert output.read_bytes() == b"fake epub"
+    assert (
+        "automatic output filename sanitized: Fate／Zero_作者.epub"
+        in capsys.readouterr().err
+    )

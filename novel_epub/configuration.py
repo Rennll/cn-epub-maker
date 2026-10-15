@@ -55,7 +55,7 @@ class ConversionPolicy:
 class ConversionRequest:
     source: Path
     book_metadata: BookMetadata
-    destination: Path
+    destination: Path | None
     policy: ConversionPolicy
     destination_mode: DestinationMode = "explicit"
 

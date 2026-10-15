@@ -13,7 +13,7 @@ def test_resolver_applies_application_defaults():
     )
 
     assert request.source == Path("book.txt")
-    assert request.destination == Path("書名_作者.epub")
+    assert request.destination is None
     assert request.destination_mode == "automatic"
     assert request.book_metadata.title == "書名"
     assert request.book_metadata.author == "作者"
@@ -25,6 +25,15 @@ def test_resolver_applies_application_defaults():
     assert request.policy.transformations.punctuation_enabled is True
     assert request.policy.transformations.junk_cleaner.rules == ()
     assert request.policy.full_source is False
+
+
+def test_automatic_destination_does_not_build_path_from_unsanitized_title():
+    request = resolve_conversion_request(
+        {"source": "book.txt", "title": "Fate/Zero", "author": "作者"}
+    )
+
+    assert request.destination is None
+    assert request.destination_mode == "automatic"
 
 
 def test_explicit_application_defaults_override_built_in_defaults():
