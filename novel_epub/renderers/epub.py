@@ -46,16 +46,14 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
     groups: list[str] = []
     if book.preamble:
         groups.append('<li><a href="text/preamble.xhtml">前言</a></li>')
-    structural_groups: list[tuple[int, int, str]] = []
-    for volume_index, volume in enumerate(book.volumes):
+    # The parser assigns all top-level chapters before the first volume.
+    # Preserve that structure directly instead of sorting groups by chapter
+    # sequence, which cannot place empty volumes correctly.
+    groups.extend(chapter_li(chapter) for chapter in sorted(book.chapters, key=lambda c: c.sequence))
+    for volume in book.volumes:
         label = escape(f"{volume.label} {volume.title}".rstrip())
         children = "".join(chapter_li(ch) for ch in sorted(volume.chapters, key=lambda c: c.sequence))
-        markup = f"<li><span>{label}</span><ol>{children}</ol></li>"
-        first_sequence = min((ch.sequence for ch in volume.chapters), default=float("inf"))
-        structural_groups.append((first_sequence, volume_index, markup))
-    for chapter in book.chapters:
-        structural_groups.append((chapter.sequence, len(book.volumes), chapter_li(chapter)))
-    groups.extend(markup for _sequence, _tie_breaker, markup in sorted(structural_groups))
+        groups.append(f"<li><span>{label}</span><ol>{children}</ol></li>")
 
     title = escape(book.title)
     language = escape(book.language)
