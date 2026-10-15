@@ -7,7 +7,7 @@ from xml.etree import ElementTree as ET
 import pytest
 
 from novel_epub.models import Book, Chapter, Paragraph, ParagraphBoundary, Volume
-from novel_epub.renderers.pandoc import render
+from novel_epub.renderers.pandoc import _markdown, render
 
 
 XHTML_NS = "http://www.w3.org/1999/xhtml"
@@ -230,7 +230,6 @@ def test_epub_heading_text_is_literal(tmp_path):
         assert "卷*一 卷_[二] $三$ ^四^ =五= <六> & 七" in nav_text
 
 
-
 def test_epub_spine_and_nav_keep_top_level_chapters_before_later_volumes(tmp_path):
     _require_pandoc()
     output = tmp_path / "book.epub"
@@ -295,3 +294,36 @@ def test_epub_nav_keeps_empty_volumes_in_declared_order(tmp_path):
     nav_text = " ".join(nav.itertext())
     assert nav_text.index("第一章 卷前") < nav_text.index("第一卷 空卷")
     assert nav_text.index("第一卷 空卷") < nav_text.index("第二卷 有內容")
+
+
+
+def test_epub_nav_places_trailing_empty_volume_after_previous_volume():
+    book = Book(
+        title="尾端空卷順序測試",
+        author="測試作者",
+        language="zh-TW",
+        volumes=[
+            Volume(
+                sequence=1,
+                number="1",
+                label="第一卷",
+                title="有內容",
+                chapters=[
+                    Chapter(sequence=1, number=1, label="第一章", title="卷內", paragraphs=[]),
+                ],
+            ),
+            Volume(sequence=2, number="2", label="第二卷", title="尾端空卷"),
+        ],
+    )
+    from novel_epub.renderers.epub import _nav_xhtml
+
+    nav = ET.fromstring(_nav_xhtml(book, {1: "text/ch000001.xhtml"}))
+    nav_text = " ".join(nav.itertext())
+    assert nav_text.index("第一卷 有內容") < nav_text.index("第二卷 尾端空卷")
+
+
+def test_pandoc_markdown_follows_canonical_chapter_sequence():
+    book = _book_with_preamble()
+    markdown = _markdown(book)
+    assert markdown.index("第一章 開始") < markdown.index("第二章 繼續")
+    assert markdown.index("第二章 繼續") < markdown.index("第三章 卷外章節")
