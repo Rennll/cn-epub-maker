@@ -46,9 +46,11 @@ class Book:
     chapters: list[Chapter] = field(default_factory=list)
 
     def iter_chapters(self):
+        """Yield every chapter in source/discovery order, independent of nesting."""
+        chapters = [*self.chapters]
         for volume in self.volumes:
-            yield from volume.chapters
-        yield from self.chapters
+            chapters.extend(volume.chapters)
+        yield from sorted(chapters, key=lambda chapter: chapter.sequence)
 
     @property
     def chapter_count(self) -> int:
