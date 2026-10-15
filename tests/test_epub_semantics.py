@@ -327,3 +327,54 @@ def test_pandoc_markdown_follows_canonical_chapter_sequence():
     markdown = _markdown(book)
     assert markdown.index("第一章 開始") < markdown.index("第二章 繼續")
     assert markdown.index("第二章 繼續") < markdown.index("第三章 卷外章節")
+
+
+
+def test_interleaved_volume_chapters_keep_spine_nav_and_markdown_order():
+    book = Book(
+        title="交錯章節順序測試",
+        author="測試作者",
+        language="zh-TW",
+        volumes=[
+            Volume(
+                sequence=1,
+                number="1",
+                label="第一卷",
+                title="卷一",
+                chapters=[
+                    Chapter(sequence=2, number=2, label="第二章", title="卷內前段", paragraphs=[]),
+                    Chapter(sequence=4, number=4, label="第四章", title="卷內後段", paragraphs=[]),
+                ],
+            )
+        ],
+        chapters=[
+            Chapter(sequence=3, number=3, label="第三章", title="卷外插入", paragraphs=[]),
+        ],
+    )
+    from novel_epub.renderers.epub import _nav_xhtml
+
+    nav = ET.fromstring(
+        _nav_xhtml(book, {
+            2: "text/ch000001.xhtml",
+            3: "text/ch000002.xhtml",
+            4: "text/ch000003.xhtml",
+        })
+    )
+    nav_links = [
+        element.get("href")
+        for element in nav.iter(f"{{{XHTML_NS}}}a")
+        if element.get("href")
+    ]
+    assert nav_links == [
+        "text/ch000001.xhtml",
+        "text/ch000002.xhtml",
+        "text/ch000003.xhtml",
+    ]
+
+    markdown = _markdown(book)
+    assert markdown.index("第二章 卷內前段") < markdown.index("第三章 卷外插入")
+    assert markdown.index("第三章 卷外插入") < markdown.index("第四章 卷內後段")
+    # The second volume run must start a fresh H1 so its chapter is not nested
+    # under the preceding top-level chapter.
+    assert markdown.count("# 第一卷 卷一") == 2
+    assert markdown.index("# 第一卷 卷一", markdown.index("第三章 卷外插入")) < markdown.index("第四章 卷內後段")
