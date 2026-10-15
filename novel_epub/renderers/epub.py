@@ -28,9 +28,14 @@ class EpubPackagingError(Exception):
 
 
 def _iter_chapters(book: Book):
-    for volume in book.volumes:
-        yield from ((volume, chapter) for chapter in volume.chapters)
-    yield from ((None, chapter) for chapter in book.chapters)
+    """Yield chapters in canonical Book order while retaining their volume."""
+    volumes_by_sequence = {
+        chapter.sequence: volume
+        for volume in book.volumes
+        for chapter in volume.chapters
+    }
+    for chapter in book.iter_chapters():
+        yield volumes_by_sequence.get(chapter.sequence), chapter
 
 
 def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
@@ -41,13 +46,69 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
     groups: list[str] = []
     if book.preamble:
         groups.append('<li><a href="text/preamble.xhtml">前言</a></li>')
-    if book.volumes:
-        for volume in book.volumes:
+
+    # A volume may have chapters on both sides of a top-level chapter in a
+    # manually assembled Book. Split its navigation group into contiguous runs
+    # so chapter links remain in the same order as the EPUB spine.
+    volumes_by_sequence = {
+        chapter.sequence: volume
+        for volume in book.volumes
+        for chapter in volume.chapters
+    }
+    events = [
+        (chapter.sequence, 1, index, "chapter", chapter)
+        for index, chapter in enumerate(book.iter_chapters())
+    ]
+    for index, volume in enumerate(book.volumes):
+        if volume.chapters:
+            continue
+        following = next(
+            (min(ch.sequence for ch in candidate.chapters)
+             for candidate in book.volumes[index + 1:] if candidate.chapters),
+            None,
+        )
+        if following is not None:
+            anchor, priority = following, 0
+        else:
+            previous = next(
+                (max(ch.sequence for ch in candidate.chapters)
+                 for candidate in reversed(book.volumes[:index]) if candidate.chapters),
+                max((ch.sequence for ch in book.chapters), default=0),
+            )
+            anchor, priority = previous, 2
+        events.append((anchor, priority, index, "empty_volume", volume))
+
+    events.sort(key=lambda event: event[:3])
+    # Keep the preamble entry already added above before all chapter events.
+    active_volume = None
+    active_children: list[str] = []
+
+    def flush_volume() -> None:
+        nonlocal active_volume, active_children
+        if active_volume is not None:
+            label = escape(f"{active_volume.label} {active_volume.title}".rstrip())
+            groups.append(f"<li><span>{label}</span><ol>{''.join(active_children)}</ol></li>")
+        active_volume = None
+        active_children = []
+
+    for _anchor, _priority, _index, kind, item in events:
+        if kind == "empty_volume":
+            flush_volume()
+            volume = item
             label = escape(f"{volume.label} {volume.title}".rstrip())
-            children = "".join(chapter_li(ch) for ch in volume.chapters)
-            groups.append(f"<li><span>{label}</span><ol>{children}</ol></li>")
-    if book.chapters:
-        groups.extend(chapter_li(chapter) for chapter in book.chapters)
+            groups.append(f"<li><span>{label}</span></li>")
+            continue
+
+        chapter = item
+        volume = volumes_by_sequence.get(chapter.sequence)
+        if volume is not active_volume:
+            flush_volume()
+            active_volume = volume
+        if volume is None:
+            groups.append(chapter_li(chapter))
+        else:
+            active_children.append(chapter_li(chapter))
+    flush_volume()
 
     title = escape(book.title)
     language = escape(book.language)
