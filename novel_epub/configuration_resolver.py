@@ -130,7 +130,9 @@ def resolve_conversion_request(
 
     destination_value = resolved.get("destination")
     if destination_value is None:
-        destination = source.with_name(f"{title}_{author}.epub")
+        # Automatic names are logical metadata until the output layer sanitizes
+        # them; constructing a Path here fails for titles containing separators.
+        destination = None
         destination_mode = "automatic"
     else:
         destination = Path(destination_value)
