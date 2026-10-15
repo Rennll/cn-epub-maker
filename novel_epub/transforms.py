@@ -260,12 +260,15 @@ class PunctuationTransformer:
             match.span(): match.group(0)
             for match in self._URL_OR_EMAIL.finditer(text)
         }
+        # Index spans by their start offset once. Scanning every protected span
+        # for every character made this loop O(len(text) * number_of_spans).
+        protected_by_start = {start: value for (start, _), value in protected.items()}
         converted: list[str] = []
         chinese_context = False
         i = 0
 
         while i < len(text):
-            protected_text = next((value for (start, _), value in protected.items() if start == i), None)
+            protected_text = protected_by_start.get(i)
             if protected_text is not None:
                 converted.append(protected_text)
                 i += len(protected_text)
