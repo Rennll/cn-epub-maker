@@ -229,3 +229,41 @@ def test_epub_heading_text_is_literal(tmp_path):
         nav_text = " ".join(element for element in nav.itertext())
         assert "卷*一 卷_[二] $三$ ^四^ =五= <六> & 七" in nav_text
 
+
+
+
+def test_epub_spine_and_nav_keep_top_level_chapters_before_later_volumes(tmp_path):
+    _require_pandoc()
+    output = tmp_path / "book.epub"
+    book = Book(
+        title="順序測試書",
+        author="測試作者",
+        language="zh-TW",
+        chapters=[
+            Chapter(sequence=1, number=1, label="第一章", title="卷前", paragraphs=[Paragraph(text="卷前內容")]),
+        ],
+        volumes=[
+            Volume(
+                sequence=1,
+                number="1",
+                label="第一卷",
+                title="卷一",
+                chapters=[
+                    Chapter(sequence=2, number=2, label="第二章", title="卷內", paragraphs=[Paragraph(text="卷內內容")]),
+                ],
+            )
+        ],
+    )
+    render(book, output)
+    with _read_epub(output) as (_zf, opf, nav):
+        spine = opf.find(f"{{{OPF_NS}}}spine")
+        spine_ids = [item.get("idref") for item in spine.findall(f"{{{OPF_NS}}}itemref")]
+        assert spine_ids == ["ch000001", "ch000002"]
+        nav_links = [
+            element.get("href")
+            for element in nav.iter(f"{{{XHTML_NS}}}a")
+            if element.get("href")
+        ]
+        assert nav_links == ["text/ch000001.xhtml", "text/ch000002.xhtml"]
+        nav_text = " ".join(nav.itertext())
+        assert nav_text.index("第一章 卷前") < nav_text.index("第一卷 卷一")
