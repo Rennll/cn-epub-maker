@@ -353,3 +353,17 @@ def test_punctuation_is_idempotent():
     twice = transformer.transform(once).text
 
     assert twice == once
+
+
+
+def test_punctuation_protects_many_urls_without_changing_surrounding_text():
+    urls = [f"https://example.com/path/{index}?q=a,b" for index in range(500)]
+    source = "中文, " + "；中文, ".join(urls) + "；中文, 結尾"
+
+    result = PunctuationTransformer().transform(source)
+
+    for url in urls:
+        assert url in result.text
+    assert result.text.startswith("中文， ")
+    assert result.text.endswith("；中文， 結尾")
+    assert result.text.count("https://") == len(urls)
