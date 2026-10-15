@@ -103,6 +103,7 @@ def test_cli_inspect_config_feeds_normal_build_and_junk_cleaner(tmp_path, monkey
     assert "其他正文" in rendered_text
     assert source.read_text(encoding="utf-8") == original
 
+
 def test_cli_build_sanitizes_automatic_filename_for_path_separator_title(
     tmp_path, monkeypatch, capsys
 ):
