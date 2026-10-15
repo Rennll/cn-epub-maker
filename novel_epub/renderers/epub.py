@@ -47,39 +47,88 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
     if book.preamble:
         groups.append('<li><a href="text/preamble.xhtml">前言</a></li>')
 
-    # Parser-produced books put top-level chapters before volumes, but Book also
-    # supports manually assembled structures. Keep navigation aligned with spine
-    # chapter sequence for those books too. Empty volumes have no sequence of their
-    # own, so anchor them before the next non-empty volume or after the previous one.
-    structural_groups: list[tuple[int, int, int, str]] = []
+    # A volume may have chapters on both sides of a top-level chapter in a
+    # manually assembled Book. Split its navigation group into contiguous runs
+    # so the chapter links remain in the same order as the EPUB spine.
+    volumes_by_sequence = {
+        chapter.sequence: volume
+        for volume in book.volumes
+        for chapter in volume.chapters
+    }
+    chapter_events = [
+        (chapter.sequence, 1, index, "chapter", chapter)
+        for index, chapter in enumerate(book.iter_chapters())
+    ]
+    empty_volume_events: list[tuple[int, int, int, str, object]] = []
     for index, volume in enumerate(book.volumes):
-        label = escape(f"{volume.label} {volume.title}".rstrip())
-        children = "".join(chapter_li(ch) for ch in sorted(volume.chapters, key=lambda c: c.sequence))
-        markup = f"<li><span>{label}</span><ol>{children}</ol></li>"
         if volume.chapters:
-            anchor = min(ch.sequence for ch in volume.chapters)
-            priority = 1
+            continue
+        following = next(
+            (min(ch.sequence for ch in candidate.chapters)
+             for candidate in book.volumes[index + 1:] if candidate.chapters),
+            None,
+        )
+        if following is not None:
+            anchor, priority = following, 0
         else:
-            following = next(
-                (min(ch.sequence for ch in candidate.chapters)
-                 for candidate in book.volumes[index + 1:] if candidate.chapters),
-                None,
+            previous = next(
+                (max(ch.sequence for ch in candidate.chapters)
+                 for candidate in reversed(book.volumes[:index]) if candidate.chapters),
+                max((ch.sequence for ch in book.chapters), default=0),
             )
-            if following is not None:
-                anchor = following
-                priority = 0
-            else:
-                previous = next(
-                    (max(ch.sequence for ch in candidate.chapters)
-                     for candidate in reversed(book.volumes[:index]) if candidate.chapters),
-                    max((ch.sequence for ch in book.chapters), default=0),
-                )
-                anchor = previous
-                priority = 2
-        structural_groups.append((anchor, priority, index, markup))
-    for chapter in book.chapters:
-        structural_groups.append((chapter.sequence, 1, len(book.volumes), chapter_li(chapter)))
-    groups.extend(markup for _anchor, _priority, _index, markup in sorted(structural_groups))
+            anchor, priority = previous, 2
+        empty_volume_events.append((anchor, priority, index, "empty_volume", volume))
+
+    events = sorted(chapter_events + empty_volume_events, key=lambda event: event[:3])
+    groups: list[str] = []
+    active_volume = None
+    for _anchor, _priority, _index, kind, item in events:
+        if kind == "empty_volume":
+            volume = item
+            label = escape(f"{volume.label} {volume.title}".rstrip())
+            groups.append(f"<li><span>{label}</span></li>")
+            continue
+
+        chapter = item
+        volume = volumes_by_sequence.get(chapter.sequence)
+        if volume is not active_volume:
+            active_volume = volume
+            if volume is not None:
+                label = escape(f"{volume.label} {volume.title}".rstrip())
+                groups.append(f"<li><span>{label}</span><ol>{chapter_li(chapter)}")
+                continue
+        if volume is not None:
+            # Continue the current volume run; close/reopen when another
+            # structure interrupts it in sequence order.
+            groups.append(chapter_li(chapter))
+        else:
+            groups.append(chapter_li(chapter))
+
+    # Wrap each contiguous volume run in a list item, without changing the
+    # order of chapter links. The stream above marks run starts with a label.
+    normalized_groups: list[str] = []
+    in_volume = False
+    for markup in groups:
+        if markup.startswith("<li><span>") and "<ol>" in markup:
+            if in_volume:
+                normalized_groups.append("</ol></li>")
+            normalized_groups.append(markup)
+            in_volume = True
+        elif markup.startswith("<li><span>") and "</span></li>" in markup:
+            if in_volume:
+                normalized_groups.append("</ol></li>")
+                in_volume = False
+            normalized_groups.append(markup)
+        elif in_volume and markup.startswith("<li><a "):
+            normalized_groups.append(markup)
+        else:
+            if in_volume:
+                normalized_groups.append("</ol></li>")
+                in_volume = False
+            normalized_groups.append(markup)
+    if in_volume:
+        normalized_groups.append("</ol></li>")
+    groups = normalized_groups
 
     title = escape(book.title)
     language = escape(book.language)
