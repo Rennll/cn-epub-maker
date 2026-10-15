@@ -132,4 +132,4 @@ def test_cli_build_sanitizes_automatic_filename_for_path_separator_title(
     assert cli.main() == 0
     output = tmp_path / "Fate／Zero_作者.epub"
     assert output.read_bytes() == b"fake epub"
-    assert "automatic output filename sanitized: Fate／Zero_作者.epub" in capsys.readouterr().err
+    assert (\n        "automatic output filename sanitized: Fate／Zero_作者.epub"\n        in capsys.readouterr().err\n    )
