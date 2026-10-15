@@ -47,9 +47,10 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
     if book.preamble:
         groups.append('<li><a href="text/preamble.xhtml">前言</a></li>')
 
-    # Order non-empty volumes and top-level chapters by their chapter sequence.
-    # Empty volumes have no chapter sequence of their own, so anchor them just
-    # before the next non-empty volume (or after the previous volume if none follows).
+    # Parser-produced books put top-level chapters before volumes, but Book also
+    # supports manually assembled structures. Keep navigation aligned with spine
+    # chapter sequence for those books too. Empty volumes have no sequence of their
+    # own, so anchor them before the next non-empty volume or after the previous one.
     structural_groups: list[tuple[int, int, int, str]] = []
     for index, volume in enumerate(book.volumes):
         label = escape(f"{volume.label} {volume.title}".rstrip())
@@ -79,7 +80,6 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
     for chapter in book.chapters:
         structural_groups.append((chapter.sequence, 1, len(book.volumes), chapter_li(chapter)))
     groups.extend(markup for _anchor, _priority, _index, markup in sorted(structural_groups))
-
 
     title = escape(book.title)
     language = escape(book.language)
