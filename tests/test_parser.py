@@ -250,3 +250,26 @@ def test_parse_document_uses_explicit_stages_without_changing_boundary_objects()
     assert result.formatting_model is formatting_model
     assert result.book.preamble[0].text == "簡介"
     assert result.book.chapters[0].number == 1
+
+
+
+def test_chapters_before_first_volume_keep_source_order_including_extra_chapters():
+    result = parse_lines([
+        "第1章 A",
+        "正文A",
+        "番外1",
+        "番外正文",
+        "第一卷 X",
+        "第2章 B",
+        "正文B",
+    ], title="書", author="作者")
+
+    chapters = list(result.book.iter_chapters())
+    assert [(chapter.sequence, chapter.label) for chapter in chapters] == [
+        (1, "第1章"),
+        (2, "番外1"),
+        (3, "第2章"),
+    ]
+    assert [chapter.paragraphs[0].text for chapter in chapters] == [
+        "正文A", "番外正文", "正文B"
+    ]
