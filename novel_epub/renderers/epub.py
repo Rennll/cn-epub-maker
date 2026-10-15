@@ -46,14 +46,40 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
     groups: list[str] = []
     if book.preamble:
         groups.append('<li><a href="text/preamble.xhtml">前言</a></li>')
-    # The parser assigns all top-level chapters before the first volume.
-    # Preserve that structure directly instead of sorting groups by chapter
-    # sequence, which cannot place empty volumes correctly.
-    groups.extend(chapter_li(chapter) for chapter in sorted(book.chapters, key=lambda c: c.sequence))
-    for volume in book.volumes:
+
+    # Order non-empty volumes and top-level chapters by their chapter sequence.
+    # Empty volumes have no chapter sequence of their own, so anchor them just
+    # before the next non-empty volume (or after the previous volume if none follows).
+    structural_groups: list[tuple[int, int, int, str]] = []
+    for index, volume in enumerate(book.volumes):
         label = escape(f"{volume.label} {volume.title}".rstrip())
         children = "".join(chapter_li(ch) for ch in sorted(volume.chapters, key=lambda c: c.sequence))
-        groups.append(f"<li><span>{label}</span><ol>{children}</ol></li>")
+        markup = f"<li><span>{label}</span><ol>{children}</ol></li>"
+        if volume.chapters:
+            anchor = min(ch.sequence for ch in volume.chapters)
+            priority = 1
+        else:
+            following = next(
+                (min(ch.sequence for ch in candidate.chapters)
+                 for candidate in book.volumes[index + 1:] if candidate.chapters),
+                None,
+            )
+            if following is not None:
+                anchor = following
+                priority = 0
+            else:
+                previous = next(
+                    (max(ch.sequence for ch in candidate.chapters)
+                     for candidate in reversed(book.volumes[:index]) if candidate.chapters),
+                    max((ch.sequence for ch in book.chapters), default=0),
+                )
+                anchor = previous
+                priority = 2
+        structural_groups.append((anchor, priority, index, markup))
+    for chapter in book.chapters:
+        structural_groups.append((chapter.sequence, 1, len(book.volumes), chapter_li(chapter)))
+    groups.extend(markup for _anchor, _priority, _index, markup in sorted(structural_groups))
+
 
     title = escape(book.title)
     language = escape(book.language)
