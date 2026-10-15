@@ -63,20 +63,23 @@ def _markdown(book: Book) -> str:
     for paragraph in book.preamble:
         lines.extend([_escape_markdown(paragraph.text), ""])
 
-    # Match canonical chapter order even for manually assembled Books where
-    # top-level chapters and volume chapters are interleaved by sequence.
+    # Preserve hierarchy when chapter sequences from top-level chapters and
+    # volumes interleave: start a new volume heading for each contiguous run.
     volumes_by_sequence = {
         chapter.sequence: volume
         for volume in book.volumes
         for chapter in volume.chapters
     }
+    active_volume = None
     emitted_volumes: set[int] = set()
     for chapter in book.iter_chapters():
         volume = volumes_by_sequence.get(chapter.sequence)
-        if volume is not None and id(volume) not in emitted_volumes:
-            volume_text = f"{volume.label} {volume.title}".rstrip()
-            lines.extend([f"# {_escape_markdown(volume_text)}", ""])
-            emitted_volumes.add(id(volume))
+        if volume is not active_volume:
+            active_volume = volume
+            if volume is not None:
+                volume_text = f"{volume.label} {volume.title}".rstrip()
+                lines.extend([f"# {_escape_markdown(volume_text)}", ""])
+                emitted_volumes.add(id(volume))
         level = 2 if volume is not None else 1
         lines.extend([_chapter_heading(chapter, level), ""])
         for paragraph in chapter.paragraphs:
