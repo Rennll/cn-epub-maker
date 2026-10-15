@@ -49,17 +49,16 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
 
     # A volume may have chapters on both sides of a top-level chapter in a
     # manually assembled Book. Split its navigation group into contiguous runs
-    # so the chapter links remain in the same order as the EPUB spine.
+    # so chapter links remain in the same order as the EPUB spine.
     volumes_by_sequence = {
         chapter.sequence: volume
         for volume in book.volumes
         for chapter in volume.chapters
     }
-    chapter_events = [
+    events = [
         (chapter.sequence, 1, index, "chapter", chapter)
         for index, chapter in enumerate(book.iter_chapters())
     ]
-    empty_volume_events: list[tuple[int, int, int, str, object]] = []
     for index, volume in enumerate(book.volumes):
         if volume.chapters:
             continue
@@ -77,13 +76,24 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
                 max((ch.sequence for ch in book.chapters), default=0),
             )
             anchor, priority = previous, 2
-        empty_volume_events.append((anchor, priority, index, "empty_volume", volume))
+        events.append((anchor, priority, index, "empty_volume", volume))
 
-    events = sorted(chapter_events + empty_volume_events, key=lambda event: event[:3])
+    events.sort(key=lambda event: event[:3])
     groups: list[str] = []
     active_volume = None
+    active_children: list[str] = []
+
+    def flush_volume() -> None:
+        nonlocal active_volume, active_children
+        if active_volume is not None:
+            label = escape(f"{active_volume.label} {active_volume.title}".rstrip())
+            groups.append(f"<li><span>{label}</span><ol>{''.join(active_children)}</ol></li>")
+        active_volume = None
+        active_children = []
+
     for _anchor, _priority, _index, kind, item in events:
         if kind == "empty_volume":
+            flush_volume()
             volume = item
             label = escape(f"{volume.label} {volume.title}".rstrip())
             groups.append(f"<li><span>{label}</span></li>")
@@ -92,43 +102,13 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
         chapter = item
         volume = volumes_by_sequence.get(chapter.sequence)
         if volume is not active_volume:
+            flush_volume()
             active_volume = volume
-            if volume is not None:
-                label = escape(f"{volume.label} {volume.title}".rstrip())
-                groups.append(f"<li><span>{label}</span><ol>{chapter_li(chapter)}")
-                continue
-        if volume is not None:
-            # Continue the current volume run; close/reopen when another
-            # structure interrupts it in sequence order.
+        if volume is None:
             groups.append(chapter_li(chapter))
         else:
-            groups.append(chapter_li(chapter))
-
-    # Wrap each contiguous volume run in a list item, without changing the
-    # order of chapter links. The stream above marks run starts with a label.
-    normalized_groups: list[str] = []
-    in_volume = False
-    for markup in groups:
-        if markup.startswith("<li><span>") and "<ol>" in markup:
-            if in_volume:
-                normalized_groups.append("</ol></li>")
-            normalized_groups.append(markup)
-            in_volume = True
-        elif markup.startswith("<li><span>") and "</span></li>" in markup:
-            if in_volume:
-                normalized_groups.append("</ol></li>")
-                in_volume = False
-            normalized_groups.append(markup)
-        elif in_volume and markup.startswith("<li><a "):
-            normalized_groups.append(markup)
-        else:
-            if in_volume:
-                normalized_groups.append("</ol></li>")
-                in_volume = False
-            normalized_groups.append(markup)
-    if in_volume:
-        normalized_groups.append("</ol></li>")
-    groups = normalized_groups
+            active_children.append(chapter_li(chapter))
+    flush_volume()
 
     title = escape(book.title)
     language = escape(book.language)
