@@ -44,6 +44,19 @@ def _report_execution(result: ExecutionResult) -> None:
         for warning in stage.warnings:
             print(f"WARNING: {stage.name}: {warning}", file=sys.stderr)
 
+    reported_warnings = {
+        f"{stage.name}: {warning}"
+        for stage in audit
+        for warning in stage.warnings
+    }
+    reported_warnings.update(
+        f"{warning.message}{f' at line {warning.line}' if warning.line else ''}"
+        for warning in validation_warnings
+    )
+    for warning in warnings:
+        if warning not in reported_warnings:
+            print(f"WARNING: {warning}", file=sys.stderr)
+
     for warning in validation_warnings:
         where = f" at line {warning.line}" if warning.line else ""
         print(f"WARNING: {warning.message}{where}", file=sys.stderr)
