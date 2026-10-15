@@ -79,7 +79,7 @@ def _nav_xhtml(book: Book, chapter_paths: dict[int, str]) -> str:
         events.append((anchor, priority, index, "empty_volume", volume))
 
     events.sort(key=lambda event: event[:3])
-    groups: list[str] = []
+    # Keep the preamble entry already added above before all chapter events.
     active_volume = None
     active_children: list[str] = []
 
